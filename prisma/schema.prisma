@@ -1,0 +1,233 @@
+// Prisma schema for MySQL
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "mysql"
+    url      = env("DATABASE_URL")
+}
+
+// =========================
+// Enums
+// =========================
+enum UserStatus {
+    ACTIVE
+    DISABLED
+}
+
+enum RoleName {
+    ADMINISTRATOR
+    DEV
+    TESTER
+}
+
+enum PermissionName {
+    // Content Management
+    VIEW_CONTENT
+    EDIT_CONTENT
+    DELETE_CONTENT
+    MANAGE_ALL_CONTENT
+    VIEW_SHARED_CONTENT
+    
+    // Project/Module Management
+    VIEW_PROJECTS
+    EDIT_PROJECTS
+    DELETE_PROJECTS
+    VIEW_MODULES
+    EDIT_MODULES
+    DELETE_MODULES
+    
+    // User Management
+    VIEW_USERS
+    CREATE_USERS
+    EDIT_USERS
+    DELETE_USERS
+    MANAGE_USER_PERMISSIONS
+    SHARE_CONTENT_ACCESS
+    
+    // Audit & Dashboard
+    VIEW_AUDIT_LOGS
+    VIEW_DASHBOARD_STATS
+}
+
+enum ContentType {
+    FILE_ZIP_HTML
+    FILE_ZIP_SCORM
+}
+
+enum ContentStatus {
+    PROCESSING
+    COMPLETED
+    FAILED
+}
+
+model User {
+    id        String   @id @default(uuid())
+    email     String   @unique
+    name      String?
+    passwordHash String?
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // account state
+    status    UserStatus @default(ACTIVE)
+
+    // relations
+    roles           UserRole[]
+    permissions     UserPermission[]
+    ownedContents   ContentData[]   @relation("UserOwnedContent")
+    auditLogs       AuditLog[]      @relation("UserAuditLogs")
+    sharedContent   ContentShare[]  @relation("ContentSharedBy")
+    receivedContent ContentShare[]  @relation("ContentSharedWith")
+}
+
+model ContentData {
+    id          String     @id @default(uuid())
+    title       String
+    description Json?
+    contentUrl  String
+    contentType ContentType
+    status      ContentStatus @default(PROCESSING)
+    progress    Int        @default(0) // 0-100
+    fileSize    Int?       // in bytes
+    isDeleted   Boolean    @default(false)
+
+    // relations
+    projectId   String
+    project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+    moduleId    String
+    module      Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+    // ownership
+    ownerId     String?
+    owner       User?      @relation("UserOwnedContent", fields: [ownerId], references: [id])
+
+    // sharing
+    shares      ContentShare[]
+
+    createdAt   DateTime   @default(now())
+    updatedAt   DateTime   @updatedAt
+}
+
+model Project {
+    id           String        @id @default(uuid())
+    name         String        @unique
+    createdAt    DateTime      @default(now())
+    updatedAt    DateTime      @updatedAt
+
+    // back-relations
+    modules      Module[]
+    contentData  ContentData[]
+}
+
+model Module {
+    id           String        @id @default(uuid())
+    name         String
+    createdAt    DateTime      @default(now())
+    updatedAt    DateTime      @updatedAt
+
+    // relations
+    projectId    String
+    project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+    // back-relations
+    contentData  ContentData[]
+
+    @@unique([projectId, name])
+}
+
+// =========================
+// RBAC Models
+// =========================
+model Role {
+    id          String       @id @default(uuid())
+    name        RoleName     @unique
+    description String?
+    createdAt   DateTime     @default(now())
+    updatedAt   DateTime     @updatedAt
+
+    users       UserRole[]
+    permissions RolePermission[]
+}
+
+model Permission {
+    id          String          @id @default(uuid())
+    name        PermissionName  @unique
+    description String?
+    createdAt   DateTime        @default(now())
+    updatedAt   DateTime        @updatedAt
+
+    roles       RolePermission[]
+    users       UserPermission[]
+}
+
+model RolePermission {
+    roleId       String
+    permissionId String
+
+    role        Role        @relation(fields: [roleId], references: [id])
+    permission  Permission  @relation(fields: [permissionId], references: [id])
+
+    @@id([roleId, permissionId])
+}
+
+model UserRole {
+    userId String
+    roleId String
+
+    user   User @relation(fields: [userId], references: [id])
+    role   Role @relation(fields: [roleId], references: [id])
+
+    @@id([userId, roleId])
+}
+
+model UserPermission {
+    userId       String
+    permissionId String
+    allow        Boolean @default(true)
+
+    user       User       @relation(fields: [userId], references: [id])
+    permission Permission @relation(fields: [permissionId], references: [id])
+
+    @@id([userId, permissionId])
+}
+
+// =========================
+// Content Sharing
+// =========================
+model ContentShare {
+    id          String   @id @default(uuid())
+    contentId   String
+    content     ContentData @relation(fields: [contentId], references: [id], onDelete: Cascade)
+    sharedById  String
+    sharedBy    User     @relation("ContentSharedBy", fields: [sharedById], references: [id])
+    sharedWithId String
+    sharedWith  User     @relation("ContentSharedWith", fields: [sharedWithId], references: [id])
+    canView     Boolean  @default(true)
+    canEdit     Boolean  @default(false)
+    canDelete   Boolean  @default(false)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    @@unique([contentId, sharedWithId])
+    @@index([sharedById])
+    @@index([sharedWithId])
+}
+
+// =========================
+// Audit Log
+// =========================
+model AuditLog {
+    id         String   @id @default(uuid())
+    actorId    String?
+    actor      User?    @relation("UserAuditLogs", fields: [actorId], references: [id])
+    action     String
+    entityType String
+    entityId   String
+    metadata   Json?
+    createdAt  DateTime @default(now())
+}
+
+

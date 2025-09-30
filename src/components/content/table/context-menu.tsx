@@ -1,0 +1,88 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "../../ui/context-menu"
+import { Eye, Copy, Check, BookOpen, Edit, Download, Trash2 } from "lucide-react"
+import { ContentItem } from "./columns"
+
+interface ContentContextMenuProps {
+  children: React.ReactNode
+  content: ContentItem
+  onView: (content: ContentItem) => void
+  onCopyUrl: (content: ContentItem) => void
+  onShowSCORMInfo: (content: ContentItem) => void
+  onEdit: (content: ContentItem) => void
+  onDownload: (content: ContentItem) => void
+  onDelete: (content: ContentItem) => void
+  copiedUrl: string | null
+  isDownloading: boolean
+  isDeleting: boolean
+  hasSCORMInfo: boolean
+}
+
+export function ContentContextMenu({
+  children,
+  content,
+  onView,
+  onCopyUrl,
+  onShowSCORMInfo,
+  onEdit,
+  onDownload,
+  onDelete,
+  copiedUrl,
+  isDownloading,
+  isDeleting,
+  hasSCORMInfo
+}: ContentContextMenuProps) {
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        {children}
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-48">
+        <ContextMenuItem onClick={() => onView(content)}>
+          <Eye className="mr-2 h-4 w-4" />
+          Xem
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => onCopyUrl(content)}>
+          {copiedUrl === content.id ? (
+            <>
+              <Check className="mr-2 h-4 w-4 text-green-400" />
+              <span className="text-green-400">Đã copy!</span>
+            </>
+          ) : (
+            <>
+              <Copy className="mr-2 h-4 w-4" />
+              Copy URL
+            </>
+          )}
+        </ContextMenuItem>
+        {hasSCORMInfo && (
+          <ContextMenuItem onClick={() => onShowSCORMInfo(content)}>
+            <BookOpen className="mr-2 h-4 w-4" />
+            Thông tin SCORM
+          </ContextMenuItem>
+        )}
+        <ContextMenuItem onClick={() => onEdit(content)}>
+          <Edit className="mr-2 h-4 w-4" />
+          Chỉnh sửa
+        </ContextMenuItem>
+        <ContextMenuItem 
+          onClick={() => onDownload(content)}
+          disabled={isDownloading}
+        >
+          <Download className="mr-2 h-4 w-4" />
+          {isDownloading ? "Đang tải..." : "Tải xuống"}
+        </ContextMenuItem>
+        <ContextMenuItem 
+          className="text-red-400 focus:text-red-400"
+          onClick={() => onDelete(content)}
+          disabled={isDeleting}
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          {isDeleting ? "Đang xóa..." : "Xóa"}
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  )
+}
