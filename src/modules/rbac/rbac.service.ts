@@ -10,6 +10,8 @@ import {
   ShareContentPayload,
   BulkSharePayload,
   UserWithRoles,
+  CreateUserPayload,
+  UpdateUserPayload,
   RoleWithPermissions
 } from "./rbac.interface"
 
@@ -47,6 +49,20 @@ export async function deleteRole(roleId: string): Promise<void> {
   return httpService.delete({ 
     url: `${RBAC_API_URL.ROLES}/${roleId}`
   })
+}
+
+export async function cloneRole(roleId: string): Promise<Role> {
+  const res = await httpService.post<{ data: Role }>({ 
+    url: `${RBAC_API_URL.ROLES}/${roleId}/clone`
+  })
+  return res.data
+}
+
+export async function toggleRoleStatus(roleId: string): Promise<Role> {
+  const res = await httpService.post<{ data: Role }>({ 
+    url: `${RBAC_API_URL.ROLES}/${roleId}/toggle`
+  })
+  return res.data
 }
 
 export async function getPermissions(): Promise<Permission[]> {
@@ -110,9 +126,45 @@ export async function bulkShareContent(payload: BulkSharePayload): Promise<{ cou
   return res.data
 }
 
+export async function revokeContentShare(shareId?: string, batchId?: string): Promise<void> {
+  return httpService.patch({ 
+    url: `${RBAC_API_URL.CONTENT_SHARING}/revoke`,
+    data: { shareId, batchId }
+  })
+}
+
+export async function updateContentShare(shareId: string, canView: boolean, canEdit: boolean, canDelete: boolean): Promise<ContentShare> {
+  const res = await httpService.patch<{ data: ContentShare }>({ 
+    url: `${RBAC_API_URL.CONTENT_SHARING}/${shareId}`,
+    data: { canView, canEdit, canDelete }
+  })
+  return res.data
+}
+
 export async function getUsers(): Promise<UserWithRoles[]> {
   const res = await httpService.get<{ data: UserWithRoles[] }>({ 
     url: "users"
   })
   return res.data
+}
+
+export async function createUser(payload: CreateUserPayload): Promise<{ data: UserWithRoles; tempPassword?: string }> {
+  const res = await httpService.post<{ data: UserWithRoles; tempPassword?: string }>({
+    url: "users",
+    data: payload,
+  })
+  // Return entire response to allow tempPassword access
+  return res
+}
+
+export async function updateUser(userId: string, payload: UpdateUserPayload): Promise<UserWithRoles> {
+  const res = await httpService.patch<{ data: UserWithRoles }>({
+    url: `users/${userId}`,
+    data: payload,
+  })
+  return res.data
+}
+
+export async function deleteUser(userId: string): Promise<void> {
+  await httpService.delete({ url: `users/${userId}` })
 }

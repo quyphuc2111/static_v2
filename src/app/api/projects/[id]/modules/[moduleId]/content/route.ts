@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
-import { RoleName } from "@prisma/client"
+import { PermissionName, ShareStatus } from "@prisma/client"
+import { hasPermission, hasAnyPermission } from "@/lib/permissions"
 import { Prisma } from "@prisma/client"
 import { writeFile, mkdir } from "fs/promises"
 import { join, dirname } from "path"
 import { existsSync, createWriteStream } from "fs"
 import yauzl from "yauzl"
 import { SCORMService } from "@/services/scormService"
+import { verifyCsrfAndOrigin } from "@/lib/csrf"
 
 // Helper function to remove Vietnamese diacritics and sanitize for file paths
 function sanitizeVietnameseString(str: string): string {
@@ -127,8 +129,9 @@ export async function GET(
       return NextResponse.json({ error: "Module not found" }, { status: 404 })
     }
 
-    // Role-based visibility
-    const isAdmin = (session.user.roles || []).includes(RoleName.ADMINISTRATOR)
+    // Permission/Role-based visibility
+    const isAdmin = (session.user.roles || []).includes("ADMINISTRATOR")
+    const canViewAll = isAdmin || await hasPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id)
 
     const whereClause: any = {
       projectId,
@@ -137,11 +140,11 @@ export async function GET(
 
     // Admin sees all, including soft-deleted of other users
     // Non-admin (e.g., DEV) sees only their own created content
-    if (!isAdmin) {
+    if (!canViewAll) {
       whereClause.isDeleted = false
       whereClause.OR = [
         { ownerId: session.user.id },
-        { shares: { some: { sharedWithId: session.user.id, canView: true } } }
+        { shares: { some: { sharedWithId: session.user.id, canView: true, status: ShareStatus.ACTIVE } } }
       ]
     }
 
@@ -150,6 +153,10 @@ export async function GET(
       include: {
         owner: {
           select: { id: true, name: true, email: true }
+        },
+        shares: {
+          where: { sharedWithId: session.user.id, status: ShareStatus.ACTIVE },
+          select: { canView: true, canEdit: true, canDelete: true, sharedById: true }
         }
       },
       orderBy: {
@@ -157,7 +164,21 @@ export async function GET(
       }
     })
 
-    return NextResponse.json({ data: content })
+    // Transform to include share permissions for current user
+    const transformedContent = content.map(item => {
+      const share = item.shares?.[0] // Get user's share if exists
+      return {
+        ...item,
+        isShared: !!share,
+        sharePermissions: share ? {
+          canView: share.canView,
+          canEdit: share.canEdit,
+          canDelete: share.canDelete
+        } : null
+      }
+    })
+
+    return NextResponse.json({ data: transformedContent })
   } catch (error) {
     console.error("Error fetching content:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -169,6 +190,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string; moduleId: string }> }
 ) {
   try {
+    const guard = await verifyCsrfAndOrigin(request)
+    if (guard) return NextResponse.json({ error: guard.error }, { status: guard.status })
+
     const session = await getSession()
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -190,6 +214,15 @@ export async function POST(
 
     if (!module) {
       return NextResponse.json({ error: "Module not found" }, { status: 404 })
+    }
+
+    // Permission check for creating content
+    const canCreate = await hasAnyPermission([
+      PermissionName.EDIT_CONTENT,
+      PermissionName.MANAGE_OWN_CONTENT
+    ], session.user.id)
+    if (!canCreate) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
     // Parse form data

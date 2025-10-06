@@ -4,7 +4,8 @@ import { getSession } from "@/lib/session"
 import { existsSync } from "fs"
 import { join } from "path"
 import archiver from "archiver"
-import { RoleName } from "@prisma/client"
+import { PermissionName, ShareStatus } from "@prisma/client"
+import { hasAnyPermission } from "@/lib/permissions"
 
 type Params = { params: Promise<{ id: string; moduleId: string; contentId: string }> }
 
@@ -40,13 +41,14 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Content not found" }, { status: 404 })
     }
 
-    // Permission: owner, admin, or shared canView
-    const isAdmin = (session.user.roles || []).includes(RoleName.ADMINISTRATOR)
-    if (!isAdmin) {
+    // Permission: owner, admin, manage_all, or shared canView
+    const isAdmin = (session.user.roles || []).includes("ADMINISTRATOR")
+    const canManageAll = await hasAnyPermission([PermissionName.MANAGE_ALL_CONTENT], session.user.id)
+    if (!isAdmin && !canManageAll) {
       const isOwner = content.ownerId === session.user.id
       if (!isOwner) {
         const share = await prisma.contentShare.findFirst({
-          where: { contentId: content.id, sharedWithId: session.user.id, canView: true }
+          where: { contentId: content.id, sharedWithId: session.user.id, canView: true, status: ShareStatus.ACTIVE }
         })
         if (!share) {
           return NextResponse.json({ error: "Forbidden" }, { status: 403 })

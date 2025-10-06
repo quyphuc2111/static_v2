@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { getContentShares, shareContent, removeContentShare, bulkShareContent } from "../rbac.service"
+import { getContentShares, shareContent, removeContentShare, bulkShareContent, revokeContentShare, updateContentShare } from "../rbac.service"
 import { ShareContentPayload, BulkSharePayload } from "../rbac.interface"
 
 export function useContentShares(userId?: string, contentId?: string) {
@@ -37,6 +37,35 @@ export function useBulkShareContent() {
 
   return useMutation({
     mutationFn: (payload: BulkSharePayload) => bulkShareContent(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["rbac", "content-shares"] })
+    },
+  })
+}
+
+export function useRevokeContentShare() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ shareId, batchId }: { shareId?: string; batchId?: string }) => 
+      revokeContentShare(shareId, batchId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["rbac", "content-shares"] })
+    },
+  })
+}
+
+export function useUpdateContentShare() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ shareId, canView, canEdit, canDelete }: { 
+      shareId: string; 
+      canView: boolean; 
+      canEdit: boolean; 
+      canDelete: boolean; 
+    }) => 
+      updateContentShare(shareId, canView, canEdit, canDelete),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rbac", "content-shares"] })
     },

@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
+import { hasPermission } from "@/lib/permissions"
+import { PermissionName, UserStatus } from "@prisma/client"
+import { verifyCsrfAndOrigin } from "@/lib/csrf"
+import bcrypt from "bcryptjs"
 
 export async function GET(req: NextRequest) {
   try {
     const session = await getSession()
     if (!session?.user?.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    }
+
+    // Check if user has permission to view users
+    if (!(await hasPermission(PermissionName.VIEW_USERS, session.user.id))) {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403 })
     }
 
     const users = await prisma.user.findMany({
@@ -43,5 +52,84 @@ export async function GET(req: NextRequest) {
       { message: "Internal server error" },
       { status: 500 }
     )
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const guard = await verifyCsrfAndOrigin(req)
+    if (guard) return NextResponse.json({ message: guard.error }, { status: guard.status })
+
+    const session = await getSession()
+    if (!session?.user?.id) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    }
+
+    if (!(await hasPermission(PermissionName.CREATE_USERS, session.user.id))) {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403 })
+    }
+
+    const body = await req.json().catch(() => ({}))
+    const { name, email, status, roleId, password } = body as { name?: string; email?: string; status?: UserStatus; roleId?: string; password?: string }
+
+    if (!email) {
+      return NextResponse.json({ message: "Email is required" }, { status: 400 })
+    }
+
+    const generateTempPassword = (): string => {
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*" // no ambiguous chars
+      const length = 12
+      let result = ""
+      for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length))
+      }
+      return result
+    }
+
+    const created = await prisma.$transaction(async (tx) => {
+      const plainPassword = (password && String(password).trim().length >= 8) ? String(password).trim() : generateTempPassword()
+      const passwordHash = await bcrypt.hash(plainPassword, 10)
+      const newUser = await tx.user.create({
+        data: {
+          email,
+          name: name ?? null,
+          status: status ?? UserStatus.ACTIVE,
+          passwordHash,
+        },
+      })
+
+      if (roleId) {
+        await tx.userRole.create({ data: { userId: newUser.id, roleId } })
+      }
+
+      const fullUser = await tx.user.findUnique({
+        where: { id: newUser.id },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+          roles: {
+            include: {
+              role: {
+                include: {
+                  permissions: { include: { permission: true } },
+                },
+              },
+            },
+          },
+        },
+      })
+
+      return { user: fullUser!, temporaryPassword: plainPassword }
+    })
+
+    return NextResponse.json({ data: created.user, temporaryPassword: created.temporaryPassword }, { status: 201 })
+  } catch (error: any) {
+    console.error("Error creating user:", error)
+    const message = error?.code === "P2002" ? "Email already exists" : "Internal server error"
+    return NextResponse.json({ message }, { status: 500 })
   }
 }

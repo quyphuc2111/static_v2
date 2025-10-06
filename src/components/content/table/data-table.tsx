@@ -39,9 +39,12 @@ interface DataTableProps<TData, TValue> {
     onEdit?: (content: ContentItem) => void
     onDownload?: (content: ContentItem) => void
     onDelete?: (content: ContentItem) => void
+    onRestore?: (content: ContentItem) => void
     copiedUrl?: string | null
     isDownloading?: boolean
     isDeleting?: boolean
+    isRestoring?: boolean
+    currentUserId?: string
   }
   // Bulk actions (optional)
   bulkActions?: {
@@ -256,10 +259,13 @@ export function DataTable<TData, TValue>({
                       onEdit={contextMenuActions.onEdit!}
                       onDownload={contextMenuActions.onDownload!}
                       onDelete={contextMenuActions.onDelete!}
+                      onRestore={contextMenuActions.onRestore!}
                       copiedUrl={contextMenuActions.copiedUrl || null}
                       isDownloading={contextMenuActions.isDownloading || false}
                       isDeleting={contextMenuActions.isDeleting || false}
+                      isRestoring={contextMenuActions.isRestoring || false}
                       hasSCORMInfo={!!scormInfo}
+                      currentUserId={contextMenuActions.currentUserId}
                     >
                       <TableRow
                         data-state={row.getIsSelected() && "selected"}

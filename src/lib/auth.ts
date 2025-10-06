@@ -1,17 +1,17 @@
-import { PermissionName, RoleName, User, UserStatus } from "@prisma/client"
+import { PermissionName, User, UserStatus } from "@prisma/client"
 
 export type AuthContext = {
   user: Pick<User, "id" | "status">
-  roles: RoleName[]
+  roles: string[]
   permissions: PermissionName[]
 }
 
-export function hasRole(ctx: AuthContext, role: RoleName): boolean {
+export function hasRole(ctx: AuthContext, role: string): boolean {
   return ctx.roles.includes(role)
 }
 
 export function hasPermission(ctx: AuthContext, perm: PermissionName): boolean {
-  return ctx.permissions.includes(perm) || ctx.roles.includes(RoleName.ADMINISTRATOR)
+  return ctx.permissions.includes(perm) || ctx.roles.includes("ADMINISTRATOR")
 }
 
 export function canViewContent(ctx: AuthContext): boolean {
@@ -22,7 +22,7 @@ export function canManageContent(ctx: AuthContext, ownerId?: string): boolean {
   if (ctx.user.status !== UserStatus.ACTIVE) return false
   if (hasPermission(ctx, PermissionName.MANAGE_CONTENT)) return true
   // Dev có thể quản lý content của chính mình (owner)
-  return hasRole(ctx, RoleName.DEV) && ownerId === ctx.user.id
+  return hasRole(ctx, "DEV") && ownerId === ctx.user.id
 }
 
 export function canViewOthersContent(ctx: AuthContext): boolean {

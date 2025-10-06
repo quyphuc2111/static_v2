@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
+import { hasPermission } from "@/lib/permissions"
+import { verifyCsrfAndOrigin } from "@/lib/csrf"
 
 export async function GET(req: NextRequest) {
   try {
     const session = await getSession()
     if (!session?.user?.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    }
+
+    // Check if user has permission to view roles
+    if (!(await hasPermission("VIEW_USERS"))) {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403 })
     }
 
     const roles = await prisma.role.findMany({
@@ -45,9 +52,17 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const guard = await verifyCsrfAndOrigin(req)
+    if (guard) return NextResponse.json({ message: guard.error }, { status: guard.status })
+
     const session = await getSession()
     if (!session?.user?.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    }
+
+    // Check if user has permission to create roles
+    if (!(await hasPermission("MANAGE_USER_PERMISSIONS"))) {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403 })
     }
 
     const { name, description, permissionIds } = await req.json()

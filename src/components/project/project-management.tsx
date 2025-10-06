@@ -8,6 +8,8 @@ import { CreateProjectDialog } from "./create-project-dialog"
 import { ProjectModulesDialog } from "./project-modules-dialog"
 import { Input } from "@/components/ui/input"
 import { EditProjectDialog } from "./edit-project-dialog"
+import { PermissionGuard } from "@/components/rbac/permission-guard"
+import { PermissionName } from "@prisma/client"
 
 export function ProjectManagement() {
   const { projects, isLoading, createProject, deleteProject, updateProject } = useProjects()
@@ -18,7 +20,9 @@ export function ProjectManagement() {
     <div className="p-4 space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-lg font-semibold">Danh sách dự án</h2>
-        <CreateProjectDialog onCreate={async (name, modules) => { await createProject({ name, modules }) }} />
+        <PermissionGuard permission={PermissionName.CREATE_PROJECTS}>
+          <CreateProjectDialog onCreate={async (name, modules) => { await createProject({ name, modules }) }} />
+        </PermissionGuard>
       </div>
 
       {isLoading ? (
@@ -41,8 +45,12 @@ export function ProjectManagement() {
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-2">
-                    <EditProjectDialog projectId={p.id} projectName={p.name} />
-                    <Button size="sm" variant="destructive" onClick={() => deleteProject(p.id)}>Xoá</Button>
+                    <PermissionGuard permission={PermissionName.EDIT_PROJECTS}>
+                      <EditProjectDialog projectId={p.id} projectName={p.name} />
+                    </PermissionGuard>
+                    <PermissionGuard permission={PermissionName.SOFT_DELETE_PROJECTS}>
+                      <Button size="sm" variant="destructive" onClick={() => deleteProject(p.id)}>Xoá</Button>
+                    </PermissionGuard>
                   </div>
                 </TableCell>
               </TableRow>

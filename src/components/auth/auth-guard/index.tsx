@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react"
 import { useAuth } from "@/modules/auth/hooks/useAuth"
-import { RoleName } from "@prisma/client"
 
 type AuthGuardProps = {
   children: ReactNode

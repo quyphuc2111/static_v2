@@ -1,0 +1,74 @@
+import { NextRequest, NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
+import { getSession } from "@/lib/session"
+import { hasPermission } from "@/lib/permissions"
+import { PermissionName } from "@prisma/client"
+import { verifyCsrfAndOrigin } from "@/lib/csrf"
+
+type Params = { params: Promise<{ id: string; moduleId: string; contentId: string }> }
+
+export async function POST(request: NextRequest, { params }: Params) {
+  try {
+    const guard = await verifyCsrfAndOrigin(request)
+    if (guard) return NextResponse.json({ error: guard.error }, { status: guard.status })
+
+    const session = await getSession()
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { id: projectId, moduleId, contentId } = await params
+
+    // Get soft-deleted content
+    const content = await prisma.contentData.findFirst({
+      where: {
+        id: contentId,
+        projectId,
+        moduleId,
+        isDeleted: true  // Only restore soft-deleted content
+      }
+    })
+
+    if (!content) {
+      return NextResponse.json({ 
+        error: "Content not found or not deleted" 
+      }, { status: 404 })
+    }
+
+    const isAdmin = (session.user.roles || []).includes("ADMINISTRATOR")
+    const canManageAll = await hasPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id)
+    
+    // Permission check: owner or admin/manager
+    if (!isAdmin && !canManageAll) {
+      const isOwner = content.ownerId === session.user.id
+      
+      if (!isOwner) {
+        return NextResponse.json({ 
+          error: "Forbidden: Only owner or admin can restore content" 
+        }, { status: 403 })
+      }
+    }
+
+    // Restore content
+    const restoredContent = await prisma.contentData.update({
+      where: { id: contentId },
+      data: { isDeleted: false },
+      include: {
+        owner: {
+          select: { id: true, name: true, email: true }
+        }
+      }
+    })
+
+    return NextResponse.json({ 
+      data: restoredContent,
+      message: "Content restored successfully"
+    })
+  } catch (error) {
+    console.error("Error restoring content:", error)
+    return NextResponse.json({ 
+      error: "Internal server error" 
+    }, { status: 500 })
+  }
+}
+

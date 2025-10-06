@@ -1,8 +1,7 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { useAuth } from "../../modules/auth/auth.hook"
-import { RoleName } from "@prisma/client"
+import { useAuth } from "@/modules/auth/hooks/useAuth"
 
 type AuthGuardProps = {
   children: ReactNode
@@ -18,14 +17,14 @@ export function AuthGuard({ children, fallback = null }: AuthGuardProps) {
 
 type RoleGuardProps = {
   children: ReactNode
-  roles: RoleName[]
+  roles: string[]
   fallback?: ReactNode
 }
 
 export function RoleGuard({ children, roles, fallback = null }: RoleGuardProps) {
   const { user, isLoading } = useAuth()
   if (isLoading) return fallback
-  const has = user?.roles?.some((r) => roles.includes(r))
+  const has = user?.roles?.some((r) => roles.includes(r.name))
   if (!has) return fallback
   return children
 }

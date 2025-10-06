@@ -23,28 +23,43 @@ enum RoleName {
 }
 
 enum PermissionName {
-    // Content Management
+    // Content Management - CRUD
     VIEW_CONTENT
+    CREATE_CONTENT
     EDIT_CONTENT
-    DELETE_CONTENT
-    MANAGE_ALL_CONTENT
+    SOFT_DELETE_CONTENT
+    HARD_DELETE_CONTENT
+    
+    // Content Scope
+    MANAGE_ALL_CONTENT      // Can manage all content (override ownership)
+    MANAGE_OWN_CONTENT      // Can only manage own content
+    VIEW_OWN_CONTENT_ONLY   // Restricted to viewing only own content
+    
+    // Content Sharing
     VIEW_SHARED_CONTENT
+    SHARE_CONTENT_ACCESS
     
-    // Project/Module Management
+    // Project Management - CRUD
     VIEW_PROJECTS
+    CREATE_PROJECTS
     EDIT_PROJECTS
-    DELETE_PROJECTS
-    VIEW_MODULES
-    EDIT_MODULES
-    DELETE_MODULES
+    SOFT_DELETE_PROJECTS
+    HARD_DELETE_PROJECTS
     
-    // User Management
+    // Module Management - CRUD
+    VIEW_MODULES
+    CREATE_MODULES
+    EDIT_MODULES
+    SOFT_DELETE_MODULES
+    HARD_DELETE_MODULES
+    
+    // User Management - CRUD
     VIEW_USERS
     CREATE_USERS
     EDIT_USERS
-    DELETE_USERS
+    SOFT_DELETE_USERS
+    HARD_DELETE_USERS
     MANAGE_USER_PERMISSIONS
-    SHARE_CONTENT_ACCESS
     
     // Audit & Dashboard
     VIEW_AUDIT_LOGS
@@ -60,6 +75,21 @@ enum ContentStatus {
     PROCESSING
     COMPLETED
     FAILED
+}
+
+// New: scope for grouping bulk shares
+enum ShareScope {
+    SINGLE
+    PROJECT
+    MODULE
+    OWNER
+    LIST
+}
+
+// Status for content sharing
+enum ShareStatus {
+    ACTIVE
+    REVOKED
 }
 
 model User {
@@ -80,6 +110,10 @@ model User {
     auditLogs       AuditLog[]      @relation("UserAuditLogs")
     sharedContent   ContentShare[]  @relation("ContentSharedBy")
     receivedContent ContentShare[]  @relation("ContentSharedWith")
+
+    // Back-relations for ShareBatch
+    batchesSharedBy   ShareBatch[]  @relation("BatchSharedBy")
+    batchesSharedWith ShareBatch[]  @relation("BatchSharedWith")
 }
 
 model ContentData {
@@ -143,8 +177,9 @@ model Module {
 // =========================
 model Role {
     id          String       @id @default(uuid())
-    name        RoleName     @unique
+    name        String       @unique
     description String?
+    isActive    Boolean      @default(true)
     createdAt   DateTime     @default(now())
     updatedAt   DateTime     @updatedAt
 
@@ -205,15 +240,52 @@ model ContentShare {
     sharedBy    User     @relation("ContentSharedBy", fields: [sharedById], references: [id])
     sharedWithId String
     sharedWith  User     @relation("ContentSharedWith", fields: [sharedWithId], references: [id])
+    // Optional batch linkage for bulk shares
+    batchId     String?
+    batch       ShareBatch? @relation(fields: [batchId], references: [id])
     canView     Boolean  @default(true)
     canEdit     Boolean  @default(false)
     canDelete   Boolean  @default(false)
+    status      ShareStatus @default(ACTIVE)
+    revokedAt   DateTime?
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
     @@unique([contentId, sharedWithId])
     @@index([sharedById])
     @@index([sharedWithId])
+    @@index([status])
+}
+
+// New: Batch entity to track bulk sharing operations for history/analytics
+model ShareBatch {
+    id           String      @id @default(uuid())
+    scope        ShareScope
+    sharedById   String
+    sharedBy     User        @relation("BatchSharedBy", fields: [sharedById], references: [id])
+    sharedWithId String
+    sharedWith   User        @relation("BatchSharedWith", fields: [sharedWithId], references: [id])
+    projectId    String?
+    moduleId     String?
+    ownerId      String?
+    canView      Boolean     @default(true)
+    canEdit      Boolean     @default(false)
+    canDelete    Boolean     @default(false)
+    status       ShareStatus @default(ACTIVE)
+    revokedAt    DateTime?
+    itemsCount   Int         @default(0)
+    createdAt    DateTime    @default(now())
+    updatedAt    DateTime    @updatedAt
+
+    // Back relation to shares
+    shares       ContentShare[]
+
+    @@index([sharedById])
+    @@index([sharedWithId])
+    @@index([projectId])
+    @@index([moduleId])
+    @@index([ownerId])
+    @@index([status])
 }
 
 // =========================

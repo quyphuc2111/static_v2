@@ -6,16 +6,20 @@ import { useModules } from "@/modules/project/hooks/useModules"
 import { useContent } from "@/modules/content/hooks/useContent"
 import { useContentStats } from "@/modules/content/hooks/useContentStats"
 import { useDeleteContent } from "@/modules/content/hooks/useDeleteContent"
+import { useRestoreContent } from "@/modules/content/hooks/useRestoreContent"
+import { useUpdateContent } from "@/modules/content/hooks/useUpdateContent"
 import { useDownloadContent } from "@/modules/content/hooks/useDownloadContent"
 import { useBulkDeleteContent } from "@/modules/content/hooks/useBulkDeleteContent"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { CreateContentDialog, SCORMInfo, DeleteContentDialog, SCORMInfoDialog, DescriptionDialog } from "./modal"
+import { CreateContentDialog, EditContentDialog, DeleteContentDialog, SCORMInfoDialog, DescriptionDialog } from "./modal"
 import { DataTable, createContentColumns, type ContentItem } from "@/components/content/table"
 import { useAuth } from "@/modules/auth/hooks/useAuth"
-import { RoleName } from "@prisma/client"
+import { PermissionName } from "@prisma/client"
+import { PermissionGuard } from "@/components/rbac/permission-guard"
+import { useUserPermissions } from "@/modules/rbac/hooks"
 
 // Helper function to get SCORM info
 const getSCORMInfo = (content: ContentItem) => {
@@ -51,9 +55,11 @@ const getContentUrl = (content: ContentItem) => {
 
 export function ContentManagement() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showEditDialog, setShowEditDialog] = useState(false)
   const [projectId, setProjectId] = useState<string>("")
   const [moduleId, setModuleId] = useState<string>("")
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null)
+  const [contentToEdit, setContentToEdit] = useState<ContentItem | null>(null)
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
   const [showDescriptionDialog, setShowDescriptionDialog] = useState(false)
   const [selectedDescription, setSelectedDescription] = useState<any>(null)
@@ -65,8 +71,10 @@ export function ContentManagement() {
   const contentQuery = useContent(projectId, moduleId, !!projectId && !!moduleId)
   const statsQuery = useContentStats(projectId)
   const { user: me } = useAuth()
-  const isAdmin = !!me?.roles?.includes(RoleName.ADMINISTRATOR)
+  const { isAdmin, hasPermission, hasAnyPermission } = useUserPermissions()
   const deleteContentMut = useDeleteContent(projectId, moduleId)
+  const restoreContentMut = useRestoreContent(projectId, moduleId)
+  const updateContentMut = useUpdateContent(projectId, moduleId)
   const downloadContentMut = useDownloadContent(projectId, moduleId)
   const bulkDeleteContentMut = useBulkDeleteContent(projectId, moduleId)
 
@@ -108,8 +116,8 @@ export function ContentManagement() {
   }
 
   const handleEdit = (content: ContentItem) => {
-    // TODO: Implement edit functionality
-    console.log('Edit content:', content)
+    setContentToEdit(content)
+    setShowEditDialog(true)
   }
 
   const handleDownload = (content: ContentItem) => {
@@ -119,6 +127,12 @@ export function ContentManagement() {
   const handleDelete = (content: ContentItem) => {
     setContentToDelete(content)
     setShowDeleteDialog(true)
+  }
+
+  const handleRestore = (content: ContentItem) => {
+    if (confirm(`Bạn có muốn khôi phục nội dung "${content.title}"?`)) {
+      restoreContentMut.mutate(content.id)
+    }
   }
 
   const handleDescriptionClick = (content: ContentItem) => {
@@ -162,11 +176,16 @@ export function ContentManagement() {
     onEdit: handleEdit,
     onDownload: handleDownload,
     onDelete: handleDelete,
+    onRestore: handleRestore,
     onDescriptionClick: handleDescriptionClick,
     copiedUrl,
     isDownloading: downloadContentMut.isPending,
-    isDeleting: deleteContentMut.isPending
-  }, { isAdmin }), [copiedUrl, downloadContentMut.isPending, deleteContentMut.isPending, isAdmin])
+    isDeleting: deleteContentMut.isPending,
+    isRestoring: restoreContentMut.isPending
+  }, { 
+    isAdmin, 
+    currentUserId: me?.id 
+  }), [copiedUrl, downloadContentMut.isPending, deleteContentMut.isPending, restoreContentMut.isPending, isAdmin, me?.id])
 
   return (
     <div className="p-6 space-y-6">
@@ -201,10 +220,12 @@ export function ContentManagement() {
             </Select>
           </div>
           {projectId && moduleId && (
-            <Button onClick={() => setShowCreateDialog(true)} className="bg-primary hover:bg-primary/90">
-              <Plus className="mr-2 h-4 w-4" />
-              Tạo Nội dung Mới
-            </Button>
+            <PermissionGuard permissions={[PermissionName.CREATE_CONTENT, PermissionName.MANAGE_OWN_CONTENT]}>
+              <Button onClick={() => setShowCreateDialog(true)} className="bg-primary hover:bg-primary/90">
+                <Plus className="mr-2 h-4 w-4" />
+                Tạo Nội dung Mới
+              </Button>
+            </PermissionGuard>
           )}
         </div>
       </div>
@@ -281,9 +302,12 @@ export function ContentManagement() {
                 onEdit: handleEdit,
                 onDownload: handleDownload,
                 onDelete: handleDelete,
+                onRestore: handleRestore,
                 copiedUrl,
                 isDownloading: downloadContentMut.isPending,
-                isDeleting: deleteContentMut.isPending
+                isDeleting: deleteContentMut.isPending,
+                isRestoring: restoreContentMut.isPending,
+                currentUserId: me?.id
               }}
               bulkActions={{
                 onBulkDelete: handleBulkDelete,
@@ -297,6 +321,15 @@ export function ContentManagement() {
       <CreateContentDialog 
         open={showCreateDialog} 
         onOpenChange={setShowCreateDialog}
+        projectId={projectId}
+        moduleId={moduleId}
+      />
+
+      {/* Edit Content Dialog */}
+      <EditContentDialog
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+        content={contentToEdit}
         projectId={projectId}
         moduleId={moduleId}
       />

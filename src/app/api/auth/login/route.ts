@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import bcrypt from "bcryptjs"
-import { PermissionName, RoleName, UserStatus } from "@prisma/client"
+import { PermissionName, UserStatus } from "@prisma/client"
 
 export async function POST(req: Request) {
   try {

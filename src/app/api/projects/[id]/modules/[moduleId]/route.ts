@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
+import { verifyCsrfAndOrigin } from "@/lib/csrf"
 
 type Params = { params: { id: string; moduleId: string } }
 
 export async function PATCH(req: Request, { params }: Params) {
   try {
+    const guard = await verifyCsrfAndOrigin(req as any)
+    if (guard) return NextResponse.json({ message: guard.error }, { status: guard.status })
+
     const session = await getSession()
     if (!session.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
 
@@ -32,6 +36,9 @@ export async function PATCH(req: Request, { params }: Params) {
 
 export async function DELETE(_req: Request, { params }: Params) {
   try {
+    const guard = await verifyCsrfAndOrigin(_req as any)
+    if (guard) return NextResponse.json({ message: guard.error }, { status: guard.status })
+
     const session = await getSession()
     if (!session.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
 

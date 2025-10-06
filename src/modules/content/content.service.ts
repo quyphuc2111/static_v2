@@ -40,6 +40,12 @@ export async function deleteContent(projectId: string, moduleId: string, content
   })
 }
 
+export async function restoreContent(projectId: string, moduleId: string, contentId: string) {
+  return httpService.post<{ message: string; data: ContentData }>({ 
+    url: `${CONTENT_API_URL.BY_ID(projectId, moduleId, contentId)}/restore`
+  })
+}
+
 export async function bulkDeleteContent(projectId: string, moduleId: string, contentIds: string[]) {
   return httpService.post<{ message: string; deletedCount: number }>({ 
     url: CONTENT_API_URL.BULK_DELETE(projectId, moduleId),

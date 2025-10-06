@@ -102,6 +102,20 @@ export interface UserWithRoles {
   roles?: UserRole[]
 }
 
+export interface CreateUserPayload {
+  name?: string
+  email: string
+  status?: string
+  roleId?: string
+  password?: string
+}
+
+export interface UpdateUserPayload {
+  name?: string
+  email?: string
+  status?: string
+}
+
 export interface RoleWithPermissions extends Role {
   permissions: (RolePermission & { permission: Permission })[]
 }

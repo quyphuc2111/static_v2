@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
-import { RoleName } from "@prisma/client"
+import { verifyCsrfAndOrigin } from "@/lib/csrf"
+import { hasPermission } from "@/lib/permissions"
+import { PermissionName, ShareScope } from "@prisma/client"
 
 export async function GET(req: NextRequest) {
   try {
@@ -48,6 +50,17 @@ export async function GET(req: NextRequest) {
             name: true,
             email: true
           }
+        },
+        batch: {
+          select: {
+            id: true,
+            scope: true,
+            projectId: true,
+            moduleId: true,
+            ownerId: true,
+            itemsCount: true,
+            createdAt: true,
+          }
         }
       },
       orderBy: {
@@ -67,9 +80,18 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const guard = await verifyCsrfAndOrigin(req)
+    if (guard) return NextResponse.json({ message: guard.error }, { status: guard.status })
+
     const session = await getSession()
     if (!session?.user?.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    }
+
+    // Check SHARE_CONTENT_ACCESS permission
+    const canShare = await hasPermission(PermissionName.SHARE_CONTENT_ACCESS, session.user.id)
+    if (!canShare) {
+      return NextResponse.json({ message: "Forbidden: Missing SHARE_CONTENT_ACCESS permission" }, { status: 403 })
     }
 
     const body = await req.json()
@@ -86,10 +108,11 @@ export async function POST(req: NextRequest) {
       contentIds
     } = body
 
-    const isAdmin = Array.isArray(session.user?.roles) && (session.user!.roles as any[]).includes(RoleName.ADMINISTRATOR)
+    const isAdmin = Array.isArray(session.user?.roles) && (session.user!.roles as any[]).includes("ADMINISTRATOR")
+    const canManageAll = await hasPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id)
 
-    // ADMIN BULK SHARE: project/module/owner/contentIds
-    if (isAdmin && sharedWithId && (projectId || moduleId || ownerId || (Array.isArray(contentIds) && contentIds.length > 0))) {
+    // ADMIN/MANAGER BULK SHARE: project/module/owner/contentIds
+    if ((isAdmin || canManageAll) && sharedWithId && (projectId || moduleId || ownerId || (Array.isArray(contentIds) && contentIds.length > 0))) {
       // Collect content IDs by filters
       const whereClause: any = { isDeleted: false }
       if (projectId) whereClause.projectId = projectId
@@ -108,16 +131,40 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ message: "User not found" }, { status: 404 })
       }
 
-      // Upsert shares for all content IDs
+      // Create batch record
+      const scope: ShareScope = projectId
+        ? ShareScope.PROJECT
+        : moduleId
+        ? ShareScope.MODULE
+        : ownerId
+        ? ShareScope.OWNER
+        : ShareScope.LIST
+
+      const batch = await prisma.shareBatch.create({
+        data: {
+          scope,
+          sharedById: session.user!.id,
+          sharedWithId,
+          projectId: projectId || null,
+          moduleId: moduleId || null,
+          ownerId: ownerId || null,
+          canView,
+          canEdit,
+          canDelete,
+          itemsCount: contents.length,
+        },
+      })
+
+      // Upsert shares for all content IDs and tag with batchId
       const operations = contents.map((c) =>
         prisma.contentShare.upsert({
           where: { contentId_sharedWithId: { contentId: c.id, sharedWithId } },
-          update: { canView, canEdit, canDelete },
-          create: { contentId: c.id, sharedById: session.user!.id, sharedWithId, canView, canEdit, canDelete },
+          update: { canView, canEdit, canDelete, batchId: batch.id },
+          create: { contentId: c.id, sharedById: session.user!.id, sharedWithId, canView, canEdit, canDelete, batchId: batch.id },
         })
       )
       const results = await prisma.$transaction(operations)
-      return NextResponse.json({ data: { count: results.length } }, { status: 201 })
+      return NextResponse.json({ data: { count: results.length, batchId: batch.id } }, { status: 201 })
     }
 
     // STANDARD SHARE: owner can share their own content
@@ -156,46 +203,87 @@ export async function POST(req: NextRequest) {
     })
 
     if (existingShare) {
-      // Update existing share
-      const updatedShare = await prisma.contentShare.update({
-        where: {
-          contentId_sharedWithId: {
-            contentId,
-            sharedWithId
-          }
-        },
-        data: {
-          canView,
-          canEdit,
-          canDelete
-        },
-        include: {
-          content: {
-            select: {
-              id: true,
-              title: true,
-              contentType: true,
-              status: true
+      // Update existing share (only if it's active)
+      if (existingShare.status === 'ACTIVE') {
+        const updatedShare = await prisma.contentShare.update({
+          where: {
+            contentId_sharedWithId: {
+              contentId,
+              sharedWithId
             }
           },
-          sharedBy: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
+          data: {
+            canView,
+            canEdit,
+            canDelete
           },
-          sharedWith: {
-            select: {
-              id: true,
-              name: true,
-              email: true
+          include: {
+            content: {
+              select: {
+                id: true,
+                title: true,
+                contentType: true,
+                status: true
+              }
+            },
+            sharedBy: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            },
+            sharedWith: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
             }
           }
-        }
-      })
+        })
 
-      return NextResponse.json({ data: updatedShare })
+        return NextResponse.json({ data: updatedShare })
+      } else {
+        // If share is revoked, create a new share
+        const newShare = await prisma.contentShare.create({
+          data: {
+            contentId,
+            sharedById: session.user!.id,
+            sharedWithId,
+            canView,
+            canEdit,
+            canDelete,
+            status: 'ACTIVE'
+          },
+          include: {
+            content: {
+              select: {
+                id: true,
+                title: true,
+                contentType: true,
+                status: true
+              }
+            },
+            sharedBy: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            },
+            sharedWith: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        })
+
+        return NextResponse.json({ data: newShare })
+      }
     } else {
       // Create new share
       const newShare = await prisma.contentShare.create({
@@ -246,6 +334,9 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const guard = await verifyCsrfAndOrigin(req)
+    if (guard) return NextResponse.json({ message: guard.error }, { status: guard.status })
+
     const session = await getSession()
     if (!session?.user?.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 })

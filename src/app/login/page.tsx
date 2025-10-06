@@ -15,7 +15,7 @@ import { Eye, EyeOff, Lock, Mail, AlertCircle, Shield } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 export default function LoginPage() {
-  const { login, isAuthenticated } = useAuth()
+  const { login, isAuthenticated } = useAuth(true)
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState("")

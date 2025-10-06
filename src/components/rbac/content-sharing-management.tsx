@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useContentShares, useRemoveContentShare } from "@/modules/rbac/hooks"
 import { ShareContentDialog } from "./share-content-dialog"
+import { PermissionGuard } from "./permission-guard"
+import { PermissionName } from "@prisma/client"
 
 export function ContentSharingManagement() {
   const [showShareDialog, setShowShareDialog] = useState(false)
@@ -46,10 +48,12 @@ export function ContentSharingManagement() {
           <h2 className="text-2xl font-bold tracking-tight">Chia sẻ Nội dung</h2>
           <p className="text-muted-foreground">Quản lý quyền chia sẻ nội dung giữa các người dùng</p>
         </div>
-        <Button onClick={() => setShowShareDialog(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Chia sẻ Nội dung
-        </Button>
+        <PermissionGuard permission={PermissionName.SHARE_CONTENT_ACCESS}>
+          <Button onClick={() => setShowShareDialog(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Chia sẻ Nội dung
+          </Button>
+        </PermissionGuard>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -162,14 +166,16 @@ export function ContentSharingManagement() {
                       {new Date(share.createdAt).toLocaleDateString('vi-VN')}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveShare(share.contentId, share.sharedWithId)}
-                        className="text-red-400 hover:text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <PermissionGuard permission={PermissionName.SHARE_CONTENT_ACCESS}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveShare(share.contentId, share.sharedWithId)}
+                          className="text-red-400 hover:text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </PermissionGuard>
                     </TableCell>
                   </TableRow>
                 ))}

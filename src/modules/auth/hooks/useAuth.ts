@@ -1,15 +1,15 @@
 "use client"
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { getMe, login, logout } from "../auth.service"
+import { getMe, getMeOptional, login, logout } from "../auth.service"
 import type { LoginPayload } from "../auth.interface"
 import cachedKeys from "@/constants/cachedKeys"
 
-export function useAuth() {
+export function useAuth(optionalOnLoginPage: boolean = false) {
   const qc = useQueryClient()
   const meQuery = useQuery({
     queryKey: cachedKeys.auth.me,
-    queryFn: getMe,
+    queryFn: optionalOnLoginPage ? getMeOptional : getMe,
     staleTime: 5 * 60 * 1000,
   })
 

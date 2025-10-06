@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { getSession } from "@/lib/session"
+import { PermissionName, ShareStatus } from "@prisma/client"
+import { hasPermission } from "@/lib/permissions"
 
 export async function GET(
   request: NextRequest,
@@ -7,6 +10,12 @@ export async function GET(
 ) {
   try {
     const { id: projectId } = await params
+
+    // Auth and permission check
+    const session = await getSession()
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
     // Verify project exists
     const project = await prisma.project.findUnique({
@@ -17,12 +26,22 @@ export async function GET(
       return NextResponse.json({ error: "Project not found" }, { status: 404 })
     }
 
-    // Get content statistics for this project
+    // Determine visibility scope
+    const isAdmin = (session.user.roles || []).includes("ADMINISTRATOR")
+    const canViewAll = isAdmin || await hasPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id)
+
+    // Get content statistics for this project with scope
     const stats = await prisma.contentData.groupBy({
       by: ['status'],
       where: {
         projectId,
-        isDeleted: false
+        isDeleted: false,
+        ...(canViewAll ? {} : {
+          OR: [
+            { ownerId: session.user.id },
+            { shares: { some: { sharedWithId: session.user.id, canView: true, status: ShareStatus.ACTIVE } } }
+          ]
+        })
       },
       _count: {
         id: true 

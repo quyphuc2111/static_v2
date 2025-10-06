@@ -3,8 +3,8 @@
 import { ColumnDef } from "@tanstack/react-table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { MoreHorizontal, Eye, Copy, Check, BookOpen, Edit, Download, Trash2 } from "lucide-react"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { MoreHorizontal, Eye, Copy, Check, BookOpen, Edit, Download, Trash2, RotateCcw } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useState } from "react"
 
 // Types
@@ -20,6 +20,12 @@ export interface ContentItem {
   contentUrl: string
   isDeleted?: boolean
   owner?: { id: string; name?: string | null; email: string } | null
+  isShared?: boolean
+  sharePermissions?: {
+    canView: boolean
+    canEdit: boolean
+    canDelete: boolean
+  } | null
 }
 
 // Utility functions
@@ -137,9 +143,12 @@ interface ContentActionsProps {
   onEdit: (content: ContentItem) => void
   onDownload: (content: ContentItem) => void
   onDelete: (content: ContentItem) => void
+  onRestore: (content: ContentItem) => void
   copiedUrl: string | null
   isDownloading: boolean
   isDeleting: boolean
+  isRestoring: boolean
+  currentUserId?: string
 }
 
 function ContentActions({
@@ -150,10 +159,51 @@ function ContentActions({
   onEdit,
   onDownload,
   onDelete,
+  onRestore,
   copiedUrl,
   isDownloading,
-  isDeleting
+  isDeleting,
+  isRestoring,
+  currentUserId
 }: ContentActionsProps) {
+  // Determine permissions
+  const isOwner = content.owner?.id === currentUserId
+  const sharePerms = content.sharePermissions
+  const isDeleted = content.isDeleted
+  
+  // If shared content, use share permissions; if owner, full access
+  const canView = isOwner || sharePerms?.canView || false
+  const canEdit = isOwner || sharePerms?.canEdit || false
+  const canDelete = isOwner || sharePerms?.canDelete || false
+  
+  // If content is deleted, show restore action instead
+  if (isDeleted) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem 
+            onClick={() => onRestore(content)}
+            disabled={isRestoring}
+            className="text-green-400"
+          >
+            <RotateCcw className="mr-2 h-4 w-4" />
+            {isRestoring ? "Đang khôi phục..." : "Khôi phục"}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => onView(content)}>
+            <Eye className="mr-2 h-4 w-4" />
+            Xem chi tiết
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  }
+  
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -162,48 +212,62 @@ function ContentActions({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => onView(content)}>
-          <Eye className="mr-2 h-4 w-4" />
-          Xem
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onCopyUrl(content)}>
-          {copiedUrl === content.id ? (
-            <>
-              <Check className="mr-2 h-4 w-4 text-green-400" />
-              <span className="text-green-400">Đã copy!</span>
-            </>
-          ) : (
-            <>
-              <Copy className="mr-2 h-4 w-4" />
-              Copy URL
-            </>
-          )}
-        </DropdownMenuItem>
-        {getSCORMInfo(content) && (
-          <DropdownMenuItem onClick={() => onShowSCORMInfo(content)}>
-            <BookOpen className="mr-2 h-4 w-4" />
-            Thông tin SCORM
-          </DropdownMenuItem>
+        {canView && (
+          <>
+            <DropdownMenuItem onClick={() => onView(content)}>
+              <Eye className="mr-2 h-4 w-4" />
+              Xem
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onCopyUrl(content)}>
+              {copiedUrl === content.id ? (
+                <>
+                  <Check className="mr-2 h-4 w-4 text-green-400" />
+                  <span className="text-green-400">Đã copy!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copy URL
+                </>
+              )}
+            </DropdownMenuItem>
+            {getSCORMInfo(content) && (
+              <DropdownMenuItem onClick={() => onShowSCORMInfo(content)}>
+                <BookOpen className="mr-2 h-4 w-4" />
+                Thông tin SCORM
+              </DropdownMenuItem>
+            )}
+          </>
         )}
-        <DropdownMenuItem onClick={() => onEdit(content)}>
-          <Edit className="mr-2 h-4 w-4" />
-          Chỉnh sửa
-        </DropdownMenuItem>
-        <DropdownMenuItem 
-          onClick={() => onDownload(content)}
-          disabled={isDownloading}
-        >
-          <Download className="mr-2 h-4 w-4" />
-          {isDownloading ? "Đang tải..." : "Tải xuống"}
-        </DropdownMenuItem>
-        <DropdownMenuItem 
-          className="text-red-400"
-          onClick={() => onDelete(content)}
-          disabled={isDeleting}
-        >
-          <Trash2 className="mr-2 h-4 w-4" />
-          {isDeleting ? "Đang xóa..." : "Xóa"}
-        </DropdownMenuItem>
+        {canEdit && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onEdit(content)}>
+              <Edit className="mr-2 h-4 w-4" />
+              Chỉnh sửa
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={() => onDownload(content)}
+              disabled={isDownloading}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              {isDownloading ? "Đang tải..." : "Tải xuống"}
+            </DropdownMenuItem>
+          </>
+        )}
+        {canDelete && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              className="text-red-400"
+              onClick={() => onDelete(content)}
+              disabled={isDeleting}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              {isDeleting ? "Đang xóa..." : "Xóa"}
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -303,12 +367,14 @@ export const createContentColumns = (
     onEdit: (content: ContentItem) => void
     onDownload: (content: ContentItem) => void
     onDelete: (content: ContentItem) => void
+    onRestore: (content: ContentItem) => void
     onDescriptionClick: (content: ContentItem) => void
     copiedUrl: string | null
     isDownloading: boolean
     isDeleting: boolean
+    isRestoring: boolean
   },
-  options?: { isAdmin?: boolean }
+  options?: { isAdmin?: boolean; currentUserId?: string }
 ): ColumnDef<ContentItem>[] => [
   {
     id: "index",
@@ -331,9 +397,13 @@ export const createContentColumns = (
     header: "Tên Nội dung",
     cell: ({ row }) => {
       const isDeleted = row.original.isDeleted
+      const isShared = row.original.isShared
       return (
         <div className="font-medium text-foreground flex items-center gap-2">
           <span>{row.getValue("title")}</span>
+          {isShared && (
+            <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">Được chia sẻ</Badge>
+          )}
           {isDeleted && (
             <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">Đã xoá mềm</Badge>
           )}
@@ -416,9 +486,12 @@ export const createContentColumns = (
         onEdit={actions.onEdit}
         onDownload={actions.onDownload}
         onDelete={actions.onDelete}
+        onRestore={actions.onRestore}
         copiedUrl={actions.copiedUrl}
         isDownloading={actions.isDownloading}
         isDeleting={actions.isDeleting}
+        isRestoring={actions.isRestoring}
+        currentUserId={options?.currentUserId}
       />
     ),
   },

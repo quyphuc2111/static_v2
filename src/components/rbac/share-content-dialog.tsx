@@ -14,7 +14,6 @@ import { useModules } from "@/modules/project/hooks/useModules"
 import { toast } from "react-toastify"
 import { Search, User, FileText } from "lucide-react"
 import { useAuth } from "@/modules/auth/hooks/useAuth"
-import { RoleName } from "@prisma/client"
 
 interface ShareContentDialogProps {
   open: boolean
@@ -40,7 +39,7 @@ export function ShareContentDialog({ open, onOpenChange }: ShareContentDialogPro
   const shareContentMut = useShareContent()
   const bulkShareMut = useBulkShareContent()
   const { user: me } = useAuth()
-  const isAdmin = !!me?.roles?.includes(RoleName.ADMINISTRATOR)
+  const isAdmin = !!me?.roles?.some(r => r.name === "ADMINISTRATOR")
 
   // Reset form when dialog opens/closes
   useEffect(() => {
