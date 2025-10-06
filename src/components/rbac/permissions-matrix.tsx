@@ -1,204 +1,283 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import React, { useState, useMemo, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Checkbox } from "@/components/ui/checkbox"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Search, Download } from "lucide-react"
+import { Shield, Users, Lock, Crown, Star, Briefcase, Zap, Award, Target, Gem, Heart, Hash, Search, ChevronRight, Check, Loader2 } from "lucide-react"
 import { useRoles, usePermissions } from "@/modules/rbac/hooks"
 
 export function PermissionsMatrix() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState<string>("all")
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const [searchTerm, setSearchTerm] = useState("")
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
+
+  // Debounce search term
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 500)
+
+    return () => {
+      clearTimeout(handler)
+    }
+  }, [searchTerm])
 
   const { data: roles, isLoading: rolesLoading } = useRoles()
   const { data: permissions, isLoading: permissionsLoading } = usePermissions()
 
-  // Group permissions by category
-  const permissionCategories = [
-    {
-      category: "Content Management",
-      items: permissions?.filter(p => p.name.includes("CONTENT") || p.name.includes("SHARE")) || []
-    },
-    {
-      category: "Project/Module Management", 
-      items: permissions?.filter(p => p.name.includes("PROJECT") || p.name.includes("MODULE")) || []
-    },
-    {
-      category: "User Management",
-      items: permissions?.filter(p => p.name.includes("USER")) || []
-    },
-    {
-      category: "Audit & Dashboard",
-      items: permissions?.filter(p => p.name.includes("AUDIT") || p.name.includes("DASHBOARD")) || []
-    }
+  // Color palette for roles
+  const colorPalette = [
+    { border: 'border-blue-500', bg: 'bg-blue-50', text: 'text-blue-600' },
+    { border: 'border-indigo-500', bg: 'bg-indigo-50', text: 'text-indigo-600' },
+    { border: 'border-purple-500', bg: 'bg-purple-50', text: 'text-purple-600' },
+    { border: 'border-green-500', bg: 'bg-green-50', text: 'text-green-600' },
+    { border: 'border-red-500', bg: 'bg-red-50', text: 'text-red-600' },
+    { border: 'border-orange-500', bg: 'bg-orange-50', text: 'text-orange-600' },
+    { border: 'border-teal-500', bg: 'bg-teal-50', text: 'text-teal-600' },
+    { border: 'border-pink-500', bg: 'bg-pink-50', text: 'text-pink-600' },
   ]
 
-  const categories = ["all", ...permissionCategories.map((p) => p.category)]
+  // Icon palette for roles
+  const iconPalette = [Shield, Crown, Star, Briefcase, Users, Zap, Award, Target, Gem, Heart, Lock]
 
-  const filteredPermissions = selectedCategory === "all" 
-    ? permissionCategories 
-    : permissionCategories.filter((p) => p.category === selectedCategory)
+  const getRoleColor = (roleId: number) => {
+    return colorPalette[roleId % colorPalette.length]
+  }
 
-  if (rolesLoading || permissionsLoading) {
-    return (
-      <div className="text-center py-8 text-muted-foreground">
-        Đang tải ma trận quyền hạn...
-      </div>
-    )
+  const getRoleIcon = (roleId: number) => {
+    return iconPalette[roleId % iconPalette.length]
+  }
+
+  // Group permissions by category
+  const groupedPermissions = useMemo(() => {
+    const groups: Record<string, any[]> = {
+      "Content Management": permissions?.filter(p => p.name.includes("CONTENT") || p.name.includes("SHARE")) || [],
+      "Project/Module Management": permissions?.filter(p => p.name.includes("PROJECT") || p.name.includes("MODULE")) || [],
+      "User Management": permissions?.filter(p => p.name.includes("USER")) || [],
+      "Audit & Dashboard": permissions?.filter(p => p.name.includes("AUDIT") || p.name.includes("DASHBOARD")) || []
+    }
+
+    // Filter by search term
+    if (debouncedSearchTerm) {
+      const filtered: Record<string, any[]> = {}
+      Object.entries(groups).forEach(([key, perms]) => {
+        const filteredPerms = perms.filter(p => 
+          p.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+          (p.description || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+        )
+        if (filteredPerms.length > 0) {
+          filtered[key] = filteredPerms
+        }
+      })
+      return filtered
+    }
+
+    return groups
+  }, [permissions, debouncedSearchTerm])
+
+  const toggleGroup = (groupName: string) => {
+    const newExpanded = new Set(expandedGroups)
+    if (newExpanded.has(groupName)) {
+      newExpanded.delete(groupName)
+    } else {
+      newExpanded.add(groupName)
+    }
+    setExpandedGroups(newExpanded)
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4 flex-1">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+    <div className="space-y-3">
+      {/* Search and Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div className="space-y-2 flex-1 max-w-sm">
+          <label className="text-sm font-medium text-foreground">Tìm kiếm</label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
-              placeholder="Tìm kiếm quyền hạn..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8"
+              type="text"
+              placeholder="Tìm kiếm quyền..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 w-full h-10"
             />
           </div>
-          <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
-            <TabsList>
-              {categories.map((cat) => (
-                <TabsTrigger key={cat} value={cat} className="text-xs">
-                  {cat === "all" ? "Tất cả" : cat}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
         </div>
-        <Button variant="outline" size="sm">
-          <Download className="h-4 w-4 mr-2" />
-          Xuất Excel
-        </Button>
+        <div className="flex items-center gap-2 sm:gap-4 text-xs text-gray-600 pb-2">
+          <span>{Object.keys(groupedPermissions).length} nhóm</span>
+          <span>•</span>
+          <span>{roles?.length || 0} vai trò</span>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Ma trận phân quyền</CardTitle>
-          <CardDescription>Xem và quản lý quyền hạn của từng vai trò trong hệ thống</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ScrollArea className="w-full">
-            <div className="min-w-[800px]">
-              <div className="grid grid-cols-[300px_repeat(3,1fr)] gap-2 mb-4">
-                <div className="font-medium text-sm">Quyền hạn</div>
-                {roles?.map((role) => (
-                  <div key={role.id} className="text-center">
-                    <Badge variant="outline" className="text-xs">
-                      {role.name}
-                    </Badge>
-                  </div>
-                ))}
+      {/* Matrix Table */}
+      <div className="border border-gray-200 rounded bg-white">
+        <div className="overflow-x-auto" style={{
+          scrollbarWidth: 'thin',
+          scrollbarColor: '#d1d5db #f3f4f6'
+        }}>
+          <style jsx>{`
+            div::-webkit-scrollbar {
+              height: 8px;
+            }
+            div::-webkit-scrollbar-track {
+              background: #f3f4f6;
+              border-radius: 4px;
+            }
+            div::-webkit-scrollbar-thumb {
+              background: #d1d5db;
+              border-radius: 4px;
+            }
+            div::-webkit-scrollbar-thumb:hover {
+              background: #9ca3af;
+            }
+          `}</style>
+          {(rolesLoading || permissionsLoading) ? (
+            <div className="flex items-center justify-center p-12">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                <p className="text-sm text-gray-600">Đang tải ma trận quyền hạn...</p>
               </div>
-
-              {filteredPermissions.map((category) => (
-                <div key={category.category} className="space-y-2 mb-6">
-                  <h4 className="font-semibold text-sm bg-muted px-3 py-2 rounded-lg">{category.category}</h4>
-                  {category.items
-                    .filter((item) => item.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                    .map((permission) => (
-                      <div
-                        key={permission.id}
-                        className="grid grid-cols-[300px_repeat(3,1fr)] gap-2 items-center py-3 px-3 rounded-lg hover:bg-accent border-b border-border/50"
-                      >
-                        <div className="space-y-1">
-                          <div className="text-sm font-medium">{permission.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {permission.description || 'Không có mô tả'}
+            </div>
+          ) : (
+            <table className="w-full text-sm" style={{ tableLayout: 'auto', minWidth: 'max-content' }}>
+              <colgroup>
+                <col style={{ width: '300px', minWidth: '250px' }} />
+                {roles?.map((role) => (
+                  <col key={role.id} style={{ width: '120px', minWidth: '100px' }} />
+                ))}
+              </colgroup>
+              <thead className="bg-gray-50 sticky top-0 z-10 border-b-2 border-gray-200">
+                <tr>
+                  <th className="sticky left-0 z-20 bg-gray-50 px-3 sm:px-5 py-3 text-left text-xs font-semibold text-gray-900 uppercase tracking-wide border-r border-gray-200">
+                    Quyền hạn
+                  </th>
+                  {roles?.map((role, index) => {
+                    const roleColor = getRoleColor(index)
+                    const RoleIcon = getRoleIcon(index)
+                    
+                    return (
+                      <th key={role.id} className="px-1 py-3 text-center border-l border-gray-200">
+                        <div className="flex flex-col items-center gap-1">
+                          <div className={`${roleColor.bg} ${roleColor.border} ${roleColor.text} border px-1.5 py-1 rounded-lg w-full flex items-center justify-center gap-1`}>
+                            <RoleIcon className="h-3 w-3 flex-shrink-0" />
+                            <span className="font-semibold text-[10px] truncate">{role.name}</span>
+                          </div>
+                          
+                          <div className="flex items-center gap-0.5 w-full justify-center h-5">
+                            <Badge className={`${roleColor.bg} ${roleColor.text} text-[9px] px-1 py-0.5 border-0 flex items-center gap-0.5 font-semibold`}>
+                              <Hash className="h-2 w-2" />
+                              <span>{role.permissions?.length || 0}</span>
+                            </Badge>
                           </div>
                         </div>
-                        {roles?.map((role) => {
-                          const hasPermission = role.permissions?.some(rp => rp.permissionId === permission.id)
-                          return (
-                            <div key={role.id} className="flex justify-center">
-                              <Checkbox checked={hasPermission} disabled />
+                      </th>
+                    )
+                  })}
+                </tr>
+              </thead>
+              <tbody className="bg-white">
+                {Object.entries(groupedPermissions).map(([groupName, groupPermissions]) => {
+                  const isExpanded = expandedGroups.has(groupName)
+                  
+                  return (
+                    <React.Fragment key={groupName}>
+                      <tr className="border-t border-gray-200">
+                        <td 
+                          colSpan={(roles?.length || 0) + 1} 
+                          className="sticky left-0 z-10 bg-white px-3 py-2.5 cursor-pointer hover:bg-blue-50 transition-colors"
+                          onClick={() => toggleGroup(groupName)}
+                        >
+                          <div className="flex items-center gap-2 h-6">
+                            <div className="w-4 h-4 flex items-center justify-center">
+                              <ChevronRight 
+                                className={`h-4 w-4 text-gray-600 transition-transform duration-200 ${isExpanded ? 'rotate-90' : 'rotate-0'}`}
+                              />
                             </div>
-                          )
-                        })}
-                      </div>
-                    ))}
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
-        </CardContent>
-      </Card>
+                            <span className="font-semibold text-xs text-gray-900">{groupName}</span>
+                            <span className="text-xs text-gray-500">
+                              ({groupPermissions.length})
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                      
+                      <tr>
+                        <td colSpan={(roles?.length || 0) + 1} className="p-0">
+                          <div 
+                            className="overflow-hidden transition-all duration-300 ease-in-out"
+                            style={{ 
+                              maxHeight: isExpanded ? `${groupPermissions.length * 80}px` : '0px'
+                            }}
+                          >
+                            <table className="w-full">
+                              <tbody>
+                                {groupPermissions.map((permission, idx) => (
+                                  <tr 
+                                    key={permission.id} 
+                                    className={`hover:bg-blue-50/50 transition-colors border-b border-gray-200 ${idx === 0 ? 'border-t border-gray-200' : ''}`}
+                                  >
+                                    <td className="px-3 py-2.5 border-r border-gray-200" style={{ width: '300px', minWidth: '250px' }}>
+                                      <div className="flex flex-col gap-1">
+                                        <span className="text-xs text-gray-900 font-medium">
+                                          {permission.name}
+                                        </span>
+                                        <span className="text-[10px] text-gray-500">
+                                          {permission.description || 'Không có mô tả'}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    {roles?.map((role) => {
+                                      const hasPermission = role.permissions?.some(
+                                        rp => rp.permissionId === permission.id
+                                      )
+                                      return (
+                                        <td key={role.id} className="px-2 py-2.5 text-center border-l border-gray-200" style={{ width: '120px', minWidth: '100px' }}>
+                                          {hasPermission ? (
+                                            <div className="flex justify-center">
+                                              <div className="bg-blue-500 rounded-full p-0.5">
+                                                <Check className="h-3 w-3 text-white" />
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <div className="flex justify-center">
+                                              <span className="text-gray-200">—</span>
+                                            </div>
+                                          )}
+                                        </td>
+                                      )
+                                    })}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </td>
+                      </tr>
+                    </React.Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Thống kê quyền hạn</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {roles?.map((role) => {
-                const totalPermissions = role.permissions?.length || 0
-                const allPermissions = permissions?.length || 0
-                const percentage = allPermissions > 0 ? Math.round((totalPermissions / allPermissions) * 100) : 0
-
-                const colorMap: { [key: string]: string } = {
-                  "ADMINISTRATOR": "red",
-                  "DEV": "blue", 
-                  "TESTER": "green"
-                }
-                const color = colorMap[role.name] || "gray"
-
-                return (
-                  <div key={role.id} className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">{role.name}</span>
-                      <span className="text-muted-foreground">
-                        {totalPermissions}/{allPermissions} ({percentage}%)
-                      </span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div className={`h-full bg-${color}-500`} style={{ width: `${percentage}%` }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Quyền phổ biến nhất</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {permissions
-                ?.map(permission => ({
-                  ...permission,
-                  roleCount: roles?.filter(role => 
-                    role.permissions?.some(rp => rp.permissionId === permission.id)
-                  ).length || 0
-                }))
-                .sort((a, b) => b.roleCount - a.roleCount)
-                .slice(0, 6)
-                .map((permission) => (
-                  <div key={permission.id} className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">{permission.name}</span>
-                      <Badge variant="secondary">{permission.roleCount} vai trò</Badge>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {permission.description || 'Không có mô tả'}
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Legend */}
+      <div className="flex items-center gap-4 text-xs text-gray-500 bg-white border border-gray-200 px-3 py-2 rounded">
+        <div className="flex items-center gap-1.5">
+          <div className="bg-blue-500 rounded-full p-0.5">
+            <Check className="h-2.5 w-2.5 text-white" />
+          </div>
+          <span>Có quyền</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-gray-200">—</span>
+          <span>Không có</span>
+        </div>
+        <div className="flex items-center gap-1.5 ml-auto">
+          <ChevronRight className="h-3 w-3" />
+          <span>Nhấp vào nhóm để mở/đóng</span>
+        </div>
       </div>
     </div>
   )
