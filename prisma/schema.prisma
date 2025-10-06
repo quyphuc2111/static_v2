@@ -30,6 +30,8 @@ enum PermissionName {
     DOWNLOAD_CONTENT
     SOFT_DELETE_CONTENT
     HARD_DELETE_CONTENT
+    VIEW_DELETED_CONTENT
+    RESTORE_CONTENT
     
     // Content Scope
     MANAGE_ALL_CONTENT      // Can manage all content (override ownership)
@@ -46,6 +48,8 @@ enum PermissionName {
     EDIT_PROJECTS
     SOFT_DELETE_PROJECTS
     HARD_DELETE_PROJECTS
+    VIEW_DELETED_PROJECTS
+    RESTORE_PROJECTS
     
     // Module Management - CRUD
     VIEW_MODULES
@@ -53,6 +57,8 @@ enum PermissionName {
     EDIT_MODULES
     SOFT_DELETE_MODULES
     HARD_DELETE_MODULES
+    VIEW_DELETED_MODULES
+    RESTORE_MODULES
     
     // User Management - CRUD
     VIEW_USERS
@@ -206,6 +212,7 @@ model Role {
 model Permission {
     id          String          @id @default(uuid())
     name        PermissionName  @unique
+    nameVi      String?         // Vietnamese name
     description String?
     createdAt   DateTime        @default(now())
     updatedAt   DateTime        @updatedAt

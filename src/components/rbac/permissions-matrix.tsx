@@ -219,11 +219,11 @@ export function PermissionsMatrix() {
                                     <td className="px-3 py-2.5 border-r border-gray-200" style={{ width: '300px', minWidth: '250px' }}>
                                       <div className="flex flex-col gap-1">
                                         <span className="text-xs text-gray-900 font-medium">
+                                          {permission.nameVi || permission.name}
+                                        </span>
+                                        <code className="text-[10px] text-gray-500 bg-gray-50 px-1.5 py-0.5 rounded w-fit font-mono">
                                           {permission.name}
-                                        </span>
-                                        <span className="text-[10px] text-gray-500">
-                                          {permission.description || 'Không có mô tả'}
-                                        </span>
+                                        </code>
                                       </div>
                                     </td>
                                     {roles?.map((role) => {

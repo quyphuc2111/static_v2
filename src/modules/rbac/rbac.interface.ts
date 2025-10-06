@@ -11,6 +11,7 @@ export interface Role {
 export interface Permission {
   id: string
   name: string
+  nameVi?: string
   description?: string
   createdAt: string
   updatedAt: string
