@@ -89,7 +89,7 @@ export function Sidebar() {
   return (
     <div
       className={cn(
-        "relative flex flex-col h-auto bg-card border-r border-border transition-all duration-300",
+        "relative flex flex-col h-[calc(100vh-4rem)] bg-card border-r border-border transition-all duration-300",
         collapsed ? "w-16" : "w-64",
       )}
     >

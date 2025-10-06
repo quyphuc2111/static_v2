@@ -23,15 +23,46 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     const { userId } = await params
     const body = await req.json().catch(() => ({}))
-    const { name, email, status } = body as { name?: string; email?: string; status?: UserStatus }
+    const { name, email, status, password, roleId } = body as { 
+      name?: string; 
+      email?: string; 
+      status?: UserStatus;
+      password?: string;
+      roleId?: string;
+    }
+
+    // Prepare update data
+    const updateData: any = {
+      name: name ?? undefined,
+      email: email ?? undefined,
+      status: status ?? undefined,
+    }
+
+    // Handle password update
+    if (password) {
+      const bcrypt = require('bcryptjs')
+      updateData.password = await bcrypt.hash(password, 10)
+    }
+
+    // Handle role update
+    if (roleId) {
+      // First, remove all existing roles for this user
+      await prisma.userRole.deleteMany({
+        where: { userId }
+      })
+      
+      // Then add the new role
+      await prisma.userRole.create({
+        data: {
+          userId,
+          roleId
+        }
+      })
+    }
 
     const updated = await prisma.user.update({
       where: { id: userId },
-      data: {
-        name: name ?? undefined,
-        email: email ?? undefined,
-        status: status ?? undefined,
-      },
+      data: updateData,
       select: {
         id: true,
         name: true,
@@ -64,13 +95,54 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
     }
 
-    if (!(await hasPermission(PermissionName.DELETE_USERS, session.user.id))) {
+    if (!(await hasPermission(PermissionName.HARD_DELETE_USERS, session.user.id))) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403 })
     }
 
     const { userId } = await params
 
-    await prisma.user.delete({ where: { id: userId } })
+    // Delete related records first to avoid foreign key constraint violations
+    await prisma.$transaction(async (tx) => {
+      // Delete user roles
+      await tx.userRole.deleteMany({
+        where: { userId }
+      })
+
+      // Delete user permissions
+      await tx.userPermission.deleteMany({
+        where: { userId }
+      })
+
+      // Delete content shares where user is sharedBy or sharedWith
+      await tx.contentShare.deleteMany({
+        where: {
+          OR: [
+            { sharedById: userId },
+            { sharedWithId: userId }
+          ]
+        }
+      })
+
+      // Delete share batches where user is sharedBy or sharedWith
+      await tx.shareBatch.deleteMany({
+        where: {
+          OR: [
+            { sharedById: userId },
+            { sharedWithId: userId }
+          ]
+        }
+      })
+
+      // Update content ownership to null (set ownerId to null)
+      await tx.contentData.updateMany({
+        where: { ownerId: userId },
+        data: { ownerId: null }
+      })
+
+      // Finally delete the user
+      await tx.user.delete({ where: { id: userId } })
+    })
+
     return NextResponse.json({ message: "User deleted" })
   } catch (error) {
     console.error("Error deleting user:", error)

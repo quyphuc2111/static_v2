@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { verifyCsrfAndOrigin } from "@/lib/csrf"
 
-type Params = { params: { id: string; moduleId: string } }
+type Params = { params: Promise<{ id: string; moduleId: string }> }
 
 export async function PATCH(req: Request, { params }: Params) {
   try {
@@ -13,14 +13,22 @@ export async function PATCH(req: Request, { params }: Params) {
     const session = await getSession()
     if (!session.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
 
-    const { name } = await req.json()
-    const moduleName = (name ?? "").trim()
-    if (!moduleName) return NextResponse.json({ message: "Tên module là bắt buộc" }, { status: 400 })
+    const body = await req.json()
+    const name = (body?.name ?? "").trim()
+    const description = (body?.description ?? "").trim()
+    const status = body?.status
+    
+    if (!name) return NextResponse.json({ message: "Tên module là bắt buộc" }, { status: 400 })
 
     try {
+      const { moduleId } = await params
+      const updateData: any = { name }
+      if (description !== undefined) updateData.description = description || null
+      if (status !== undefined) updateData.status = status
+      
       const updated = await prisma.module.update({
-        where: { id: params.moduleId },
-        data: { name: moduleName },
+        where: { id: moduleId },
+        data: updateData,
       })
       return NextResponse.json({ data: updated })
     } catch (err: any) {
@@ -42,7 +50,8 @@ export async function DELETE(_req: Request, { params }: Params) {
     const session = await getSession()
     if (!session.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
 
-    await prisma.module.delete({ where: { id: params.moduleId } })
+    const { moduleId } = await params
+    await prisma.module.delete({ where: { id: moduleId } })
     return NextResponse.json({ success: true })
   } catch (e) {
     return NextResponse.json({ message: "Server error" }, { status: 500 })

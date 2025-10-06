@@ -75,7 +75,24 @@ export async function downloadContent(projectId: string, moduleId: string, conte
       throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
     }
     
-    return response.blob()
+    const blob = await response.blob()
+    
+    // Extract filename from Content-Disposition header
+    const contentDisposition = response.headers.get('Content-Disposition')
+    let filename = `content-${contentId}.zip` // fallback
+    
+    if (contentDisposition) {
+      console.log('Content-Disposition header:', contentDisposition)
+      // Try to extract filename from Content-Disposition header
+      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1].replace(/['"]/g, '')
+        console.log('Extracted filename:', filename)
+      }
+    }
+    
+    // Return both blob and filename
+    return { blob, filename }
   } catch (error) {
     console.error('Download error:', error)
     throw error
@@ -85,6 +102,14 @@ export async function downloadContent(projectId: string, moduleId: string, conte
 export async function getContentStats(projectId?: string) {
   const res = await httpService.get<{ data: ContentStats }>({ 
     url: CONTENT_API_URL.STATS(projectId) 
+  })
+  return res.data
+}
+
+export async function importContentBulk(projectId: string, moduleId: string, items: Array<{ title: string; description?: any; contentType?: 'FILE_ZIP_HTML' | 'FILE_ZIP_SCORM' }>) {
+  const res = await httpService.post<{ data: ContentData[] }>({
+    url: CONTENT_API_URL.IMPORT(projectId, moduleId),
+    data: { items }
   })
   return res.data
 }

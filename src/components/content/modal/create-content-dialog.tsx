@@ -212,7 +212,7 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
       onOpenChange(open)
     }}>
       <DialogContent 
-        className="bg-card border-border"
+        className="bg-card border-border overflow-hidden flex flex-col"
         style={{ 
           width: '60vw', 
           maxWidth: '60vw', 
@@ -220,15 +220,15 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
           maxHeight: '90vh'
         }}
       >
-        <DialogHeader>
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="text-foreground">Tạo Nội dung Mới</DialogTitle>
           <DialogDescription className="text-muted-foreground">
             Upload file ZIP (HTML hoặc SCORM) để tạo nội dung học tập
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="h-full flex flex-col overflow-hidden">
-          <ScrollArea className="flex-1 pr-2">
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+          <ScrollArea className="flex-1 pr-2 h-[300px] 2xl:h-[500px]">
             <div className="space-y-6 pr-2">
             {/* Content Type Selection */}
             <div className="space-y-4">
@@ -317,37 +317,35 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
                     </div>
                   ) : (
                     <div className="border border-border rounded-lg bg-background/50 backdrop-blur-sm">
-                      <ScrollArea className="h-[250px]">
-                        <div className="p-3 space-y-3">
-                          {descriptionItems.map((item) => (
-                            <div key={item.id} className="flex gap-2 items-start">
-                              <div className="flex-1 space-y-2">
-                                <Input
-                                  placeholder="Tên thuộc tính (VD: Tác giả, Phiên bản)"
-                                  value={item.key}
-                                  onChange={(e) => updateDescriptionItem(item.id, 'key', e.target.value)}
-                                  className="bg-background border-border hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary/20"
-                                />
-                                <Input
-                                  placeholder="Giá trị (VD: Nguyễn Văn A, 1.0)"
-                                  value={item.value}
-                                  onChange={(e) => updateDescriptionItem(item.id, 'value', e.target.value)}
-                                  className="bg-background border-border hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary/20"
-                                />
-                              </div>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => removeDescriptionItem(item.id)}
-                                className="h-8 w-8 p-0 text-red-400 hover:text-red-600"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                      <div className="max-h-[250px] overflow-y-auto p-3 space-y-3">
+                        {descriptionItems.map((item) => (
+                          <div key={item.id} className="flex gap-2 items-start">
+                            <div className="flex-1 space-y-2">
+                              <Input
+                                placeholder="Tên thuộc tính (VD: Tác giả, Phiên bản)"
+                                value={item.key}
+                                onChange={(e) => updateDescriptionItem(item.id, 'key', e.target.value)}
+                                className="bg-background border-border hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary/20"
+                              />
+                              <Input
+                                placeholder="Giá trị (VD: Nguyễn Văn A, 1.0)"
+                                value={item.value}
+                                onChange={(e) => updateDescriptionItem(item.id, 'value', e.target.value)}
+                                className="bg-background border-border hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary/20"
+                              />
                             </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeDescriptionItem(item.id)}
+                              className="h-8 w-8 p-0 text-red-400 hover:text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -454,7 +452,7 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
             </div>
           </ScrollArea>
 
-          <DialogFooter className="gap-3 pt-4 border-t border-border flex-shrink-0">
+          <DialogFooter className="gap-3 pt-4 flex-shrink-0">
             <Button 
               type="button" 
               variant="outline" 

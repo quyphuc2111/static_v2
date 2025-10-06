@@ -3,7 +3,7 @@
 import { ColumnDef } from "@tanstack/react-table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { MoreHorizontal, Eye, Copy, Check, BookOpen, Edit, Download, Trash2, RotateCcw } from "lucide-react"
+import { MoreHorizontal, Eye, Copy, Check, BookOpen, Edit, Download, Trash2, RotateCcw, Upload, Link, RefreshCw } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useState } from "react"
 
@@ -23,6 +23,7 @@ export interface ContentItem {
   isShared?: boolean
   sharePermissions?: {
     canView: boolean
+    canDownload: boolean
     canEdit: boolean
     canDelete: boolean
   } | null
@@ -66,7 +67,7 @@ const getStatusBadge = (status: string, progress?: number) => {
       return (
         <div className="flex items-center gap-2">
           <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">Đang xử lý</Badge>
-          {progress !== undefined && (
+          {/* {progress !== undefined && (
             <div className="flex items-center gap-1">
               <div className="w-8 bg-muted rounded-full h-1.5">
                 <div 
@@ -76,7 +77,7 @@ const getStatusBadge = (status: string, progress?: number) => {
               </div>
               <span className="text-xs text-blue-400 font-medium">{progress}%</span>
             </div>
-          )}
+          )} */}
         </div>
       )
     case "FAILED":
@@ -144,10 +145,14 @@ interface ContentActionsProps {
   onDownload: (content: ContentItem) => void
   onDelete: (content: ContentItem) => void
   onRestore: (content: ContentItem) => void
+  onUploadFile?: (content: ContentItem) => void
+  onUpdateFile?: (content: ContentItem) => void
   copiedUrl: string | null
   isDownloading: boolean
   isDeleting: boolean
   isRestoring: boolean
+  isUploading?: boolean
+  isUpdating?: boolean
   currentUserId?: string
 }
 
@@ -160,21 +165,29 @@ function ContentActions({
   onDownload,
   onDelete,
   onRestore,
+  onUploadFile,
+  onUpdateFile,
   copiedUrl,
   isDownloading,
   isDeleting,
   isRestoring,
+  isUploading,
+  isUpdating,
   currentUserId
 }: ContentActionsProps) {
   // Determine permissions
   const isOwner = content.owner?.id === currentUserId
   const sharePerms = content.sharePermissions
   const isDeleted = content.isDeleted
+  const hasFile = content.contentUrl && content.contentUrl.trim() !== ""
   
   // If shared content, use share permissions; if owner, full access
   const canView = isOwner || sharePerms?.canView || false
+  const canDownload = isOwner || sharePerms?.canDownload || false
   const canEdit = isOwner || sharePerms?.canEdit || false
   const canDelete = isOwner || sharePerms?.canDelete || false
+  const canUpload = isOwner && !hasFile && !isDeleted
+  const canUpdate = isOwner && hasFile && !isDeleted
   
   // If content is deleted, show restore action instead
   if (isDeleted) {
@@ -239,6 +252,15 @@ function ContentActions({
             )}
           </>
         )}
+        {canDownload && (
+          <DropdownMenuItem 
+            onClick={() => onDownload(content)}
+            disabled={isDownloading}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            {isDownloading ? "Đang tải..." : "Tải xuống"}
+          </DropdownMenuItem>
+        )}
         {canEdit && (
           <>
             <DropdownMenuSeparator />
@@ -246,13 +268,15 @@ function ContentActions({
               <Edit className="mr-2 h-4 w-4" />
               Chỉnh sửa
             </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={() => onDownload(content)}
-              disabled={isDownloading}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              {isDownloading ? "Đang tải..." : "Tải xuống"}
-            </DropdownMenuItem>
+            {canUpdate && onUpdateFile && (
+              <DropdownMenuItem 
+                onClick={() => onUpdateFile(content)}
+                disabled={isUpdating}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                {isUpdating ? "Đang cập nhật..." : "Cập nhật File"}
+              </DropdownMenuItem>
+            )}
           </>
         )}
         {canDelete && (
@@ -369,10 +393,14 @@ export const createContentColumns = (
     onDelete: (content: ContentItem) => void
     onRestore: (content: ContentItem) => void
     onDescriptionClick: (content: ContentItem) => void
+    onUploadFile?: (content: ContentItem) => void
+    onUpdateFile?: (content: ContentItem) => void
     copiedUrl: string | null
     isDownloading: boolean
     isDeleting: boolean
     isRestoring: boolean
+    isUploading?: boolean
+    isUpdating?: boolean
   },
   options?: { isAdmin?: boolean; currentUserId?: string }
 ): ColumnDef<ContentItem>[] => [
@@ -440,6 +468,49 @@ export const createContentColumns = (
     ),
   },
   {
+    accessorKey: "contentUrl",
+    header: "File Path",
+    cell: ({ row }) => {
+      const contentUrl = row.getValue("contentUrl") as string
+      const hasFile = contentUrl && contentUrl.trim() !== ""
+      const content = row.original
+      const isOwner = content.owner?.id === options?.currentUserId
+      const canUpload = isOwner && !hasFile && !content.isDeleted
+      const canUpdate = isOwner && hasFile && !content.isDeleted
+      
+      if (!hasFile) {
+        return (
+          <div className="flex items-center gap-2">
+            {/* <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">
+              Chưa có file
+            </Badge> */}
+            {canUpload && actions.onUploadFile && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-xs"
+                onClick={() => actions.onUploadFile!(content)}
+                disabled={actions.isUploading}
+              >
+                <Upload className="h-3 w-3 mr-1" />
+                {actions.isUploading ? "..." : "Upload"}
+              </Button>
+            )}
+          </div>
+        )
+      }
+      
+      return (
+        <div className="flex items-center gap-2 max-w-xs">
+          <Link className="h-4 w-4 text-green-400 flex-shrink-0" />
+          <span className="text-xs text-muted-foreground truncate" title={contentUrl}>
+            {truncateText(contentUrl, 30)}
+          </span>
+        </div>
+      )
+    },
+  },
+  {
     accessorKey: "status",
     header: "Trạng thái",
     cell: ({ row }) => getStatusBadge(row.getValue("status"), row.original.progress),
@@ -487,10 +558,14 @@ export const createContentColumns = (
         onDownload={actions.onDownload}
         onDelete={actions.onDelete}
         onRestore={actions.onRestore}
+        onUploadFile={actions.onUploadFile}
+        onUpdateFile={actions.onUpdateFile}
         copiedUrl={actions.copiedUrl}
         isDownloading={actions.isDownloading}
         isDeleting={actions.isDeleting}
         isRestoring={actions.isRestoring}
+        isUploading={actions.isUploading}
+        isUpdating={actions.isUpdating}
         currentUserId={options?.currentUserId}
       />
     ),

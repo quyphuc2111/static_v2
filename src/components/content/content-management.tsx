@@ -10,11 +10,14 @@ import { useRestoreContent } from "@/modules/content/hooks/useRestoreContent"
 import { useUpdateContent } from "@/modules/content/hooks/useUpdateContent"
 import { useDownloadContent } from "@/modules/content/hooks/useDownloadContent"
 import { useBulkDeleteContent } from "@/modules/content/hooks/useBulkDeleteContent"
+import { useUploadContentFile } from "@/modules/content/hooks/useUploadContentFile"
+import { useUpdateContentFile } from "@/modules/content/hooks/useUpdateContentFile"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus } from "lucide-react"
+import { Plus, FileSpreadsheet, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { CreateContentDialog, EditContentDialog, DeleteContentDialog, SCORMInfoDialog, DescriptionDialog } from "./modal"
+import { CreateContentDialog, EditContentDialog, DeleteContentDialog, SCORMInfoDialog, DescriptionDialog, UploadMissingFilesDialog, UploadFileDialog, UpdateFileDialog } from "./modal"
+import { ImportExcelDialog } from "./modal/import-excel-dialog"
 import { DataTable, createContentColumns, type ContentItem } from "@/components/content/table"
 import { useAuth } from "@/modules/auth/hooks/useAuth"
 import { PermissionName } from "@prisma/client"
@@ -56,6 +59,12 @@ const getContentUrl = (content: ContentItem) => {
 export function ContentManagement() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
+  const [showImportDialog, setShowImportDialog] = useState(false)
+  const [showUploadMissingDialog, setShowUploadMissingDialog] = useState(false)
+  const [showUploadFileDialog, setShowUploadFileDialog] = useState(false)
+  const [showUpdateFileDialog, setShowUpdateFileDialog] = useState(false)
+  const [contentToUpload, setContentToUpload] = useState<ContentItem | null>(null)
+  const [contentToUpdate, setContentToUpdate] = useState<ContentItem | null>(null)
   const [projectId, setProjectId] = useState<string>("")
   const [moduleId, setModuleId] = useState<string>("")
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null)
@@ -77,6 +86,8 @@ export function ContentManagement() {
   const updateContentMut = useUpdateContent(projectId, moduleId)
   const downloadContentMut = useDownloadContent(projectId, moduleId)
   const bulkDeleteContentMut = useBulkDeleteContent(projectId, moduleId)
+  const uploadContentFileMut = useUploadContentFile(projectId, moduleId)
+  const updateContentFileMut = useUpdateContentFile(projectId, moduleId)
 
   const contentData = contentQuery.data || []
 
@@ -143,6 +154,16 @@ export function ContentManagement() {
     setShowDescriptionDialog(true)
   }
 
+  const handleUploadFile = (content: ContentItem) => {
+    setContentToUpload(content)
+    setShowUploadFileDialog(true)
+  }
+
+  const handleUpdateFile = (content: ContentItem) => {
+    setContentToUpdate(content)
+    setShowUpdateFileDialog(true)
+  }
+
   const handleConfirmDelete = () => {
     if (contentToDelete) {
       deleteContentMut.mutate(contentToDelete.id, {
@@ -178,14 +199,18 @@ export function ContentManagement() {
     onDelete: handleDelete,
     onRestore: handleRestore,
     onDescriptionClick: handleDescriptionClick,
+    onUploadFile: handleUploadFile,
+    onUpdateFile: handleUpdateFile,
     copiedUrl,
     isDownloading: downloadContentMut.isPending,
     isDeleting: deleteContentMut.isPending,
-    isRestoring: restoreContentMut.isPending
+    isRestoring: restoreContentMut.isPending,
+    isUploading: uploadContentFileMut.isPending,
+    isUpdating: updateContentFileMut.isPending
   }, { 
     isAdmin, 
     currentUserId: me?.id 
-  }), [copiedUrl, downloadContentMut.isPending, deleteContentMut.isPending, restoreContentMut.isPending, isAdmin, me?.id])
+  }), [copiedUrl, downloadContentMut.isPending, deleteContentMut.isPending, restoreContentMut.isPending, uploadContentFileMut.isPending, updateContentFileMut.isPending, isAdmin, me?.id])
 
   return (
     <div className="p-6 space-y-6">
@@ -227,6 +252,20 @@ export function ContentManagement() {
               </Button>
             </PermissionGuard>
           )}
+          <PermissionGuard permissions={[PermissionName.CREATE_CONTENT, PermissionName.MANAGE_OWN_CONTENT]}>
+            <Button variant="outline" onClick={() => setShowImportDialog(true)}>
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              Nhập Excel
+            </Button>
+          </PermissionGuard>
+          {/* {projectId && moduleId && (
+            <PermissionGuard permissions={[PermissionName.CREATE_CONTENT, PermissionName.MANAGE_OWN_CONTENT]}>
+              <Button variant="outline" onClick={() => setShowUploadMissingDialog(true)}>
+                <Upload className="mr-2 h-4 w-4" />
+                Upload Files
+              </Button>
+            </PermissionGuard>
+          )} */}
         </div>
       </div>
 
@@ -303,10 +342,14 @@ export function ContentManagement() {
                 onDownload: handleDownload,
                 onDelete: handleDelete,
                 onRestore: handleRestore,
+                onUploadFile: handleUploadFile,
+                onUpdateFile: handleUpdateFile,
                 copiedUrl,
                 isDownloading: downloadContentMut.isPending,
                 isDeleting: deleteContentMut.isPending,
                 isRestoring: restoreContentMut.isPending,
+                isUploading: uploadContentFileMut.isPending,
+                isUpdating: updateContentFileMut.isPending,
                 currentUserId: me?.id
               }}
               bulkActions={{
@@ -356,6 +399,36 @@ export function ContentManagement() {
         content={contentToDelete}
         onConfirm={handleConfirmDelete}
         isDeleting={deleteContentMut.isPending}
+      />
+
+      <ImportExcelDialog
+        open={showImportDialog}
+        onOpenChange={setShowImportDialog}
+        projectId={projectId}
+        moduleId={moduleId}
+      />
+
+      <UploadMissingFilesDialog
+        open={showUploadMissingDialog}
+        onOpenChange={setShowUploadMissingDialog}
+        projectId={projectId}
+        moduleId={moduleId}
+      />
+
+      <UploadFileDialog
+        open={showUploadFileDialog}
+        onOpenChange={setShowUploadFileDialog}
+        content={contentToUpload}
+        projectId={projectId}
+        moduleId={moduleId}
+      />
+
+      <UpdateFileDialog
+        open={showUpdateFileDialog}
+        onOpenChange={setShowUpdateFileDialog}
+        content={contentToUpdate}
+        projectId={projectId}
+        moduleId={moduleId}
       />
     </div>
   )

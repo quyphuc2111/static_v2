@@ -13,7 +13,6 @@ export default function UsersPage() {
           <UserManagement />
         </main>
       </div>
-      <Footer />
     </div>
   )
 }

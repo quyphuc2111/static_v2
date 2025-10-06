@@ -133,10 +133,10 @@ export async function revokeContentShare(shareId?: string, batchId?: string): Pr
   })
 }
 
-export async function updateContentShare(shareId: string, canView: boolean, canEdit: boolean, canDelete: boolean): Promise<ContentShare> {
+export async function updateContentShare(shareId: string, canView: boolean, canDownload: boolean, canEdit: boolean, canDelete: boolean): Promise<ContentShare> {
   const res = await httpService.patch<{ data: ContentShare }>({ 
     url: `${RBAC_API_URL.CONTENT_SHARING}/${shareId}`,
-    data: { canView, canEdit, canDelete }
+    data: { canView, canDownload, canEdit, canDelete }
   })
   return res.data
 }

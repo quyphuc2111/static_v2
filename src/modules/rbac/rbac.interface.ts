@@ -77,6 +77,7 @@ export interface ShareContentPayload {
   contentId: string
   sharedWithId: string
   canView?: boolean
+  canDownload?: boolean
   canEdit?: boolean
   canDelete?: boolean
 }
@@ -114,6 +115,8 @@ export interface UpdateUserPayload {
   name?: string
   email?: string
   status?: string
+  password?: string
+  roleId?: string
 }
 
 export interface RoleWithPermissions extends Role {

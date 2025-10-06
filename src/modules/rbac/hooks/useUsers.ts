@@ -16,7 +16,7 @@ export function useUsers() {
   })
 
   const update = useMutation({
-    mutationFn: ({ userId, payload }: { userId: string; payload: UpdateUserPayload }) => updateUser(userId, payload),
+    mutationFn: ({ id, ...payload }: { id: string } & UpdateUserPayload) => updateUser(id, payload),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["rbac", "users"] }),
   })
 

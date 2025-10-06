@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useMemo, useState } from "react"
-import { User, Mail, Shield } from "lucide-react"
+import { User, Mail, Shield, RefreshCw, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -23,6 +23,7 @@ import { PermissionGuard } from "@/components/rbac/permission-guard"
 import { PermissionName } from "@prisma/client"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import {toast} from "react-toastify"
 
 interface CreateUserDialogProps {
   open: boolean
@@ -46,11 +47,20 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
   })
   const [showPasswordDialog, setShowPasswordDialog] = useState(false)
   const [generatedPassword, setGeneratedPassword] = useState<string>("")
+  const [createdUserEmail, setCreatedUserEmail] = useState<string>("")
+  const [showPassword, setShowPassword] = useState(false)
   const { data: roles } = useRoles()
   const { create } = useUsers()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validate password if provided
+    if (formData.password && formData.password.length < 8) {
+      alert("Mật khẩu phải có ít nhất 8 ký tự")
+      return
+    }
+    
     const result: any = await create.mutateAsync({
       name: formData.name || undefined,
       email: formData.email,
@@ -58,10 +68,17 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
       // status implicit ACTIVE; if needed, add toggle in UI
       roleId: formData.role || undefined,
     })
-    const temp = result?.tempPassword
-    const finalPassword = formData.password || temp || ""
+    
+    console.log("API Response:", result)
+    console.log("User password:", formData.password)
+    console.log("Temporary password:", result?.temporaryPassword)
+    
+    // If user provided a password, use that; otherwise show the generated temporary password
+    const finalPassword = formData.password || result?.temporaryPassword || ""
+    
     if (finalPassword) {
       setGeneratedPassword(finalPassword)
+      setCreatedUserEmail(formData.email)
       setShowPasswordDialog(true)
     } else {
       // fallback: no password provided nor returned
@@ -72,6 +89,16 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
 
   const updateFormData = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const generateStrongPassword = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*"
+    const length = 12
+    let result = ""
+    for (let i = 0; i < length; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    updateFormData("password", result)
   }
 
   return (
@@ -107,16 +134,47 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
               <Label htmlFor="password" className="text-foreground">
                 Mật khẩu (tuỳ chọn)
               </Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => updateFormData("password", e.target.value)}
-                  placeholder="Để trống để tạo tự động"
-                  className="bg-muted/50 border-border"
-                />
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={formData.password}
+                    onChange={(e) => updateFormData("password", e.target.value)}
+                    placeholder="Tối thiểu 8 ký tự, để trống để tạo tự động"
+                    className="bg-muted/50 border-border pr-20"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 hover:bg-transparent"
+                    title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={generateStrongPassword}
+                  title="Tạo mật khẩu mạnh"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
               </div>
+              {formData.password && formData.password.length < 8 && (
+                <p className="text-sm text-red-400">Mật khẩu phải có ít nhất 8 ký tự</p>
+              )}
+              {formData.password && formData.password.length >= 8 && (
+                <p className="text-sm text-green-400">✓ Mật khẩu hợp lệ</p>
+              )}
             </div>
           </div>
 
@@ -166,7 +224,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
             </div>
           </div>
 
-          <div className="space-y-4">
+          {/* <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label className="text-foreground">Gửi email chào mừng</Label>
@@ -188,7 +246,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                 onCheckedChange={(checked) => updateFormData("requirePasswordChange", checked)}
               />
             </div>
-          </div>
+          </div> */}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -205,19 +263,51 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
     <Dialog open={showPasswordDialog} onOpenChange={(v) => { setShowPasswordDialog(v); if (!v) onOpenChange(false) }}>
       <DialogContent className="sm:max-w-[460px] bg-card border-border">
         <DialogHeader>
-          <DialogTitle className="text-foreground">Mật khẩu tài khoản mới</DialogTitle>
-          <DialogDescription className="text-muted-foreground">Hãy lưu lại mật khẩu bên dưới để gửi cho người dùng.</DialogDescription>
+          <DialogTitle className="text-foreground">Copy thông tin tài khoản mới</DialogTitle>
+          <DialogDescription className="text-muted-foreground">
+            {formData.password ? 
+              "Hãy copy thông tin tài khoản mới." : 
+              "Hãy copy thông tin tài khoản mới."
+            }
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          <div>
-            <Label className="text-foreground">Mật khẩu</Label>
+          {/* <div>
+            <Label className="text-foreground">Email</Label>
+            <div className="mt-2 flex items-center gap-2">
+              <Input readOnly value={createdUserEmail} className="font-mono" />
+              <Button type="button" variant="outline" onClick={() => navigator.clipboard.writeText(createdUserEmail)}>Sao chép</Button>
+            </div>
+          </div> */}
+          
+          {/* <div>
+            <Label className="text-foreground">
+              {formData.password ? "Mật khẩu đã nhập" : "Mật khẩu tạm thời"}
+            </Label>
             <div className="mt-2 flex items-center gap-2">
               <Input readOnly value={generatedPassword} className="font-mono" />
               <Button type="button" variant="outline" onClick={() => navigator.clipboard.writeText(generatedPassword)}>Sao chép</Button>
             </div>
+          </div> */}
+          
+          <div>
+            <Label className="text-foreground">Email | Password (để copy)</Label>
+            <div className="mt-2 flex items-center gap-2">
+              <Input readOnly value={`${createdUserEmail} | ${generatedPassword}`} className="font-mono" />
+              <Button type="button" variant="outline" onClick={() => {
+                navigator.clipboard.writeText(`${createdUserEmail} | ${generatedPassword}`)
+                toast.success("Đã copy thông tin tài khoản mới")
+              }}>Sao chép</Button>
+            </div>
           </div>
+          
           <Separator />
-          <p className="text-sm text-muted-foreground">Bạn có thể yêu cầu người dùng đổi mật khẩu sau khi đăng nhập lần đầu.</p>
+          <p className="text-sm text-muted-foreground">
+            {formData.password ? 
+              "Người dùng có thể đăng nhập ngay với thông tin này." :
+              "Người dùng cần đăng nhập với thông tin này và có thể đổi mật khẩu sau."
+            }
+          </p>
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => { setShowPasswordDialog(false); onOpenChange(false) }}>Đóng</Button>

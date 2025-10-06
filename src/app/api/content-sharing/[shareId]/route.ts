@@ -26,9 +26,9 @@ export async function PATCH(
 
     const { shareId } = await params
     const body = await req.json()
-    const { canView, canEdit, canDelete } = body
+    const { canView, canEdit, canDelete, canDownload } = body
 
-    if (typeof canView !== 'boolean' || typeof canEdit !== 'boolean' || typeof canDelete !== 'boolean') {
+    if (typeof canView !== 'boolean' || typeof canEdit !== 'boolean' || typeof canDelete !== 'boolean' || typeof canDownload !== 'boolean') {
       return NextResponse.json({ message: "Invalid permission values" }, { status: 400 })
     }
 
@@ -51,19 +51,32 @@ export async function PATCH(
     // Update share permissions
     const updatedShare = await prisma.contentShare.update({
       where: { id: shareId },
-      data: {
-        canView,
-        canEdit,
-        canDelete,
-        updatedAt: new Date()
-      },
+        data: {
+          canView,
+          canEdit,
+          canDelete,
+          canDownload,
+          updatedAt: new Date()
+        },
       include: {
         content: {
           select: {
             id: true,
             title: true,
             contentType: true,
-            status: true
+            status: true,
+            project: {
+              select: {
+                id: true,
+                name: true
+              }
+            },
+            module: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
           }
         },
         sharedBy: {

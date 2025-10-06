@@ -10,6 +10,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { CreateUserDialog } from "./create-user-dialog"
+import { EditUserDialog } from "./edit-user-dialog"
+import { DeleteUserDialog } from "./delete-user-dialog"
 import { useUsers } from "@/modules/rbac/hooks/useUsers"
 import { PermissionGuard } from "@/components/rbac/permission-guard"
 import { PermissionName } from "@prisma/client"
@@ -32,6 +34,9 @@ const getStatusBadge = (status: string) => {
 export function UserManagement() {
   const [searchTerm, setSearchTerm] = useState("")
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<any>(null)
   const { data: users, isLoading, remove } = useUsers()
 
   const safeUsers = users ?? []
@@ -46,6 +51,16 @@ export function UserManagement() {
   const activeUsers = safeUsers.filter((user) => user.status === "ACTIVE").length
   const pendingUsers = 0
   const totalDocuments = 0
+
+  const handleEditUser = (user: any) => {
+    setSelectedUser(user)
+    setShowEditDialog(true)
+  }
+
+  const handleDeleteUser = (user: any) => {
+    setSelectedUser(user)
+    setShowDeleteDialog(true)
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -171,10 +186,12 @@ export function UserManagement() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Chỉnh sửa
-                        </DropdownMenuItem>
+                        <PermissionGuard permission={PermissionName.EDIT_USERS}>
+                          <DropdownMenuItem onClick={() => handleEditUser(user)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Chỉnh sửa
+                          </DropdownMenuItem>
+                        </PermissionGuard>
                         <PermissionGuard permission={PermissionName.MANAGE_USER_PERMISSIONS}>
                         <DropdownMenuItem>
                           <Shield className="mr-2 h-4 w-4" />
@@ -192,8 +209,8 @@ export function UserManagement() {
                             Kích hoạt
                           </DropdownMenuItem>
                         )}
-                        <PermissionGuard permission={PermissionName.DELETE_USERS}>
-                        <DropdownMenuItem className="text-red-400" onClick={() => remove.mutate(user.id)}>
+                        <PermissionGuard permission={PermissionName.HARD_DELETE_USERS}>
+                        <DropdownMenuItem className="text-red-400" onClick={() => handleDeleteUser(user)}>
                           <Trash2 className="mr-2 h-4 w-4" />
                           Xóa
                         </DropdownMenuItem>
@@ -210,6 +227,16 @@ export function UserManagement() {
       </Card>
 
       <CreateUserDialog open={showCreateDialog} onOpenChange={setShowCreateDialog} />
+      <EditUserDialog 
+        open={showEditDialog} 
+        onOpenChange={setShowEditDialog} 
+        user={selectedUser} 
+      />
+      <DeleteUserDialog 
+        open={showDeleteDialog} 
+        onOpenChange={setShowDeleteDialog} 
+        user={selectedUser} 
+      />
     </div>
   )
 }

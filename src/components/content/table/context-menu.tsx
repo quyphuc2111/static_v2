@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "../../ui/context-menu"
-import { Eye, Copy, Check, BookOpen, Edit, Download, Trash2, RotateCcw } from "lucide-react"
+import { Eye, Copy, Check, BookOpen, Edit, Download, Trash2, RotateCcw, Upload, RefreshCw } from "lucide-react"
 import { ContentItem } from "./columns"
 
 interface ContentContextMenuProps {
@@ -15,10 +15,14 @@ interface ContentContextMenuProps {
   onDownload: (content: ContentItem) => void
   onDelete: (content: ContentItem) => void
   onRestore: (content: ContentItem) => void
+  onUploadFile?: (content: ContentItem) => void
+  onUpdateFile?: (content: ContentItem) => void
   copiedUrl: string | null
   isDownloading: boolean
   isDeleting: boolean
   isRestoring: boolean
+  isUploading?: boolean
+  isUpdating?: boolean
   hasSCORMInfo: boolean
   currentUserId?: string
 }
@@ -33,10 +37,14 @@ export function ContentContextMenu({
   onDownload,
   onDelete,
   onRestore,
+  onUploadFile,
+  onUpdateFile,
   copiedUrl,
   isDownloading,
   isDeleting,
   isRestoring,
+  isUploading,
+  isUpdating,
   hasSCORMInfo,
   currentUserId
 }: ContentContextMenuProps) {
@@ -44,11 +52,14 @@ export function ContentContextMenu({
   const isOwner = content.owner?.id === currentUserId
   const sharePerms = content.sharePermissions
   const isDeleted = content.isDeleted
+  const hasFile = content.contentUrl && content.contentUrl.trim() !== ""
   
   // If shared content, use share permissions; if owner, full access
   const canView = isOwner || sharePerms?.canView || false
   const canEdit = isOwner || sharePerms?.canEdit || false
   const canDelete = isOwner || sharePerms?.canDelete || false
+  const canUpload = isOwner && !hasFile && !isDeleted
+  const canUpdate = isOwner && hasFile && !isDeleted
   
   // If content is deleted, show restore action
   if (isDeleted) {
@@ -123,6 +134,15 @@ export function ContentContextMenu({
               <Download className="mr-2 h-4 w-4" />
               {isDownloading ? "Đang tải..." : "Tải xuống"}
             </ContextMenuItem>
+            {canUpdate && onUpdateFile && (
+              <ContextMenuItem 
+                onClick={() => onUpdateFile(content)}
+                disabled={isUpdating}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                {isUpdating ? "Đang cập nhật..." : "Cập nhật File"}
+              </ContextMenuItem>
+            )}
           </>
         )}
         {canDelete && (

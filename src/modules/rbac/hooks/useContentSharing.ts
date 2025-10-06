@@ -16,6 +16,7 @@ export function useShareContent() {
     mutationFn: (payload: ShareContentPayload) => shareContent(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rbac", "content-shares"] })
+      queryClient.invalidateQueries({ queryKey: ["content"] })
     },
   })
 }
@@ -28,6 +29,7 @@ export function useRemoveContentShare() {
       removeContentShare(contentId, sharedWithId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rbac", "content-shares"] })
+      queryClient.invalidateQueries({ queryKey: ["content"] })
     },
   })
 }
@@ -39,6 +41,7 @@ export function useBulkShareContent() {
     mutationFn: (payload: BulkSharePayload) => bulkShareContent(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rbac", "content-shares"] })
+      queryClient.invalidateQueries({ queryKey: ["content"] })
     },
   })
 }
@@ -51,6 +54,7 @@ export function useRevokeContentShare() {
       revokeContentShare(shareId, batchId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rbac", "content-shares"] })
+      queryClient.invalidateQueries({ queryKey: ["content"] })
     },
   })
 }
@@ -59,15 +63,17 @@ export function useUpdateContentShare() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ shareId, canView, canEdit, canDelete }: { 
+    mutationFn: ({ shareId, canView, canDownload, canEdit, canDelete }: { 
       shareId: string; 
       canView: boolean; 
+      canDownload: boolean;
       canEdit: boolean; 
       canDelete: boolean; 
     }) => 
-      updateContentShare(shareId, canView, canEdit, canDelete),
+      updateContentShare(shareId, canView, canDownload, canEdit, canDelete),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rbac", "content-shares"] })
+      queryClient.invalidateQueries({ queryKey: ["content"] })
     },
   })
 }

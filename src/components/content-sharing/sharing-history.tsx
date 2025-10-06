@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Search, Calendar, User, FileText, Clock, UserMinus, Share2, RotateCcw, Edit, MoreHorizontal, Eye, EyeOff, Edit3, Trash2, Shield, Filter, SortAsc, SortDesc } from "lucide-react"
+import { Search, Calendar, User, FileText, Clock, UserMinus, Share2, RotateCcw, Edit, MoreHorizontal, MoreVertical, Eye, EyeOff, Edit3, Trash2, Shield, Filter, SortAsc, SortDesc, Download } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { useContentShares, useRevokeContentShare, useShareContent, useUpdateContentShare } from "@/modules/rbac/hooks/useContentSharing"
+import { useModules } from "@/modules/project/hooks/useModules"
 import { toast } from "react-toastify"
 
 const getTypeBadge = (type?: string) => {
@@ -34,6 +35,7 @@ const getTypeBadge = (type?: string) => {
 const getPermissionBadges = (share: any) => {
   const items: any[] = []
   if (share?.canView) items.push(<Badge key="v" variant="outline">Xem</Badge>)
+  if (share?.canDownload) items.push(<Badge key="dl" className="bg-blue-500/20 text-blue-400 border-blue-500/30">Tải xuống</Badge>)
   if (share?.canEdit) items.push(<Badge key="e" className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Sửa</Badge>)
   if (share?.canDelete) items.push(<Badge key="d" className="bg-red-500/20 text-red-400 border-red-500/30">Xóa</Badge>)
   return <div className="flex gap-1 flex-wrap">{items}</div>
@@ -42,6 +44,8 @@ const getPermissionBadges = (share: any) => {
 export function SharingHistory() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [projectFilter, setProjectFilter] = useState<string>("all")
+  const [moduleFilter, setModuleFilter] = useState<string>("all")
   const [sortBy, setSortBy] = useState<string>("createdAt")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
   const [showRevokeDialog, setShowRevokeDialog] = useState(false)
@@ -52,11 +56,13 @@ export function SharingHistory() {
   const [editData, setEditData] = useState<any>(null)
   const [permissions, setPermissions] = useState({
     canView: true,
+    canDownload: true,
     canEdit: false,
     canDelete: false
   })
   
   const { data: shares, isLoading } = useContentShares()
+  const { data: modules, isLoading: modulesLoading } = useModules(projectFilter !== "all" ? projectFilter : "", projectFilter !== "all")
   const revokeShareMut = useRevokeContentShare()
   const shareContentMut = useShareContent()
   const updateShareMut = useUpdateContentShare()
@@ -77,6 +83,16 @@ export function SharingHistory() {
     // Filter by status
     if (statusFilter !== "all") {
       list = list.filter((s: any) => s.status.toLowerCase() === statusFilter.toLowerCase())
+    }
+    
+    // Filter by project
+    if (projectFilter !== "all") {
+      list = list.filter((s: any) => s.content?.project?.id === projectFilter)
+    }
+    
+    // Filter by module (only if project is selected)
+    if (moduleFilter !== "all" && projectFilter !== "all") {
+      list = list.filter((s: any) => s.content?.module?.id === moduleFilter)
     }
     
     // Sort
@@ -112,9 +128,9 @@ export function SharingHistory() {
     })
     
     return list
-  }, [shares, searchTerm, statusFilter, sortBy, sortOrder])
+  }, [shares, searchTerm, statusFilter, projectFilter, moduleFilter, sortBy, sortOrder])
 
-  const handleRevoke = () => {
+  const handleRevokeConfirm = () => {
     if (!revokeShareId) return
     revokeShareMut.mutate(
       { shareId: revokeShareId },
@@ -131,13 +147,14 @@ export function SharingHistory() {
     )
   }
 
-  const handleReshare = () => {
+  const handleReshareConfirm = () => {
     if (!reshareData) return
     shareContentMut.mutate(
       {
         contentId: reshareData.contentId,
         sharedWithId: reshareData.sharedWithId,
         canView: reshareData.canView,
+        canDownload: reshareData.canDownload,
         canEdit: reshareData.canEdit,
         canDelete: reshareData.canDelete
       },
@@ -160,6 +177,7 @@ export function SharingHistory() {
       {
         shareId: editData.id,
         canView: permissions.canView,
+        canDownload: permissions.canDownload,
         canEdit: permissions.canEdit,
         canDelete: permissions.canDelete
       },
@@ -180,10 +198,37 @@ export function SharingHistory() {
     setEditData(item)
     setPermissions({
       canView: item.canView,
+      canDownload: item.canDownload,
       canEdit: item.canEdit,
       canDelete: item.canDelete
     })
     setShowEditDialog(true)
+  }
+
+  const handleProjectChange = (projectId: string) => {
+    setProjectFilter(projectId)
+    setModuleFilter("all") // Reset module filter when project changes
+  }
+
+  const handleEditPermission = (item: any) => {
+    handleEditClick(item)
+  }
+
+  const handleReshare = (item: any) => {
+    setReshareData({
+      contentId: item.contentId,
+      sharedWithId: item.sharedWithId,
+      canView: item.canView,
+      canDownload: item.canDownload,
+      canEdit: item.canEdit,
+      canDelete: item.canDelete
+    })
+    setShowReshareDialog(true)
+  }
+
+  const handleRevoke = (item: any) => {
+    setRevokeShareId(item.id)
+    setShowRevokeDialog(true)
   }
 
   return (
@@ -199,7 +244,7 @@ export function SharingHistory() {
           />
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-40">
               <SelectValue placeholder="Trạng thái" />
@@ -208,6 +253,54 @@ export function SharingHistory() {
               <SelectItem value="all">Tất cả</SelectItem>
               <SelectItem value="active">Đang hoạt động</SelectItem>
               <SelectItem value="revoked">Đã thu hồi</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <Select value={projectFilter} onValueChange={handleProjectChange}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Dự án" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tất cả dự án</SelectItem>
+              {shares && Array.from(new Map(shares
+                .filter((s: any) => s.content?.project?.id && s.content?.project?.name)
+                .map((s: any) => [s.content.project.id, { id: s.content.project.id, name: s.content.project.name }])
+              ).values()).map((project: any) => (
+                <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          <Select value={moduleFilter} onValueChange={setModuleFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder={
+                projectFilter === "all" 
+                  ? "Module" 
+                  : modulesLoading 
+                    ? "Đang tải..." 
+                    : "Module"
+              } />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tất cả module</SelectItem>
+              {projectFilter === "all" ? (
+                // Show all modules from shares when no project is selected
+                shares && Array.from(new Map(shares
+                  .filter((s: any) => s.content?.module?.id && s.content?.module?.name)
+                  .map((s: any) => [s.content.module.id, { id: s.content.module.id, name: s.content.module.name }])
+                ).values()).map((module: any) => (
+                  <SelectItem key={module.id} value={module.id}>{module.name}</SelectItem>
+                ))
+              ) : (
+                // Show modules from selected project
+                modulesLoading ? (
+                  <SelectItem value="loading" disabled>Đang tải...</SelectItem>
+                ) : (
+                  modules && modules.map((module: any) => (
+                    <SelectItem key={module.id} value={module.id}>{module.name}</SelectItem>
+                  ))
+                )
+              )}
             </SelectContent>
           </Select>
           
@@ -306,6 +399,7 @@ export function SharingHistory() {
               <TableRow className="border-border">
                 <TableHead className="text-muted-foreground">Loại</TableHead>
                 <TableHead className="text-muted-foreground">Tài liệu</TableHead>
+                <TableHead className="text-muted-foreground">Vị trí</TableHead>
                 <TableHead className="text-muted-foreground">Người chia sẻ</TableHead>
                 <TableHead className="text-muted-foreground">Chia sẻ với</TableHead>
                 <TableHead className="text-muted-foreground">Quyền</TableHead>
@@ -318,12 +412,33 @@ export function SharingHistory() {
             <TableBody>
               {isLoading ? (
                 <TableRow className="border-border">
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">Đang tải...</TableCell>
+                  <TableCell colSpan={10} className="text-center text-muted-foreground">Đang tải...</TableCell>
                 </TableRow>
               ) : filtered.map((item: any) => (
                 <TableRow key={`${item.contentId}-${item.sharedWithId}-${item.createdAt}`} className="border-border">
                   <TableCell>{getTypeBadge(item?.batch?.scope)}</TableCell>
                   <TableCell className="font-medium text-foreground">{item.content?.title || '-'}</TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1">
+                        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                          📁 {item.content?.project?.name || 'Không xác định'}
+                        </Badge>
+                      </div>
+                      {item.content?.module?.name && (
+                        <div className="flex items-center gap-1">
+                          <Badge variant="secondary" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                            📂 {item.content?.module?.name}
+                          </Badge>
+                        </div>
+                      )}
+                      {!item.content?.module?.name && item.content?.project?.name && (
+                        <div className="text-xs text-muted-foreground italic">
+                          Không có module
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Avatar className="h-6 w-6">
@@ -344,59 +459,36 @@ export function SharingHistory() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      {item.status.toLowerCase() === 'active' ? (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditClick(item)}
-                            className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                          >
-                            <Edit className="h-4 w-4 mr-1" />
-                            Sửa quyền
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="outline" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setRevokeShareId(item.id)
-                                  setShowRevokeDialog(true)
-                                }}
-                                className="text-red-600"
-                              >
-                                <UserMinus className="h-4 w-4 mr-2" />
-                                Thu hồi chia sẻ
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setReshareData({
-                              contentId: item.contentId,
-                              sharedWithId: item.sharedWithId,
-                              canView: item.canView,
-                              canEdit: item.canEdit,
-                              canDelete: item.canDelete
-                            })
-                            setShowReshareDialog(true)
-                          }}
-                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                        >
-                          <Share2 className="h-4 w-4 mr-1" />
-                          Chia sẻ lại
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
                         </Button>
-                      )}
-                    </div>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-popover border-border">
+                        <DropdownMenuItem
+                          onClick={() => handleEditPermission(item)}
+                          className="cursor-pointer"
+                          disabled={item.status === "revoked"}
+                        >
+                          <Edit className="mr-2 h-4 w-4" />
+                          Chỉnh sửa quyền
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleReshare(item)} className="cursor-pointer">
+                          <Share2 className="mr-2 h-4 w-4" />
+                          Chia sẻ lại
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator className="bg-border" />
+                        <DropdownMenuItem
+                          onClick={() => handleRevoke(item)}
+                          className="cursor-pointer text-red-400 focus:text-red-400"
+                          disabled={item.status === "revoked"}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Thu hồi chia sẻ
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))}
@@ -420,7 +512,7 @@ export function SharingHistory() {
             </Button>
             <Button
               variant="destructive"
-              onClick={handleRevoke}
+              onClick={handleRevokeConfirm}
               disabled={revokeShareMut.isPending}
             >
               {revokeShareMut.isPending ? "Đang thu hồi..." : "Thu hồi"}
@@ -443,7 +535,7 @@ export function SharingHistory() {
               Hủy
             </Button>
             <Button
-              onClick={handleReshare}
+              onClick={handleReshareConfirm}
               disabled={shareContentMut.isPending}
               className="bg-blue-600 hover:bg-blue-700"
             >
@@ -482,6 +574,19 @@ export function SharingHistory() {
               </div>
               <div className="flex items-center space-x-2">
                 <Checkbox
+                  id="canDownload"
+                  checked={permissions.canDownload}
+                  onCheckedChange={(checked) => 
+                    setPermissions(prev => ({ ...prev, canDownload: !!checked }))
+                  }
+                />
+                <Label htmlFor="canDownload" className="flex items-center gap-2">
+                  <Download className="h-4 w-4" />
+                  Tải xuống nội dung
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
                   id="canEdit"
                   checked={permissions.canEdit}
                   onCheckedChange={(checked) => 
@@ -509,7 +614,7 @@ export function SharingHistory() {
             </div>
             <div className="bg-muted/50 p-3 rounded-lg">
               <p className="text-sm text-muted-foreground">
-                <strong>Lưu ý:</strong> Quyền "Xem" là bắt buộc. Nếu bỏ chọn, người dùng sẽ không thể truy cập nội dung.
+                <strong>Lưu ý:</strong> Quyền "Xem" là bắt buộc. Quyền "Tải xuống" cho phép người dùng tải file về máy. Nếu bỏ chọn "Xem", người dùng sẽ không thể truy cập nội dung.
               </p>
             </div>
           </div>

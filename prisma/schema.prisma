@@ -27,6 +27,7 @@ enum PermissionName {
     VIEW_CONTENT
     CREATE_CONTENT
     EDIT_CONTENT
+    DOWNLOAD_CONTENT
     SOFT_DELETE_CONTENT
     HARD_DELETE_CONTENT
     
@@ -75,6 +76,17 @@ enum ContentStatus {
     PROCESSING
     COMPLETED
     FAILED
+}
+
+enum ProjectStatus {
+    ACTIVE
+    INACTIVE
+    ARCHIVED
+}
+
+enum ModuleStatus {
+    ACTIVE
+    INACTIVE
 }
 
 // New: scope for grouping bulk shares
@@ -148,6 +160,8 @@ model ContentData {
 model Project {
     id           String        @id @default(uuid())
     name         String        @unique
+    description  String?
+    status       ProjectStatus @default(ACTIVE)
     createdAt    DateTime      @default(now())
     updatedAt    DateTime      @updatedAt
 
@@ -159,6 +173,8 @@ model Project {
 model Module {
     id           String        @id @default(uuid())
     name         String
+    description  String?
+    status       ModuleStatus  @default(ACTIVE)
     createdAt    DateTime      @default(now())
     updatedAt    DateTime      @updatedAt
 
@@ -246,15 +262,17 @@ model ContentShare {
     canView     Boolean  @default(true)
     canEdit     Boolean  @default(false)
     canDelete   Boolean  @default(false)
+    canDownload Boolean  @default(true)
     status      ShareStatus @default(ACTIVE)
     revokedAt   DateTime?
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
-    @@unique([contentId, sharedWithId])
+    @@index([contentId, sharedWithId])
     @@index([sharedById])
     @@index([sharedWithId])
     @@index([status])
+    @@index([createdAt])
 }
 
 // New: Batch entity to track bulk sharing operations for history/analytics
@@ -271,6 +289,7 @@ model ShareBatch {
     canView      Boolean     @default(true)
     canEdit      Boolean     @default(false)
     canDelete    Boolean     @default(false)
+    canDownload  Boolean     @default(true)
     status       ShareStatus @default(ACTIVE)
     revokedAt    DateTime?
     itemsCount   Int         @default(0)

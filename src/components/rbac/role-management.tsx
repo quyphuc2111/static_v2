@@ -163,7 +163,7 @@ export function RoleManagement() {
                 Tạo vai trò mới
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[90vh]">
+            <DialogContent className="!max-w-4xl max-h-[90vh]">
               <DialogHeader>
                 <DialogTitle>
                   {selectedRole ? "Chỉnh sửa vai trò" : "Tạo vai trò mới"}

@@ -26,13 +26,23 @@ export async function POST(req: Request, { params }: Params) {
     const session = await getSession()
     if (!session.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
 
-    const { name } = await req.json()
-    const moduleName = (name ?? "").trim()
-    if (!moduleName) return NextResponse.json({ message: "Tên module là bắt buộc" }, { status: 400 })
+    const body = await req.json()
+    const name = (body?.name ?? "").trim()
+    const description = (body?.description ?? "").trim()
+    const status = body?.status ?? "ACTIVE"
+    
+    if (!name) return NextResponse.json({ message: "Tên module là bắt buộc" }, { status: 400 })
 
     const { id } = await params
     try {
-      const created = await prisma.module.create({ data: { name: moduleName, projectId: id } })
+      const created = await prisma.module.create({ 
+        data: { 
+          name, 
+          description: description || null,
+          status,
+          projectId: id 
+        } 
+      })
       return NextResponse.json({ data: created }, { status: 201 })
     } catch (err: any) {
       if (err?.code === "P2002") {

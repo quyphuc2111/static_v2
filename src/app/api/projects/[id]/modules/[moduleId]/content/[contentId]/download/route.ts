@@ -48,7 +48,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       const isOwner = content.ownerId === session.user.id
       if (!isOwner) {
         const share = await prisma.contentShare.findFirst({
-          where: { contentId: content.id, sharedWithId: session.user.id, canView: true, status: ShareStatus.ACTIVE }
+          where: { contentId: content.id, sharedWithId: session.user.id, canDownload: true, status: ShareStatus.ACTIVE }
         })
         if (!share) {
           return NextResponse.json({ error: "Forbidden" }, { status: 403 })
@@ -108,10 +108,20 @@ export async function GET(request: NextRequest, { params }: Params) {
     const buffer = Buffer.concat(chunks)
     console.log('Buffer size:', buffer.length)
 
+    // Helper function to sanitize filename
+    const sanitizeFilename = (filename: string): string => {
+      return filename
+        .normalize('NFD') // Decompose accented characters
+        .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+        .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters except spaces
+        .replace(/\s+/g, '_') // Replace spaces with underscores
+        .toLowerCase()
+    }
+
     // Set response headers
     const headers = new Headers()
     headers.set('Content-Type', 'application/zip')
-    headers.set('Content-Disposition', `attachment; filename="${content.title}.zip"`)
+    headers.set('Content-Disposition', `attachment; filename="${sanitizeFilename(content.title)}.zip"`)
     headers.set('Content-Length', buffer.length.toString())
     headers.set('Cache-Control', 'no-cache')
 

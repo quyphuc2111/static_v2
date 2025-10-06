@@ -40,10 +40,14 @@ interface DataTableProps<TData, TValue> {
     onDownload?: (content: ContentItem) => void
     onDelete?: (content: ContentItem) => void
     onRestore?: (content: ContentItem) => void
+    onUploadFile?: (content: ContentItem) => void
+    onUpdateFile?: (content: ContentItem) => void
     copiedUrl?: string | null
     isDownloading?: boolean
     isDeleting?: boolean
     isRestoring?: boolean
+    isUploading?: boolean
+    isUpdating?: boolean
     currentUserId?: string
   }
   // Bulk actions (optional)
@@ -260,10 +264,14 @@ export function DataTable<TData, TValue>({
                       onDownload={contextMenuActions.onDownload!}
                       onDelete={contextMenuActions.onDelete!}
                       onRestore={contextMenuActions.onRestore!}
+                      onUploadFile={contextMenuActions.onUploadFile}
+                      onUpdateFile={contextMenuActions.onUpdateFile}
                       copiedUrl={contextMenuActions.copiedUrl || null}
                       isDownloading={contextMenuActions.isDownloading || false}
                       isDeleting={contextMenuActions.isDeleting || false}
                       isRestoring={contextMenuActions.isRestoring || false}
+                      isUploading={contextMenuActions.isUploading || false}
+                      isUpdating={contextMenuActions.isUpdating || false}
                       hasSCORMInfo={!!scormInfo}
                       currentUserId={contextMenuActions.currentUserId}
                     >

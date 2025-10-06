@@ -62,6 +62,7 @@ export async function PATCH(req: NextRequest) {
           canView: false,
           canEdit: false,
           canDelete: false,
+          canDownload: false,
           revokedAt: new Date(),
           updatedAt: new Date()
         }
@@ -96,6 +97,7 @@ export async function PATCH(req: NextRequest) {
           canView: false,
           canEdit: false,
           canDelete: false,
+          canDownload: false,
           revokedAt: new Date(),
           updatedAt: new Date()
         }

@@ -1,63 +1,102 @@
 "use client"
 
 import { useState } from "react"
-import { useProjects } from "@/modules/project/hooks/useProjects"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { CreateProjectDialog } from "./create-project-dialog"
-import { ProjectModulesDialog } from "./project-modules-dialog"
 import { Input } from "@/components/ui/input"
-import { EditProjectDialog } from "./edit-project-dialog"
-import { PermissionGuard } from "@/components/rbac/permission-guard"
-import { PermissionName } from "@prisma/client"
+import { Plus, Search, FolderOpen } from "lucide-react"
+import { ProjectList } from "./project-list"
+import { CreateProjectDialog } from "./modal/create-project-dialog"
+import { useProjects } from "@/modules/project/hooks/useProjects"
 
 export function ProjectManagement() {
-  const { projects, isLoading, createProject, deleteProject, updateProject } = useProjects()
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editingName, setEditingName] = useState("")
+  const { projects, isLoading } = useProjects()
+  const [searchQuery, setSearchQuery] = useState("")
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+
+  // Calculate stats
+  const totalProjects = projects?.length || 0
+  const activeProjects = projects?.filter(p => p.status === 'ACTIVE').length || 0
+  const totalModules = projects?.reduce((sum, p) => sum + (p.modules?.length || 0), 0) || 0
 
   return (
-    <div className="p-4 space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold">Danh sách dự án</h2>
-        <PermissionGuard permission={PermissionName.CREATE_PROJECTS}>
-          <CreateProjectDialog onCreate={async (name, modules) => { await createProject({ name, modules }) }} />
-        </PermissionGuard>
+    <div className="flex flex-col gap-6 p-6 ">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Quản lý Dự án</h1>
+          <p className="text-muted-foreground mt-1">Quản lý các dự án và module trong hệ thống</p>
+        </div>
+        <Button onClick={() => setIsCreateDialogOpen(true)} className="gap-2">
+          <Plus className="h-4 w-4" />
+          Tạo Dự án Mới
+        </Button>
       </div>
 
-      {isLoading ? (
-        <p>Đang tải...</p>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Tên dự án</TableHead>
-              <TableHead>Số module</TableHead>
-              <TableHead className="w-[120px]">Hành động</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {projects?.map((p) => (
-              <TableRow key={p.id}>
-                <TableCell>{p.name}</TableCell>
-                <TableCell>
-                  <ProjectModulesDialog projectId={p.id} count={p.modules?.length ?? 0} />
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-2">
-                    <PermissionGuard permission={PermissionName.EDIT_PROJECTS}>
-                      <EditProjectDialog projectId={p.id} projectName={p.name} />
-                    </PermissionGuard>
-                    <PermissionGuard permission={PermissionName.SOFT_DELETE_PROJECTS}>
-                      <Button size="sm" variant="destructive" onClick={() => deleteProject(p.id)}>Xoá</Button>
-                    </PermissionGuard>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Tổng Dự án</CardTitle>
+            <FolderOpen className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalProjects}</div>
+            <p className="text-xs text-muted-foreground">
+              {isLoading ? "Đang tải..." : `${activeProjects} đang hoạt động`}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Dự án Đang Hoạt động</CardTitle>
+            <FolderOpen className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{activeProjects}</div>
+            <p className="text-xs text-muted-foreground">
+              {totalProjects > 0 ? `${Math.round((activeProjects / totalProjects) * 100)}% tổng số dự án` : "0% tổng số dự án"}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Tổng Module</CardTitle>
+            <FolderOpen className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalModules}</div>
+            <p className="text-xs text-muted-foreground">
+              {totalProjects > 0 ? `Trung bình ${(totalModules / totalProjects).toFixed(1)} module/dự án` : "0 module/dự án"}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Danh sách Dự án</CardTitle>
+              <CardDescription>Quản lý tất cả các dự án và module</CardDescription>
+            </div>
+            <div className="relative w-64">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Tìm kiếm dự án..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ProjectList searchQuery={searchQuery} />
+        </CardContent>
+      </Card>
+
+      <CreateProjectDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
     </div>
   )
 }

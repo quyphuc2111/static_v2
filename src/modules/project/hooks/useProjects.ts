@@ -15,8 +15,9 @@ export function useProjects() {
     onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEY }),
   })
 
-  const updateMut = useMutation<{ id: string; name: string }, unknown, { id: string; name: string }>({
-    mutationFn: ({ id, name }) => updateProject(id, { name }),
+  const updateMut = useMutation({
+    mutationFn: ({ id, ...payload }: { id: string; name: string; description?: string; status?: "ACTIVE" | "INACTIVE" | "ARCHIVED" }) => 
+      updateProject(id, payload),
     onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEY }),
   })
 
@@ -30,7 +31,8 @@ export function useProjects() {
     isLoading: listQuery.isLoading,
     refetch: listQuery.refetch,
     createProject: createMut.mutateAsync,
-    updateProject: (id: string, name: string) => updateMut.mutateAsync({ id, name }),
+    updateProject: (id: string, payload: { name: string; description?: string; status?: "ACTIVE" | "INACTIVE" | "ARCHIVED" }) => 
+      updateMut.mutateAsync({ id, ...payload }),
     deleteProject: deleteMut.mutateAsync,
   }
 }

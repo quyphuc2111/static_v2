@@ -5,8 +5,8 @@ import { Sidebar } from "./sidebar"
 export function Dashboard() {
   return (
     <div className="flex h-[calc(100vh-4rem)]">
-      <Sidebar />
-      <div className="flex-1 overflow-auto">
+      {/* <Sidebar /> */}
+      <div className="flex-1">
         <div className="p-6 space-y-6">
           <div>
             <h2 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h2>

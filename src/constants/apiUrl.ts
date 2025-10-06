@@ -20,5 +20,6 @@ export const CONTENT_API_URL = {
     BY_ID: (projectId: string, moduleId: string, contentId: string) => `projects/${projectId}/modules/${moduleId}/content/${contentId}`,
     DOWNLOAD: (projectId: string, moduleId: string, contentId: string) => `projects/${projectId}/modules/${moduleId}/content/${contentId}/download`,
     BULK_DELETE: (projectId: string, moduleId: string) => `projects/${projectId}/modules/${moduleId}/content/bulk-delete`,
+  IMPORT: (projectId: string, moduleId: string) => `projects/${projectId}/modules/${moduleId}/content/import`,
     STATS: (projectId?: string) => projectId ? `projects/${projectId}/content/stats` : "content/stats",
 }

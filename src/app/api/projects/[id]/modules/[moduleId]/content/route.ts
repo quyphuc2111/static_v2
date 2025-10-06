@@ -156,7 +156,7 @@ export async function GET(
         },
         shares: {
           where: { sharedWithId: session.user.id, status: ShareStatus.ACTIVE },
-          select: { canView: true, canEdit: true, canDelete: true, sharedById: true }
+          select: { canView: true, canDownload: true, canEdit: true, canDelete: true, sharedById: true }
         }
       },
       orderBy: {
@@ -172,6 +172,7 @@ export async function GET(
         isShared: !!share,
         sharePermissions: share ? {
           canView: share.canView,
+          canDownload: share.canDownload,
           canEdit: share.canEdit,
           canDelete: share.canDelete
         } : null

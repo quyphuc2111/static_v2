@@ -34,7 +34,19 @@ export async function GET(req: NextRequest) {
             id: true,
             title: true,
             contentType: true,
-            status: true
+            status: true,
+            project: {
+              select: {
+                id: true,
+                name: true
+              }
+            },
+            module: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
           }
         },
         sharedBy: {
@@ -101,6 +113,7 @@ export async function POST(req: NextRequest) {
       canView = true,
       canEdit = false,
       canDelete = false,
+      canDownload = true,
       // Admin bulk share inputs (optional)
       projectId,
       moduleId,
@@ -111,8 +124,21 @@ export async function POST(req: NextRequest) {
     const isAdmin = Array.isArray(session.user?.roles) && (session.user!.roles as any[]).includes("ADMINISTRATOR")
     const canManageAll = await hasPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id)
 
-    // ADMIN/MANAGER BULK SHARE: project/module/owner/contentIds
-    if ((isAdmin || canManageAll) && sharedWithId && (projectId || moduleId || ownerId || (Array.isArray(contentIds) && contentIds.length > 0))) {
+    // BULK SHARE: project/module/owner/contentIds (requires SHARE_CONTENT_ACCESS permission)
+    if (sharedWithId && (projectId || moduleId || ownerId || (Array.isArray(contentIds) && contentIds.length > 0))) {
+      // Check permissions for different bulk share types
+      if (projectId && !isAdmin && !canManageAll) {
+        return NextResponse.json({ message: "Forbidden: Project sharing requires admin privileges" }, { status: 403 })
+      }
+      
+      if (moduleId && !isAdmin && !canManageAll) {
+        return NextResponse.json({ message: "Forbidden: Module sharing requires admin privileges" }, { status: 403 })
+      }
+      
+      if (ownerId && !isAdmin && !canManageAll && ownerId !== session.user.id) {
+        return NextResponse.json({ message: "Forbidden: Can only share your own content" }, { status: 403 })
+      }
+      
       // Collect content IDs by filters
       const whereClause: any = { isDeleted: false }
       if (projectId) whereClause.projectId = projectId
@@ -151,19 +177,62 @@ export async function POST(req: NextRequest) {
           canView,
           canEdit,
           canDelete,
+          canDownload,
           itemsCount: contents.length,
         },
       })
 
-      // Upsert shares for all content IDs and tag with batchId
-      const operations = contents.map((c) =>
-        prisma.contentShare.upsert({
-          where: { contentId_sharedWithId: { contentId: c.id, sharedWithId } },
-          update: { canView, canEdit, canDelete, batchId: batch.id },
-          create: { contentId: c.id, sharedById: session.user!.id, sharedWithId, canView, canEdit, canDelete, batchId: batch.id },
+      // Smart sharing: Create new or update existing based on scope
+      const results = []
+      for (const c of contents) {
+        // Check if there's an active share with same scope and sharedBy
+        const existingShare = await prisma.contentShare.findFirst({
+          where: {
+            contentId: c.id,
+            sharedWithId,
+            status: 'ACTIVE',
+            batch: {
+              scope: scope,
+              sharedById: session.user!.id
+            }
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
         })
-      )
-      const results = await prisma.$transaction(operations)
+
+        if (existingShare) {
+          // Update existing share with same scope
+          const updated = await prisma.contentShare.update({
+            where: { id: existingShare.id },
+            data: {
+              canView,
+              canEdit,
+              canDelete,
+              canDownload,
+              batchId: batch.id,
+              updatedAt: new Date()
+            }
+          })
+          results.push(updated)
+        } else {
+          // Create new share for different scope or first time
+          const created = await prisma.contentShare.create({
+            data: { 
+              contentId: c.id, 
+              sharedById: session.user!.id, 
+              sharedWithId, 
+              canView, 
+              canEdit, 
+              canDelete, 
+              canDownload, 
+              batchId: batch.id,
+              status: 'ACTIVE'
+            }
+          })
+          results.push(created)
+        }
+      }
       return NextResponse.json({ data: { count: results.length, batchId: batch.id } }, { status: 201 })
     }
 
@@ -192,98 +261,90 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: "User not found" }, { status: 404 })
     }
 
-    // Check if share already exists
-    const existingShare = await prisma.contentShare.findUnique({
+    // Create batch for standard share (OWNER scope)
+    const batch = await prisma.shareBatch.create({
+      data: {
+        scope: ShareScope.OWNER,
+        sharedById: session.user.id,
+        sharedWithId,
+        ownerId: session.user.id,
+        canView,
+        canEdit,
+        canDelete,
+        canDownload,
+        itemsCount: 1,
+      },
+    })
+
+    // Check if there's an active share with same scope (OWNER scope for standard share)
+    const existingShare = await prisma.contentShare.findFirst({
       where: {
-        contentId_sharedWithId: {
-          contentId,
-          sharedWithId
+        contentId,
+        sharedWithId,
+        status: 'ACTIVE',
+        batch: {
+          scope: ShareScope.OWNER,
+          sharedById: session.user.id
         }
+      },
+      orderBy: {
+        createdAt: 'desc'
       }
     })
 
     if (existingShare) {
-      // Update existing share (only if it's active)
-      if (existingShare.status === 'ACTIVE') {
-        const updatedShare = await prisma.contentShare.update({
-          where: {
-            contentId_sharedWithId: {
-              contentId,
-              sharedWithId
-            }
-          },
-          data: {
-            canView,
-            canEdit,
-            canDelete
-          },
-          include: {
-            content: {
-              select: {
-                id: true,
-                title: true,
-                contentType: true,
-                status: true
-              }
-            },
-            sharedBy: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-              }
-            },
-            sharedWith: {
-              select: {
-                id: true,
-                name: true,
-                email: true
+      // Update existing share with same scope
+      const updatedShare = await prisma.contentShare.update({
+        where: {
+          id: existingShare.id
+        },
+        data: {
+          canView,
+          canEdit,
+          canDelete,
+          canDownload,
+          batchId: batch.id,
+          updatedAt: new Date()
+        },
+        include: {
+          content: {
+            select: {
+              id: true,
+              title: true,
+              contentType: true,
+              status: true,
+              project: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              },
+              module: {
+                select: {
+                  id: true,
+                  name: true
+                }
               }
             }
-          }
-        })
-
-        return NextResponse.json({ data: updatedShare })
-      } else {
-        // If share is revoked, create a new share
-        const newShare = await prisma.contentShare.create({
-          data: {
-            contentId,
-            sharedById: session.user!.id,
-            sharedWithId,
-            canView,
-            canEdit,
-            canDelete,
-            status: 'ACTIVE'
           },
-          include: {
-            content: {
-              select: {
-                id: true,
-                title: true,
-                contentType: true,
-                status: true
-              }
-            },
-            sharedBy: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-              }
-            },
-            sharedWith: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-              }
+          sharedBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          },
+          sharedWith: {
+            select: {
+              id: true,
+              name: true,
+              email: true
             }
           }
-        })
+        }
+      })
 
-        return NextResponse.json({ data: newShare })
-      }
+      return NextResponse.json({ data: updatedShare })
     } else {
       // Create new share
       const newShare = await prisma.contentShare.create({
@@ -293,7 +354,9 @@ export async function POST(req: NextRequest) {
           sharedWithId,
           canView,
           canEdit,
-          canDelete
+          canDelete,
+          canDownload,
+          batchId: batch.id
         },
         include: {
           content: {
@@ -301,7 +364,19 @@ export async function POST(req: NextRequest) {
               id: true,
               title: true,
               contentType: true,
-              status: true
+              status: true,
+              project: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              },
+              module: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
             }
           },
           sharedBy: {
@@ -368,10 +443,7 @@ export async function DELETE(req: NextRequest) {
 
     await prisma.contentShare.delete({
       where: {
-        contentId_sharedWithId: {
-          contentId,
-          sharedWithId
-        }
+        id: share.id
       }
     })
 
