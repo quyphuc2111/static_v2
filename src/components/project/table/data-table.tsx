@@ -72,7 +72,7 @@ export function DataTable({ data, onDelete }: DataTableProps) {
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <>
-                  <TableRow key={row.id} className="group">
+                  <TableRow key={row.id} className={`group cursor-pointer hover:bg-muted/50 ${row.original.isDeleted ? 'bg-red-50/30' : ''}`}>
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -100,7 +100,7 @@ export function DataTable({ data, onDelete }: DataTableProps) {
                               row.original.modules.map((module: any) => (
                                 <div
                                   key={module.id}
-                                  className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                                  className={`flex items-center justify-between p-3 rounded-lg border ${module.isDeleted ? 'bg-red-50/40 border-red-200' : 'bg-card'}`}
                                 >
                                   <div className="flex-1">
                                     <div className="flex items-center gap-2">

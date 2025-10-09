@@ -23,7 +23,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     const { userId } = await params
     const body = await req.json().catch(() => ({}))
-    const { name, email, status, password, roleId } = body as { 
+    const { username, name, email, status, password, roleId } = body as { 
+      username?: string;
       name?: string; 
       email?: string; 
       status?: UserStatus;
@@ -31,12 +32,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       roleId?: string;
     }
 
-    // Prepare update data
-    const updateData: any = {
-      name: name ?? undefined,
-      email: email ?? undefined,
-      status: status ?? undefined,
-    }
+    // Prepare update data - only include fields that are provided
+    const updateData: any = {}
+    
+    if (username !== undefined) updateData.username = username
+    if (name !== undefined) updateData.name = name
+    if (email !== undefined) updateData.email = email
+    if (status !== undefined) updateData.status = status
 
     // Handle password update
     if (password) {
@@ -65,6 +67,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       data: updateData,
       select: {
         id: true,
+        username: true,
         name: true,
         email: true,
         status: true,
@@ -79,9 +82,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     })
 
     return NextResponse.json({ data: updated })
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error updating user:", error)
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 })
+    let message = "Internal server error"
+    if (error?.code === "P2002") {
+      const target = error?.meta?.target?.[0]
+      message = target === "username" ? "Username đã tồn tại" : "Email đã tồn tại"
+    }
+    return NextResponse.json({ message }, { status: 500 })
   }
 }
 

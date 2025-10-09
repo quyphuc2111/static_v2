@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Card, CardContent } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useRoles } from "@/modules/rbac/hooks"
 import { useUsers } from "@/modules/rbac/hooks/useUsers"
 import { PermissionGuard } from "@/components/rbac/permission-guard"
@@ -38,6 +39,7 @@ const colorMap: Record<string, string> = {
 
 export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) {
   const [formData, setFormData] = useState({
+    username: "",
     name: "",
     email: "",
     role: "",
@@ -62,8 +64,9 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
     }
     
     const result: any = await create.mutateAsync({
+      username: formData.username,
       name: formData.name || undefined,
-      email: formData.email,
+      email: formData.email || undefined,
       password: formData.password || undefined,
       // status implicit ACTIVE; if needed, add toggle in UI
       roleId: formData.role || undefined,
@@ -78,13 +81,13 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
     
     if (finalPassword) {
       setGeneratedPassword(finalPassword)
-      setCreatedUserEmail(formData.email)
+      setCreatedUserEmail(formData.username)
       setShowPasswordDialog(true)
     } else {
       // fallback: no password provided nor returned
       onOpenChange(false)
     }
-    setFormData({ name: "", email: "", role: "", password: "", sendWelcomeEmail: true, requirePasswordChange: true })
+    setFormData({ username: "", name: "", email: "", role: "", password: "", sendWelcomeEmail: true, requirePasswordChange: true })
   }
 
   const updateFormData = (field: string, value: any) => {
@@ -102,29 +105,29 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
   }
 
   return (
-   <>
-    <Dialog open={open} onOpenChange={(v) => { if (!v) setShowPasswordDialog(false); onOpenChange(v) }}>
-      <DialogContent className="sm:max-w-[500px] bg-card border-border">
-        <DialogHeader>
-          <DialogTitle className="text-foreground">Thêm Người dùng Mới</DialogTitle>
-          <DialogDescription className="text-muted-foreground">
-            Tạo tài khoản mới và phân quyền cho người dùng
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={(v) => { if (!v) setShowPasswordDialog(false); onOpenChange(v) }}>
+        <DialogContent className="sm:max-w-[500px] bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Thêm Người dùng Mới</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Tạo tài khoản mới và phân quyền cho người dùng
+            </DialogDescription>
+          </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-foreground">
-                Họ và tên
+              <Label htmlFor="username" className="text-foreground">
+                Tên đăng nhập <span className="text-red-400">*</span>
               </Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => updateFormData("name", e.target.value)}
-                  placeholder="Nhập họ và tên"
+                  id="username"
+                  value={formData.username}
+                  onChange={(e) => updateFormData("username", e.target.value)}
+                  placeholder="Nhập tên đăng nhập"
                   className="pl-10 bg-muted/50 border-border"
                   required
                 />
@@ -180,8 +183,23 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
+              <Label htmlFor="name" className="text-foreground">
+                Họ và tên
+              </Label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => updateFormData("name", e.target.value)}
+                  placeholder="Nhập họ và tên (tùy chọn)"
+                  className="pl-10 bg-muted/50 border-border"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="email" className="text-foreground">
-                Email
+                Email (tùy chọn)
               </Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -190,37 +208,36 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                   type="email"
                   value={formData.email}
                   onChange={(e) => updateFormData("email", e.target.value)}
-                  placeholder="Nhập địa chỉ email"
+                  placeholder="Nhập email (tùy chọn)"
                   className="pl-10 bg-muted/50 border-border"
-                  required
                 />
               </div>
             </div>
           </div>
 
-          <div className="space-y-3">
-            <Label className="text-foreground">Vai trò</Label>
-            <div className="space-y-2">
-              {(roles || []).map((role) => (
-                <Card
-                  key={role.id}
-                  className={`cursor-pointer transition-colors border-2 ${
-                    formData.role === role.id ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
-                  }`}
-                  onClick={() => updateFormData("role", role.id)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <Shield className={`h-5 w-5 ${colorMap[role.name] || "text-muted-foreground"}`} />
-                      <div className="flex-1">
-                        <h3 className="font-medium text-foreground">{role.name}</h3>
-                        <p className="text-sm text-muted-foreground">{role.description}</p>
+          <div className="space-y-2">
+            <Label htmlFor="role" className="text-foreground">
+              Vai trò
+            </Label>
+            <div className="relative">
+              <Shield className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground z-10" />
+              <Select value={formData.role} onValueChange={(value) => updateFormData("role", value)}>
+                <SelectTrigger className="pl-10 bg-muted/50 border-border w-full">
+                  <SelectValue placeholder="Chọn vai trò..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  {(roles || []).map((role) => (
+                    <SelectItem key={role.id} value={role.id}>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{role.name}</span>
+                        {role.description && (
+                          <span className="text-xs text-muted-foreground">- {role.description}</span>
+                        )}
                       </div>
-                      <Badge variant={formData.role === role.id ? "default" : "outline"}>{formData.role === role.id ? "Đã chọn" : "Chọn"}</Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -248,19 +265,20 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
             </div>
           </div> */}
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Hủy
-            </Button>
-            <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={create.isPending}>
-              Tạo Người dùng
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-    {/* Password Dialog */}
-    <Dialog open={showPasswordDialog} onOpenChange={(v) => { setShowPasswordDialog(v); if (!v) onOpenChange(false) }}>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Hủy
+              </Button>
+              <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={create.isPending}>
+                Tạo Người dùng
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Password Dialog */}
+      <Dialog open={showPasswordDialog} onOpenChange={(v) => { setShowPasswordDialog(v); if (!v) onOpenChange(false) }}>
       <DialogContent className="sm:max-w-[460px] bg-card border-border">
         <DialogHeader>
           <DialogTitle className="text-foreground">Copy thông tin tài khoản mới</DialogTitle>
@@ -291,7 +309,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
           </div> */}
           
           <div>
-            <Label className="text-foreground">Email | Password (để copy)</Label>
+            <Label className="text-foreground">Username | Password (để copy)</Label>
             <div className="mt-2 flex items-center gap-2">
               <Input readOnly value={`${createdUserEmail} | ${generatedPassword}`} className="font-mono" />
               <Button type="button" variant="outline" onClick={() => {
@@ -309,11 +327,11 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
             }
           </p>
         </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => { setShowPasswordDialog(false); onOpenChange(false) }}>Đóng</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => { setShowPasswordDialog(false); onOpenChange(false) }}>Đóng</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

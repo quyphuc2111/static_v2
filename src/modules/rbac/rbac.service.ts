@@ -168,3 +168,18 @@ export async function updateUser(userId: string, payload: UpdateUserPayload): Pr
 export async function deleteUser(userId: string): Promise<void> {
   await httpService.delete({ url: `users/${userId}` })
 }
+
+export async function toggleUserStatus(userId: string): Promise<UserWithRoles> {
+  const res = await httpService.patch<{ data: UserWithRoles }>({
+    url: `users/${userId}/toggle-status`,
+  })
+  return res.data
+}
+
+export async function resetUserPassword(userId: string, newPassword: string): Promise<UserWithRoles> {
+  const res = await httpService.patch<{ data: UserWithRoles }>({
+    url: `users/${userId}/reset-password`,
+    data: { newPassword },
+  })
+  return res.data
+}

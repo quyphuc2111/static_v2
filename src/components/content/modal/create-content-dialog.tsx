@@ -89,6 +89,7 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
       // Find HTML files
       const htmlFiles: string[] = []
       const indexFiles: string[] = []
+      const subdirIndexFiles: string[] = []
       
       zip.forEach((relativePath: string, zipEntry: any) => {
         if (!zipEntry.dir) {
@@ -99,7 +100,13 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
             // Check for index files
             const baseName = fileName.split('/').pop() || ''
             if (baseName === 'index.html' || baseName === 'index.htm') {
-              indexFiles.push(relativePath)
+              // Check if it's in a subdirectory
+              const pathParts = relativePath.split('/')
+              if (pathParts.length > 1) {
+                subdirIndexFiles.push(relativePath)
+              } else {
+                indexFiles.push(relativePath)
+              }
             }
           }
         }
@@ -108,11 +115,14 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
       // Determine launch file priority
       let launchFile: string | null = null
       
-      if (indexFiles.length > 0) {
-        // Prefer index.html or index.htm
+      if (subdirIndexFiles.length > 0) {
+        // Prefer index.html in subdirectories first
+        launchFile = subdirIndexFiles[0]
+      } else if (indexFiles.length > 0) {
+        // Then index.html in root directory
         launchFile = indexFiles[0]
       } else if (htmlFiles.length > 0) {
-        // Use first HTML file found
+        // Finally, any HTML file
         launchFile = htmlFiles[0]
       }
       

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import { get, isObject } from "lodash"
 import { useProjects } from "@/modules/project/hooks/useProjects"
 import { useModules } from "@/modules/project/hooks/useModules"
 import { useContent } from "@/modules/content/hooks/useContent"
@@ -12,17 +13,23 @@ import { useDownloadContent } from "@/modules/content/hooks/useDownloadContent"
 import { useBulkDeleteContent } from "@/modules/content/hooks/useBulkDeleteContent"
 import { useUploadContentFile } from "@/modules/content/hooks/useUploadContentFile"
 import { useUpdateContentFile } from "@/modules/content/hooks/useUpdateContentFile"
+import { useSoftDeleteContent } from "@/modules/content/hooks/useSoftDeleteContent"
+import { useHardDeleteContent } from "@/modules/content/hooks/useHardDeleteContent"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, FileSpreadsheet, Upload } from "lucide-react"
+import { Plus, FileSpreadsheet, Upload, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CreateContentDialog, EditContentDialog, DeleteContentDialog, SCORMInfoDialog, DescriptionDialog, UploadMissingFilesDialog, UploadFileDialog, UpdateFileDialog } from "./modal"
 import { ImportExcelDialog } from "./modal/import-excel-dialog"
 import { DataTable, createContentColumns, type ContentItem } from "@/components/content/table"
+import { DescriptionFilter, applyDescriptionFilters, type DescriptionFilterValue } from "./description-filter"
 import { useAuth } from "@/modules/auth/hooks/useAuth"
 import { PermissionName } from "@prisma/client"
 import { PermissionGuard } from "@/components/rbac/permission-guard"
 import { useUserPermissions } from "@/modules/rbac/hooks"
+import { getContentUrl, getScormContentUrl } from "@/utils/content"
+import { toast } from "react-toastify"
 
 // Helper function to get SCORM info
 const getSCORMInfo = (content: ContentItem) => {
@@ -37,23 +44,6 @@ const getSCORMInfo = (content: ContentItem) => {
     }
   }
   return null
-}
-
-// Helper function to get content URL
-const getContentUrl = (content: ContentItem) => {
-  const desc: any = content.description
-  const scorm = typeof desc === 'object' && desc ? desc.scorm : null
-  const launchFile = typeof desc === 'object' && desc ? desc.launchFile : null
-  
-  if (content.contentType === 'FILE_ZIP_SCORM' && scorm && launchFile) {
-    const raw = `/uploads${content.contentUrl}/${launchFile}`
-    return raw.replace(/\/+/g, '/').replace('/uploads/uploads', '/uploads')
-  } else if (content.contentType === 'FILE_ZIP_HTML' && launchFile) {
-    const raw = `/uploads${content.contentUrl}/${launchFile}`
-    return raw.replace(/\/+/g, '/').replace('/uploads/uploads', '/uploads')
-  } else {
-    return `/uploads${content.contentUrl}`.replace('/uploads/uploads', '/uploads')
-  }
 }
 
 export function ContentManagement() {
@@ -74,6 +64,8 @@ export function ContentManagement() {
   const [selectedDescription, setSelectedDescription] = useState<any>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [contentToDelete, setContentToDelete] = useState<ContentItem | null>(null)
+  const [descriptionFilters, setDescriptionFilters] = useState<DescriptionFilterValue[]>([])
+  const [showDeleted, setShowDeleted] = useState(false)
 
   const projectsQuery = useProjects()
   const modulesQuery = useModules(projectId, !!projectId)
@@ -88,14 +80,34 @@ export function ContentManagement() {
   const bulkDeleteContentMut = useBulkDeleteContent(projectId, moduleId)
   const uploadContentFileMut = useUploadContentFile(projectId, moduleId)
   const updateContentFileMut = useUpdateContentFile(projectId, moduleId)
+  const softDeleteContentMut = useSoftDeleteContent(projectId, moduleId)
+  const hardDeleteContentMut = useHardDeleteContent(projectId, moduleId)
 
-  const contentData = contentQuery.data || []
+  const rawContentData = contentQuery.data || []
+  
+  // Filter by deleted status and apply description filters
+  const contentData = useMemo(() => {
+    const filteredByDeleted = rawContentData.filter(item => 
+      showDeleted ? item.isDeleted : !item.isDeleted
+    )
+    return applyDescriptionFilters(filteredByDeleted, descriptionFilters)
+  }, [rawContentData, descriptionFilters, showDeleted])
+  
+  // Calculate stats for current view
+  const activeContent = rawContentData.filter(item => !item.isDeleted)
+  const deletedContent = rawContentData.filter(item => item.isDeleted)
 
   // Action handlers
   const handleView = (content: ContentItem) => {
+    // Check permission to view content
+    if (!hasPermission(PermissionName.VIEW_CONTENT) && !isAdmin) {
+      toast.error("Bạn không có quyền xem nội dung này")
+      return
+    }
+    
     const url = getContentUrl(content)
     if (content.contentType === 'FILE_ZIP_SCORM') {
-      const scormUrl = `/scorm/view?entry=${encodeURIComponent(url)}`
+      const scormUrl = getScormContentUrl(content)
       window.open(scormUrl, '_blank')
     } else {
       window.open(url, '_blank')
@@ -127,20 +139,40 @@ export function ContentManagement() {
   }
 
   const handleEdit = (content: ContentItem) => {
+    // Check permission to edit content
+    if (!hasAnyPermission([PermissionName.EDIT_CONTENT, PermissionName.MANAGE_OWN_CONTENT]) && !isAdmin) {
+      toast.error("Bạn không có quyền chỉnh sửa nội dung này")
+      return
+    }
+    
     setContentToEdit(content)
     setShowEditDialog(true)
   }
 
   const handleDownload = (content: ContentItem) => {
+    // Check permission to download content
+    
     downloadContentMut.mutate(content.id)
   }
 
   const handleDelete = (content: ContentItem) => {
+    // Check permission to delete content
+    if (!hasAnyPermission([PermissionName.SOFT_DELETE_CONTENT, PermissionName.MANAGE_OWN_CONTENT]) && !isAdmin) {
+      toast.error("Bạn không có quyền xóa nội dung này")
+      return
+    }
+    
     setContentToDelete(content)
     setShowDeleteDialog(true)
   }
 
   const handleRestore = (content: ContentItem) => {
+    // Check permission to restore content
+    if (!hasAnyPermission([PermissionName.RESTORE_CONTENT, PermissionName.MANAGE_OWN_CONTENT]) && !isAdmin) {
+      toast.error("Bạn không có quyền khôi phục nội dung này")
+      return
+    }
+    
     if (confirm(`Bạn có muốn khôi phục nội dung "${content.title}"?`)) {
       restoreContentMut.mutate(content.id)
     }
@@ -155,13 +187,47 @@ export function ContentManagement() {
   }
 
   const handleUploadFile = (content: ContentItem) => {
+    if (!hasAnyPermission([PermissionName.EDIT_CONTENT, PermissionName.MANAGE_OWN_CONTENT]) && !isAdmin) {
+      toast.error("Bạn không có quyền upload file cho nội dung này")
+      return
+    }
+    
     setContentToUpload(content)
     setShowUploadFileDialog(true)
   }
 
   const handleUpdateFile = (content: ContentItem) => {
+    if (!hasAnyPermission([PermissionName.EDIT_CONTENT, PermissionName.MANAGE_OWN_CONTENT]) && !isAdmin) {
+      toast.error("Bạn không có quyền cập nhật file cho nội dung này")
+      return
+    }
+    
     setContentToUpdate(content)
     setShowUpdateFileDialog(true)
+  }
+
+  const handleSoftDelete = (content: ContentItem) => {
+    // Check permission to soft delete content
+    if (!hasAnyPermission([PermissionName.SOFT_DELETE_CONTENT, PermissionName.MANAGE_OWN_CONTENT]) && !isAdmin) {
+      toast.error("Bạn không có quyền xóa mềm nội dung này")
+      return
+    }
+    
+    if (confirm(`Bạn có muốn chuyển nội dung "${content.title}" vào thùng rác?`)) {
+      softDeleteContentMut.mutate(content.id)
+    }
+  }
+
+  const handleHardDelete = (content: ContentItem) => {
+    // Check permission to hard delete content
+    if (!hasAnyPermission([PermissionName.HARD_DELETE_CONTENT, PermissionName.MANAGE_ALL_CONTENT]) && !isAdmin) {
+      toast.error("Bạn không có quyền xóa vĩnh viễn nội dung này")
+      return
+    }
+    
+    if (confirm(`Bạn có chắc chắn muốn XÓA VĨNH VIỄN nội dung "${content.title}"? Hành động này không thể hoàn tác!`)) {
+      hardDeleteContentMut.mutate(content.id)
+    }
   }
 
   const handleConfirmDelete = () => {
@@ -180,11 +246,10 @@ export function ContentManagement() {
     bulkDeleteContentMut.mutate(contentIds, {
       onSuccess: (data) => {
         console.log(`Successfully deleted ${data.deletedCount} items`)
-        // You could add a toast notification here
+        toast.success(`Đã xóa ${data.deletedCount} nội dung thành công`)
       },
       onError: (error) => {
-        console.error('Bulk delete failed:', error)
-        // You could add error handling here
+        toast.error("Bulk delete failed")
       }
     })
   }
@@ -196,21 +261,23 @@ export function ContentManagement() {
     onShowSCORMInfo: handleShowSCORMInfo,
     onEdit: handleEdit,
     onDownload: handleDownload,
-    onDelete: handleDelete,
     onRestore: handleRestore,
     onDescriptionClick: handleDescriptionClick,
     onUploadFile: handleUploadFile,
     onUpdateFile: handleUpdateFile,
+    onSoftDelete: handleSoftDelete,
+    onHardDelete: handleHardDelete,
     copiedUrl,
     isDownloading: downloadContentMut.isPending,
-    isDeleting: deleteContentMut.isPending,
     isRestoring: restoreContentMut.isPending,
     isUploading: uploadContentFileMut.isPending,
-    isUpdating: updateContentFileMut.isPending
+    isUpdating: updateContentFileMut.isPending,
+    isSoftDeleting: softDeleteContentMut.isPending,
+    isHardDeleting: hardDeleteContentMut.isPending
   }, { 
     isAdmin, 
     currentUserId: me?.id 
-  }), [copiedUrl, downloadContentMut.isPending, deleteContentMut.isPending, restoreContentMut.isPending, uploadContentFileMut.isPending, updateContentFileMut.isPending, isAdmin, me?.id])
+  }), [copiedUrl, downloadContentMut.isPending, deleteContentMut.isPending, restoreContentMut.isPending, uploadContentFileMut.isPending, updateContentFileMut.isPending, softDeleteContentMut.isPending, hardDeleteContentMut.isPending, isAdmin, me?.id])
 
   return (
     <div className="p-6 space-y-6">
@@ -245,67 +312,81 @@ export function ContentManagement() {
             </Select>
           </div>
           {projectId && moduleId && (
+          <>
             <PermissionGuard permissions={[PermissionName.CREATE_CONTENT, PermissionName.MANAGE_OWN_CONTENT]}>
               <Button onClick={() => setShowCreateDialog(true)} className="bg-primary hover:bg-primary/90">
                 <Plus className="mr-2 h-4 w-4" />
                 Tạo Nội dung Mới
               </Button>
             </PermissionGuard>
-          )}
-          <PermissionGuard permissions={[PermissionName.CREATE_CONTENT, PermissionName.MANAGE_OWN_CONTENT]}>
+            <PermissionGuard permissions={[PermissionName.CREATE_CONTENT, PermissionName.MANAGE_OWN_CONTENT]}>
             <Button variant="outline" onClick={() => setShowImportDialog(true)}>
               <FileSpreadsheet className="mr-2 h-4 w-4" />
               Nhập Excel
             </Button>
-          </PermissionGuard>
-          {/* {projectId && moduleId && (
-            <PermissionGuard permissions={[PermissionName.CREATE_CONTENT, PermissionName.MANAGE_OWN_CONTENT]}>
-              <Button variant="outline" onClick={() => setShowUploadMissingDialog(true)}>
-                <Upload className="mr-2 h-4 w-4" />
-                Upload Files
-              </Button>
-            </PermissionGuard>
-          )} */}
+          </PermissionGuard></>
+          )}
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <Card className="bg-card border-border">
+        <Card className={`bg-card border-border ${showDeleted ? 'opacity-50' : ''}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Tổng Nội dung</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {showDeleted ? "Nội dung Đã Xóa" : "Tổng Nội dung"}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{statsQuery.data?.total || 0}</div>
-            <p className="text-xs text-muted-foreground">Tất cả nội dung</p>
+            <div className="text-2xl font-bold text-foreground">
+              {showDeleted ? deletedContent.length : activeContent.length}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {showDeleted ? "nội dung đã xóa" : "đang hoạt động"}
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-card border-border">
+        <Card className={`bg-card border-border ${showDeleted ? 'opacity-50' : ''}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Hoàn thành</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{statsQuery.data?.completed || 0}</div>
+            <div className="text-2xl font-bold text-foreground">
+              {showDeleted 
+                ? deletedContent.filter(c => c.status === 'COMPLETED').length
+                : activeContent.filter(c => c.status === 'COMPLETED').length
+              }
+            </div>
             <p className="text-xs text-green-400">Đã xử lý xong</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-card border-border">
+        <Card className={`bg-card border-border ${showDeleted ? 'opacity-50' : ''}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Đang xử lý</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{statsQuery.data?.processing || 0}</div>
+            <div className="text-2xl font-bold text-foreground">
+              {showDeleted 
+                ? deletedContent.filter(c => c.status === 'PROCESSING').length
+                : activeContent.filter(c => c.status === 'PROCESSING').length
+              }
+            </div>
             <p className="text-xs text-blue-400">Đang upload/giải nén</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-card border-border">
+        <Card className={`bg-card border-border ${showDeleted ? 'opacity-50' : ''}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Thất bại</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{statsQuery.data?.failed || 0}</div>
+            <div className="text-2xl font-bold text-foreground">
+              {showDeleted 
+                ? deletedContent.filter(c => c.status === 'FAILED').length
+                : activeContent.filter(c => c.status === 'FAILED').length
+              }
+            </div>
             <p className="text-xs text-red-400">Cần xử lý lại</p>
           </CardContent>
         </Card>
@@ -313,7 +394,34 @@ export function ContentManagement() {
 
       <Card className="bg-card border-border">
         <CardHeader>
-          <CardTitle className="text-foreground">Danh sách Tài liệu</CardTitle>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-foreground">Danh sách Tài liệu</CardTitle>
+              <CardDescription>Quản lý tất cả nội dung trong dự án và module</CardDescription>
+            </div>
+            <div className="flex items-center gap-3">
+              {projectId && moduleId && (
+                <PermissionGuard permissions={[PermissionName.VIEW_DELETED_ALL_CONTENT, PermissionName.VIEW_DELETED_OWN_CONTENT]}>
+                  <Tabs value={showDeleted ? "deleted" : "active"} onValueChange={(v) => setShowDeleted(v === "deleted")}>
+                    <TabsList>
+                      <TabsTrigger value="active">Đang hoạt động</TabsTrigger>
+                      <TabsTrigger value="deleted">
+                        <Trash2 className="h-3 w-3 mr-1" />
+                        Đã xóa
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </PermissionGuard>
+              )}
+              {projectId && moduleId && rawContentData.length > 0 && (
+                <DescriptionFilter
+                  data={rawContentData}
+                  onFilterChange={setDescriptionFilters}
+                  activeFilters={descriptionFilters}
+                />
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {contentQuery.isLoading ? (
@@ -340,16 +448,18 @@ export function ContentManagement() {
                 onShowSCORMInfo: handleShowSCORMInfo,
                 onEdit: handleEdit,
                 onDownload: handleDownload,
-                onDelete: handleDelete,
                 onRestore: handleRestore,
                 onUploadFile: handleUploadFile,
                 onUpdateFile: handleUpdateFile,
+                onSoftDelete: handleSoftDelete,
+                onHardDelete: handleHardDelete,
                 copiedUrl,
                 isDownloading: downloadContentMut.isPending,
-                isDeleting: deleteContentMut.isPending,
                 isRestoring: restoreContentMut.isPending,
                 isUploading: uploadContentFileMut.isPending,
                 isUpdating: updateContentFileMut.isPending,
+                isSoftDeleting: softDeleteContentMut.isPending,
+                isHardDeleting: hardDeleteContentMut.isPending,
                 currentUserId: me?.id
               }}
               bulkActions={{

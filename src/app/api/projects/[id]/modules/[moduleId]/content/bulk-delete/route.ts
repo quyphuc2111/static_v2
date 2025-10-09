@@ -112,7 +112,11 @@ export async function POST(req: NextRequest, { params }: Params) {
             id: { in: contentIds },
             moduleId: moduleId
           },
-          data: { isDeleted: true }
+          data: { 
+            isDeleted: true,
+            deletedAt: new Date(),
+            updatedAt: new Date()
+          }
         })
         return { count: updateResult.count }
       }

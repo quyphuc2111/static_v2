@@ -1,331 +1,283 @@
-// Prisma schema for MySQL
 generator client {
-    provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-    provider = "mysql"
-    url      = env("DATABASE_URL")
-}
-
-// =========================
-// Enums
-// =========================
-enum UserStatus {
-    ACTIVE
-    DISABLED
-}
-
-enum RoleName {
-    ADMINISTRATOR
-    DEV
-    TESTER
-}
-
-enum PermissionName {
-    // Content Management - CRUD
-    VIEW_CONTENT
-    CREATE_CONTENT
-    EDIT_CONTENT
-    DOWNLOAD_CONTENT
-    SOFT_DELETE_CONTENT
-    HARD_DELETE_CONTENT
-    VIEW_DELETED_CONTENT
-    RESTORE_CONTENT
-    
-    // Content Scope
-    MANAGE_ALL_CONTENT      // Can manage all content (override ownership)
-    MANAGE_OWN_CONTENT      // Can only manage own content
-    VIEW_OWN_CONTENT_ONLY   // Restricted to viewing only own content
-    
-    // Content Sharing
-    VIEW_SHARED_CONTENT
-    SHARE_CONTENT_ACCESS
-    
-    // Project Management - CRUD
-    VIEW_PROJECTS
-    CREATE_PROJECTS
-    EDIT_PROJECTS
-    SOFT_DELETE_PROJECTS
-    HARD_DELETE_PROJECTS
-    VIEW_DELETED_PROJECTS
-    RESTORE_PROJECTS
-    
-    // Module Management - CRUD
-    VIEW_MODULES
-    CREATE_MODULES
-    EDIT_MODULES
-    SOFT_DELETE_MODULES
-    HARD_DELETE_MODULES
-    VIEW_DELETED_MODULES
-    RESTORE_MODULES
-    
-    // User Management - CRUD
-    VIEW_USERS
-    CREATE_USERS
-    EDIT_USERS
-    SOFT_DELETE_USERS
-    HARD_DELETE_USERS
-    MANAGE_USER_PERMISSIONS
-    
-    // Audit & Dashboard
-    VIEW_AUDIT_LOGS
-    VIEW_DASHBOARD_STATS
-}
-
-enum ContentType {
-    FILE_ZIP_HTML
-    FILE_ZIP_SCORM
-}
-
-enum ContentStatus {
-    PROCESSING
-    COMPLETED
-    FAILED
-}
-
-enum ProjectStatus {
-    ACTIVE
-    INACTIVE
-    ARCHIVED
-}
-
-enum ModuleStatus {
-    ACTIVE
-    INACTIVE
-}
-
-// New: scope for grouping bulk shares
-enum ShareScope {
-    SINGLE
-    PROJECT
-    MODULE
-    OWNER
-    LIST
-}
-
-// Status for content sharing
-enum ShareStatus {
-    ACTIVE
-    REVOKED
+  provider = "mysql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
-    id        String   @id @default(uuid())
-    email     String   @unique
-    name      String?
-    passwordHash String?
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-
-    // account state
-    status    UserStatus @default(ACTIVE)
-
-    // relations
-    roles           UserRole[]
-    permissions     UserPermission[]
-    ownedContents   ContentData[]   @relation("UserOwnedContent")
-    auditLogs       AuditLog[]      @relation("UserAuditLogs")
-    sharedContent   ContentShare[]  @relation("ContentSharedBy")
-    receivedContent ContentShare[]  @relation("ContentSharedWith")
-
-    // Back-relations for ShareBatch
-    batchesSharedBy   ShareBatch[]  @relation("BatchSharedBy")
-    batchesSharedWith ShareBatch[]  @relation("BatchSharedWith")
+  id                String           @id @default(uuid())
+  email             String?
+  name              String?
+  passwordHash      String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  status            UserStatus       @default(ACTIVE)
+  username          String           @unique
+  auditLogs         AuditLog[]       @relation("UserAuditLogs")
+  ownedContents     ContentData[]    @relation("UserOwnedContent")
+  sharedContent     ContentShare[]   @relation("ContentSharedBy")
+  receivedContent   ContentShare[]   @relation("ContentSharedWith")
+  batchesSharedBy   ShareBatch[]     @relation("BatchSharedBy")
+  batchesSharedWith ShareBatch[]     @relation("BatchSharedWith")
+  permissions       UserPermission[]
+  roles             UserRole[]
 }
 
 model ContentData {
-    id          String     @id @default(uuid())
-    title       String
-    description Json?
-    contentUrl  String
-    contentType ContentType
-    status      ContentStatus @default(PROCESSING)
-    progress    Int        @default(0) // 0-100
-    fileSize    Int?       // in bytes
-    isDeleted   Boolean    @default(false)
+  id          String         @id @default(uuid())
+  title       String
+  description Json?
+  contentUrl  String
+  contentType ContentType
+  status      ContentStatus  @default(PROCESSING)
+  progress    Int            @default(0)
+  fileSize    Int?
+  isDeleted   Boolean        @default(false)
+  projectId   String
+  moduleId    String
+  ownerId     String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  deletedAt   DateTime?
+  module      Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  owner       User?          @relation("UserOwnedContent", fields: [ownerId], references: [id])
+  project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  shares      ContentShare[]
 
-    // relations
-    projectId   String
-    project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-    moduleId    String
-    module      Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-
-    // ownership
-    ownerId     String?
-    owner       User?      @relation("UserOwnedContent", fields: [ownerId], references: [id])
-
-    // sharing
-    shares      ContentShare[]
-
-    createdAt   DateTime   @default(now())
-    updatedAt   DateTime   @updatedAt
+  @@index([moduleId], map: "ContentData_moduleId_fkey")
+  @@index([ownerId], map: "ContentData_ownerId_fkey")
+  @@index([projectId], map: "ContentData_projectId_fkey")
 }
 
 model Project {
-    id           String        @id @default(uuid())
-    name         String        @unique
-    description  String?
-    status       ProjectStatus @default(ACTIVE)
-    createdAt    DateTime      @default(now())
-    updatedAt    DateTime      @updatedAt
-
-    // back-relations
-    modules      Module[]
-    contentData  ContentData[]
+  id          String        @id @default(uuid())
+  name        String        @unique
+  description String?
+  status      ProjectStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+  isDeleted   Boolean       @default(false)
+  contentData ContentData[]
+  modules     Module[]
 }
 
 model Module {
-    id           String        @id @default(uuid())
-    name         String
-    description  String?
-    status       ModuleStatus  @default(ACTIVE)
-    createdAt    DateTime      @default(now())
-    updatedAt    DateTime      @updatedAt
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  status      ModuleStatus  @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  projectId   String
+  deletedAt   DateTime?
+  isDeleted   Boolean       @default(false)
+  contentData ContentData[]
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-    // relations
-    projectId    String
-    project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-    // back-relations
-    contentData  ContentData[]
-
-    @@unique([projectId, name])
+  @@unique([projectId, name])
 }
 
-// =========================
-// RBAC Models
-// =========================
 model Role {
-    id          String       @id @default(uuid())
-    name        String       @unique
-    description String?
-    isActive    Boolean      @default(true)
-    createdAt   DateTime     @default(now())
-    updatedAt   DateTime     @updatedAt
-
-    users       UserRole[]
-    permissions RolePermission[]
+  id          String           @id @default(uuid())
+  name        String           @unique
+  description String?
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  permissions RolePermission[]
+  users       UserRole[]
 }
 
 model Permission {
-    id          String          @id @default(uuid())
-    name        PermissionName  @unique
-    nameVi      String?         // Vietnamese name
-    description String?
-    createdAt   DateTime        @default(now())
-    updatedAt   DateTime        @updatedAt
-
-    roles       RolePermission[]
-    users       UserPermission[]
+  id          String           @id @default(uuid())
+  name        PermissionName   @unique
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  nameVi      String?
+  roles       RolePermission[]
+  users       UserPermission[]
 }
 
 model RolePermission {
-    roleId       String
-    permissionId String
+  roleId       String
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id])
+  role         Role       @relation(fields: [roleId], references: [id])
 
-    role        Role        @relation(fields: [roleId], references: [id])
-    permission  Permission  @relation(fields: [permissionId], references: [id])
-
-    @@id([roleId, permissionId])
+  @@id([roleId, permissionId])
+  @@index([permissionId], map: "RolePermission_permissionId_fkey")
 }
 
 model UserRole {
-    userId String
-    roleId String
+  userId String
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
 
-    user   User @relation(fields: [userId], references: [id])
-    role   Role @relation(fields: [roleId], references: [id])
-
-    @@id([userId, roleId])
+  @@id([userId, roleId])
+  @@index([roleId], map: "UserRole_roleId_fkey")
 }
 
 model UserPermission {
-    userId       String
-    permissionId String
-    allow        Boolean @default(true)
+  userId       String
+  permissionId String
+  allow        Boolean    @default(true)
+  permission   Permission @relation(fields: [permissionId], references: [id])
+  user         User       @relation(fields: [userId], references: [id])
 
-    user       User       @relation(fields: [userId], references: [id])
-    permission Permission @relation(fields: [permissionId], references: [id])
-
-    @@id([userId, permissionId])
+  @@id([userId, permissionId])
+  @@index([permissionId], map: "UserPermission_permissionId_fkey")
 }
 
-// =========================
-// Content Sharing
-// =========================
 model ContentShare {
-    id          String   @id @default(uuid())
-    contentId   String
-    content     ContentData @relation(fields: [contentId], references: [id], onDelete: Cascade)
-    sharedById  String
-    sharedBy    User     @relation("ContentSharedBy", fields: [sharedById], references: [id])
-    sharedWithId String
-    sharedWith  User     @relation("ContentSharedWith", fields: [sharedWithId], references: [id])
-    // Optional batch linkage for bulk shares
-    batchId     String?
-    batch       ShareBatch? @relation(fields: [batchId], references: [id])
-    canView     Boolean  @default(true)
-    canEdit     Boolean  @default(false)
-    canDelete   Boolean  @default(false)
-    canDownload Boolean  @default(true)
-    status      ShareStatus @default(ACTIVE)
-    revokedAt   DateTime?
-    createdAt   DateTime @default(now())
-    updatedAt   DateTime @updatedAt
+  id           String      @id @default(uuid())
+  contentId    String
+  sharedById   String
+  sharedWithId String
+  batchId      String?
+  canView      Boolean     @default(true)
+  canEdit      Boolean     @default(false)
+  canDelete    Boolean     @default(false)
+  canDownload  Boolean     @default(true)
+  status       ShareStatus @default(ACTIVE)
+  revokedAt    DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  batch        ShareBatch? @relation(fields: [batchId], references: [id])
+  content      ContentData @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  sharedBy     User        @relation("ContentSharedBy", fields: [sharedById], references: [id])
+  sharedWith   User        @relation("ContentSharedWith", fields: [sharedWithId], references: [id])
 
-    @@index([contentId, sharedWithId])
-    @@index([sharedById])
-    @@index([sharedWithId])
-    @@index([status])
-    @@index([createdAt])
+  @@index([contentId, sharedWithId])
+  @@index([sharedById])
+  @@index([sharedWithId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([batchId], map: "ContentShare_batchId_fkey")
 }
 
-// New: Batch entity to track bulk sharing operations for history/analytics
 model ShareBatch {
-    id           String      @id @default(uuid())
-    scope        ShareScope
-    sharedById   String
-    sharedBy     User        @relation("BatchSharedBy", fields: [sharedById], references: [id])
-    sharedWithId String
-    sharedWith   User        @relation("BatchSharedWith", fields: [sharedWithId], references: [id])
-    projectId    String?
-    moduleId     String?
-    ownerId      String?
-    canView      Boolean     @default(true)
-    canEdit      Boolean     @default(false)
-    canDelete    Boolean     @default(false)
-    canDownload  Boolean     @default(true)
-    status       ShareStatus @default(ACTIVE)
-    revokedAt    DateTime?
-    itemsCount   Int         @default(0)
-    createdAt    DateTime    @default(now())
-    updatedAt    DateTime    @updatedAt
+  id           String         @id @default(uuid())
+  scope        ShareScope
+  sharedById   String
+  sharedWithId String
+  projectId    String?
+  moduleId     String?
+  ownerId      String?
+  canView      Boolean        @default(true)
+  canEdit      Boolean        @default(false)
+  canDelete    Boolean        @default(false)
+  canDownload  Boolean        @default(true)
+  status       ShareStatus    @default(ACTIVE)
+  revokedAt    DateTime?
+  itemsCount   Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  shares       ContentShare[]
+  sharedBy     User           @relation("BatchSharedBy", fields: [sharedById], references: [id])
+  sharedWith   User           @relation("BatchSharedWith", fields: [sharedWithId], references: [id])
 
-    // Back relation to shares
-    shares       ContentShare[]
-
-    @@index([sharedById])
-    @@index([sharedWithId])
-    @@index([projectId])
-    @@index([moduleId])
-    @@index([ownerId])
-    @@index([status])
+  @@index([sharedById])
+  @@index([sharedWithId])
+  @@index([projectId])
+  @@index([moduleId])
+  @@index([ownerId])
+  @@index([status])
 }
 
-// =========================
-// Audit Log
-// =========================
 model AuditLog {
-    id         String   @id @default(uuid())
-    actorId    String?
-    actor      User?    @relation("UserAuditLogs", fields: [actorId], references: [id])
-    action     String
-    entityType String
-    entityId   String
-    metadata   Json?
-    createdAt  DateTime @default(now())
+  id         String   @id @default(uuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  actor      User?    @relation("UserAuditLogs", fields: [actorId], references: [id])
+
+  @@index([actorId], map: "AuditLog_actorId_fkey")
 }
 
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
 
+enum PermissionName {
+  VIEW_CONTENT
+  CREATE_CONTENT
+  EDIT_CONTENT
+  DOWNLOAD_CONTENT
+  SOFT_DELETE_CONTENT
+  HARD_DELETE_CONTENT
+  VIEW_DELETED_ALL_CONTENT
+  VIEW_DELETED_OWN_CONTENT
+  RESTORE_CONTENT
+  MANAGE_ALL_CONTENT
+  MANAGE_OWN_CONTENT
+  VIEW_OWN_CONTENT_ONLY
+  VIEW_SHARED_CONTENT
+  SHARE_CONTENT_ACCESS
+  VIEW_PROJECTS
+  CREATE_PROJECTS
+  EDIT_PROJECTS
+  SOFT_DELETE_PROJECTS
+  HARD_DELETE_PROJECTS
+  VIEW_DELETED_PROJECTS
+  RESTORE_PROJECTS
+  VIEW_MODULES
+  CREATE_MODULES
+  EDIT_MODULES
+  SOFT_DELETE_MODULES
+  HARD_DELETE_MODULES
+  VIEW_DELETED_MODULES
+  RESTORE_MODULES
+  VIEW_USERS
+  CREATE_USERS
+  EDIT_USERS
+  SOFT_DELETE_USERS
+  HARD_DELETE_USERS
+  MANAGE_USER_PERMISSIONS
+  VIEW_AUDIT_LOGS
+  VIEW_DASHBOARD_STATS
+}
+
+enum ContentType {
+  FILE_ZIP_HTML
+  FILE_ZIP_SCORM
+}
+
+enum ContentStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ProjectStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum ModuleStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ShareScope {
+  SINGLE
+  PROJECT
+  MODULE
+  OWNER
+  LIST
+}
+
+enum ShareStatus {
+  ACTIVE
+  REVOKED
+}

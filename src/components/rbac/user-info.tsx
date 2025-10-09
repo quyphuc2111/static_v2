@@ -22,12 +22,13 @@ export function UserInfo() {
           <div className="flex items-center gap-4">
             <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
               <span className="text-lg font-medium">
-                {user.name?.charAt(0) || user.email.charAt(0).toUpperCase()}
+                {(user.name || user.username || user.email || 'U').charAt(0).toUpperCase()}
               </span>
             </div>
             <div>
-              <h3 className="font-semibold">{user.name || "Chưa có tên"}</h3>
-              <p className="text-sm text-muted-foreground">{user.email}</p>
+              <h3 className="font-semibold">{user.name || user.username || "Chưa có tên"}</h3>
+              <p className="text-sm text-muted-foreground">@{user.username}</p>
+              {user.email && <p className="text-xs text-muted-foreground">{user.email}</p>}
             </div>
           </div>
           

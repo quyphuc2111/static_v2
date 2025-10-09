@@ -96,8 +96,8 @@ export function useUpdateContentFile(projectId: string, moduleId: string) {
         queryKey: cachedKeys.content.list(projectId, moduleId)
       })
       
-      // Start polling for completion
-      startPollingForCompletion()
+      // Since API now updates status to COMPLETED immediately, no need for polling
+      // startPollingForCompletion()
       
       toast.success("Cập nhật file thành công!")
     },
@@ -117,7 +117,14 @@ export function useUpdateContentFile(projectId: string, moduleId: string) {
       } else if (error?.response?.status === 404) {
         message = "Không tìm thấy tài liệu"
       } else if (error?.message) {
-        message = error.message
+        // Check if it's a validation error from our new logic
+        if (error.message.includes("File ZIP không chứa file HTML")) {
+          message = error.message
+        } else if (error.message.includes("Lỗi khi đọc file ZIP")) {
+          message = error.message
+        } else {
+          message = error.message
+        }
       }
       
       toast.error(message)

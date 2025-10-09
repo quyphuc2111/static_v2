@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useRoles } from "@/modules/rbac/hooks"
 import { useUsers } from "@/modules/rbac/hooks/useUsers"
 import { Badge } from "@/components/ui/badge"
@@ -34,6 +35,7 @@ const colorMap: Record<string, string> = {
 
 export function EditUserDialog({ open, onOpenChange, user }: EditUserDialogProps) {
   const [formData, setFormData] = useState({
+    username: "",
     name: "",
     email: "",
     role: "",
@@ -47,6 +49,7 @@ export function EditUserDialog({ open, onOpenChange, user }: EditUserDialogProps
   useEffect(() => {
     if (user) {
       setFormData({
+        username: user.username || "",
         name: user.name || "",
         email: user.email || "",
         role: user.roles?.[0]?.role?.id || "",
@@ -67,8 +70,9 @@ export function EditUserDialog({ open, onOpenChange, user }: EditUserDialogProps
     try {
       await update.mutateAsync({
         id: user.id,
+        // Don't send username - it's not editable
         name: formData.name || undefined,
-        email: formData.email,
+        email: formData.email || undefined,
         password: formData.password || undefined,
         roleId: formData.role || undefined,
       })
@@ -110,20 +114,20 @@ export function EditUserDialog({ open, onOpenChange, user }: EditUserDialogProps
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-foreground">
-                Họ và tên
+              <Label htmlFor="username" className="text-foreground">
+                Tên đăng nhập
               </Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => updateFormData("name", e.target.value)}
-                  placeholder="Nhập họ và tên"
-                  className="pl-10 bg-muted/50 border-border"
-                  required
+                  id="username"
+                  value={formData.username}
+                  className="pl-10 bg-muted/30 border-border cursor-not-allowed"
+                  disabled
+                  title="Username không thể thay đổi"
                 />
               </div>
+              <p className="text-xs text-muted-foreground">Username không thể thay đổi sau khi tạo</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="password" className="text-foreground">
@@ -175,8 +179,23 @@ export function EditUserDialog({ open, onOpenChange, user }: EditUserDialogProps
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
+              <Label htmlFor="name" className="text-foreground">
+                Họ và tên
+              </Label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => updateFormData("name", e.target.value)}
+                  placeholder="Nhập họ và tên (tùy chọn)"
+                  className="pl-10 bg-muted/50 border-border"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="email" className="text-foreground">
-                Email
+                Email (tùy chọn)
               </Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -185,39 +204,36 @@ export function EditUserDialog({ open, onOpenChange, user }: EditUserDialogProps
                   type="email"
                   value={formData.email}
                   onChange={(e) => updateFormData("email", e.target.value)}
-                  placeholder="Nhập địa chỉ email"
+                  placeholder="Nhập email (tùy chọn)"
                   className="pl-10 bg-muted/50 border-border"
-                  required
                 />
               </div>
             </div>
           </div>
 
-          <div className="space-y-3">
-            <Label className="text-foreground">Vai trò</Label>
-            <div className="space-y-2">
-              {(roles || []).map((role) => (
-                <Card
-                  key={role.id}
-                  className={`cursor-pointer transition-colors border-2 ${
-                    formData.role === role.id ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
-                  }`}
-                  onClick={() => updateFormData("role", role.id)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <Shield className={`h-5 w-5 ${colorMap[role.name] || "text-muted-foreground"}`} />
-                      <div className="flex-1">
-                        <h3 className="font-medium text-foreground">{role.name}</h3>
-                        <p className="text-sm text-muted-foreground">{role.description}</p>
+          <div className="space-y-2">
+            <Label htmlFor="role" className="text-foreground">
+              Vai trò
+            </Label>
+            <div className="relative">
+              <Shield className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground z-10" />
+              <Select value={formData.role} onValueChange={(value) => updateFormData("role", value)}>
+                <SelectTrigger className="pl-10 bg-muted/50 border-border w-full">
+                  <SelectValue placeholder="Chọn vai trò..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  {(roles || []).map((role) => (
+                    <SelectItem key={role.id} value={role.id}>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{role.name}</span>
+                        {role.description && (
+                          <span className="text-xs text-muted-foreground">- {role.description}</span>
+                        )}
                       </div>
-                      <Badge variant={formData.role === role.id ? "default" : "outline"}>
-                        {formData.role === role.id ? "Đã chọn" : "Chọn"}
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

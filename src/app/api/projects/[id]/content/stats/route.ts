@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { PermissionName, ShareStatus } from "@prisma/client"
-import { hasPermission } from "@/lib/permissions"
+import { hasPermission as checkPermission } from "@/lib/permissions"
 
 export async function GET(
   request: NextRequest,
@@ -28,7 +28,7 @@ export async function GET(
 
     // Determine visibility scope
     const isAdmin = (session.user.roles || []).includes("ADMINISTRATOR")
-    const canViewAll = isAdmin || await hasPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id)
+    const canViewAll = isAdmin || await checkPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id)
 
     // Get content statistics for this project with scope
     const stats = await prisma.contentData.groupBy({

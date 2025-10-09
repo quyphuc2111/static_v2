@@ -40,7 +40,8 @@ const navigation: NavigationItem[] = [
       PermissionName.VIEW_PROJECTS,
       PermissionName.CREATE_PROJECTS,
       PermissionName.EDIT_PROJECTS,
-      PermissionName.DELETE_PROJECTS
+      PermissionName.SOFT_DELETE_PROJECTS,
+      PermissionName.HARD_DELETE_PROJECTS
     ]
   }, 
   {
@@ -57,7 +58,8 @@ const navigation: NavigationItem[] = [
       PermissionName.VIEW_USERS,
       PermissionName.CREATE_USERS,
       PermissionName.EDIT_USERS,
-      PermissionName.DELETE_USERS
+      PermissionName.SOFT_DELETE_USERS,
+      PermissionName.HARD_DELETE_USERS
     ]
   },
   {

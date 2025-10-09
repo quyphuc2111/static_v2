@@ -70,7 +70,8 @@ export function UserRoleManagement() {
   const filteredUsers = users?.filter((user) => {
     const matchesSearch =
       (user.name?.toLowerCase().includes(searchQuery.toLowerCase()) || false) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase())
+      (user.username?.toLowerCase().includes(searchQuery.toLowerCase()) || false) ||
+      (user.email?.toLowerCase().includes(searchQuery.toLowerCase()) || false)
     const matchesRole = filterRole === "all" || 
       (user.roles?.some((userRole: any) => userRole.role?.name === filterRole) || false)
     return matchesSearch && matchesRole
@@ -157,14 +158,15 @@ export function UserRoleManagement() {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar className="h-9 w-9">
-                        <AvatarImage src="/placeholder.svg" alt={user.name || ""} />
+                        <AvatarImage src="/placeholder.svg" alt={user.name || user.username || ""} />
                         <AvatarFallback>
-                          {(user.name || user.email).charAt(0).toUpperCase()}
+                          {(user.name || user.username || user.email || 'U').charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <div className="font-medium">{user.name || "Chưa có tên"}</div>
-                        <div className="text-sm text-muted-foreground">{user.email}</div>
+                        <div className="font-medium">{user.name || user.username || "Chưa có tên"}</div>
+                        <div className="text-sm text-muted-foreground">@{user.username}</div>
+                        {user.email && <div className="text-xs text-muted-foreground">{user.email}</div>}
                       </div>
                     </div>
                   </TableCell>

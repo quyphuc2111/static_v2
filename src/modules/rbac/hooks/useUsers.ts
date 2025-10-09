@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { createUser, deleteUser, getUsers, updateUser } from "../rbac.service"
+import { createUser, deleteUser, getUsers, updateUser, toggleUserStatus, resetUserPassword } from "../rbac.service"
 import { CreateUserPayload, UpdateUserPayload, UserWithRoles } from "../rbac.interface"
 
 export function useUsers() {
@@ -25,5 +25,16 @@ export function useUsers() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["rbac", "users"] }),
   })
 
-  return { ...list, create, update, remove }
+  const toggleStatus = useMutation({
+    mutationFn: (userId: string) => toggleUserStatus(userId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["rbac", "users"] }),
+  })
+
+  const resetPassword = useMutation({
+    mutationFn: ({ userId, newPassword }: { userId: string; newPassword: string }) => 
+      resetUserPassword(userId, newPassword),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["rbac", "users"] }),
+  })
+
+  return { ...list, create, update, remove, toggleStatus, resetPassword }
 }

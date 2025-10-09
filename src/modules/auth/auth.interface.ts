@@ -1,13 +1,14 @@
 import { PermissionName, UserStatus } from "@prisma/client"
 
 export type LoginPayload = {
-  email: string
+  login: string // username or email
   password: string
 }
 
 export type AuthUser = {
   id: string
-  email: string
+  username: string
+  email?: string | null
   name?: string | null
   status: UserStatus
   roles: Array<{

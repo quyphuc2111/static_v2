@@ -84,7 +84,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
         if (!open) resetForm()
       }}
     >
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px]" data-testid="create-project-dialog">
         <DialogHeader>
           <DialogTitle>Tạo Dự án Mới</DialogTitle>
           <DialogDescription>Tạo một dự án mới để quản lý tài liệu và module</DialogDescription>
@@ -99,6 +99,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
+                data-testid="create-project-name"
               />
             </div>
             <div className="grid gap-2">
@@ -109,25 +110,26 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={3}
+                data-testid="create-project-description"
               />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="status">Trạng thái</Label>
               <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
-                <SelectTrigger>
+                <SelectTrigger data-testid="create-project-status">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ACTIVE">Đang hoạt động</SelectItem>
-                  <SelectItem value="INACTIVE">Tạm dừng</SelectItem>
-                  <SelectItem value="ARCHIVED">Đã lưu trữ</SelectItem>
+                  <SelectItem value="ACTIVE" data-testid="status-active">Đang hoạt động</SelectItem>
+                  <SelectItem value="INACTIVE" data-testid="status-inactive">Tạm dừng</SelectItem>
+                  <SelectItem value="ARCHIVED" data-testid="status-archived">Đã lưu trữ</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="grid gap-2">
               <div className="flex items-center justify-between">
                 <Label>Modules</Label>
-                <Button type="button" size="sm" variant="outline" onClick={addModuleField} className="gap-1">
+                <Button type="button" size="sm" variant="outline" onClick={addModuleField} className="gap-1" data-testid="add-module-field">
                   <Plus className="h-3 w-3" />
                   Thêm Module
                 </Button>
@@ -143,6 +145,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
                           placeholder={`Tên module #${idx + 1}`}
                           value={module}
                           onChange={(e) => changeModuleValue(idx, e.target.value)}
+                          data-testid={`create-module-name-${idx}`}
                         />
                         <Button
                           type="button"
@@ -150,6 +153,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
                           variant="ghost"
                           onClick={() => removeModuleField(idx)}
                           className="h-8 w-8"
+                          data-testid={`remove-module-${idx}`}
                         >
                           <X className="h-3 w-3" />
                         </Button>
@@ -161,10 +165,10 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} data-testid="create-project-cancel">
               Hủy
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading} data-testid="create-project-submit">
               {loading ? "Đang tạo..." : "Tạo Dự án"}
             </Button>
           </DialogFooter>

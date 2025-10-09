@@ -35,7 +35,7 @@ import { EditRoleDialog } from "./edit-role-dialog"
 import { PermissionGuard } from "./permission-guard"
 import { PermissionName } from "@prisma/client"
 
-const buildPermissionCategories = (allPermissions: Array<{ id: string, name: string, description?: string }>) => {
+const buildPermissionCategories = (allPermissions: Array<{ id: string, name: string, description?: string, nameVi?: string }>) => {
   const categories = [
     {
       name: "Content Management",
@@ -59,7 +59,7 @@ const buildPermissionCategories = (allPermissions: Array<{ id: string, name: str
     name: cat.name,
     permissions: allPermissions
       .filter(p => cat.match(p.name))
-      .map(p => ({ id: p.id, name: p.name, description: p.description }))
+      .map(p => ({ id: p.id, name: p.name, description: p.description, nameVi: p.nameVi }))
   }))
 }
 
@@ -234,7 +234,7 @@ export function RoleManagement() {
                                 <Label htmlFor={permission.id} className="text-sm font-medium cursor-pointer">
                                   {permission.name}
                                 </Label>
-                                <p className="text-xs text-muted-foreground">{permission.description}</p>
+                                <Label htmlFor={permission.id} className="text-xs text-muted-foreground">{permission.nameVi}</Label>
                               </div>
                             </div>
                           ))}

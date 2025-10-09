@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
-import { hasPermission } from "@/lib/permissions"
+import { hasPermission as checkPermission } from "@/lib/permissions"
 import { PermissionName } from "@prisma/client"
 import { verifyCsrfAndOrigin } from "@/lib/csrf"
 import { promises as fs } from "fs"
@@ -17,8 +17,8 @@ export async function PATCH(_req: Request, { params }: Params) {
 
     const session = await getSession()
     if (!session.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
-    if (!(await hasPermission(PermissionName.EDIT_PROJECTS, session.user.id))) {
-      return NextResponse.json({ message: "Forbidden" }, { status: 403 })
+    if (!(await checkPermission(PermissionName.EDIT_PROJECTS, session.user.id))) {
+      return NextResponse.json({ message: "Bạn không có quyền chỉnh sửa dự án" }, { status: 403 })
     }
     const body = await _req.json()
     const name = body?.name?.trim()
@@ -50,7 +50,7 @@ export async function DELETE(_req: Request, { params }: Params) {
 
     const session = await getSession()
     if (!session.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
-    if (!(await hasPermission(PermissionName.SOFT_DELETE_PROJECTS, session.user.id))) {
+    if (!(await checkPermission(PermissionName.SOFT_DELETE_PROJECTS, session.user.id))) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403 })
     }
 

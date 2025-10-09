@@ -1,24 +1,25 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Shield, UserCheck, UserX } from "lucide-react"
+import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Shield, UserCheck, UserX, Key } from "lucide-react"
+import { toast } from "react-toastify"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { CreateUserDialog } from "./create-user-dialog"
 import { EditUserDialog } from "./edit-user-dialog"
 import { DeleteUserDialog } from "./delete-user-dialog"
+import { AssignRoleDialog } from "./assign-role-dialog"
+import { ResetPasswordDialog } from "./reset-password-dialog"
 import { useUsers } from "@/modules/rbac/hooks/useUsers"
 import { PermissionGuard } from "@/components/rbac/permission-guard"
 import { PermissionName } from "@prisma/client"
 
 // Live data via useUsers
-
-const getRoleLabel = (name?: string) => name || "Chưa có vai trò"
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -36,15 +37,18 @@ export function UserManagement() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showAssignRoleDialog, setShowAssignRoleDialog] = useState(false)
+  const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false)
   const [selectedUser, setSelectedUser] = useState<any>(null)
-  const { data: users, isLoading, remove } = useUsers()
+  const { data: users, isLoading, remove, toggleStatus } = useUsers()
 
   const safeUsers = users ?? []
   const filteredUsers = useMemo(() =>
     safeUsers.filter(
       (user) =>
         (user.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase()),
+        (user.username || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (user.email || "").toLowerCase().includes(searchTerm.toLowerCase()),
     )
   , [safeUsers, searchTerm])
 
@@ -60,6 +64,27 @@ export function UserManagement() {
   const handleDeleteUser = (user: any) => {
     setSelectedUser(user)
     setShowDeleteDialog(true)
+  }
+
+  const handleAssignRole = (user: any) => {
+    setSelectedUser(user)
+    setShowAssignRoleDialog(true)
+  }
+
+  const handleToggleStatus = async (user: any) => {
+    try {
+      await toggleStatus.mutateAsync(user.id)
+      const action = user.status === "ACTIVE" ? "vô hiệu hóa" : "kích hoạt"
+      toast.success(`Đã ${action} tài khoản thành công!`)
+    } catch (error) {
+      console.error("Error toggling user status:", error)
+      toast.error("Có lỗi xảy ra khi thay đổi trạng thái tài khoản")
+    }
+  }
+
+  const handleResetPassword = (user: any) => {
+    setSelectedUser(user)
+    setShowResetPasswordDialog(true)
   }
 
   return (
@@ -151,11 +176,10 @@ export function UserManagement() {
             <TableHeader>
               <TableRow className="border-border">
                 <TableHead className="text-muted-foreground">Người dùng</TableHead>
+                <TableHead className="text-muted-foreground">Username</TableHead>
                 <TableHead className="text-muted-foreground">Email</TableHead>
                 <TableHead className="text-muted-foreground">Vai trò</TableHead>
                 <TableHead className="text-muted-foreground">Trạng thái</TableHead>
-                <TableHead className="text-muted-foreground">Đăng nhập cuối</TableHead>
-                <TableHead className="text-muted-foreground">Tài liệu</TableHead>
                 <TableHead className="text-muted-foreground">Thao tác</TableHead>
               </TableRow>
             </TableHeader>
@@ -165,19 +189,34 @@ export function UserManagement() {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar className="h-10 w-10">
-                        <AvatarImage src={"/placeholder.svg"} alt={user.name || user.email} />
-                        <AvatarFallback>{(user.name || user.email).charAt(0)}</AvatarFallback>
+                        <AvatarImage src={"/placeholder.svg"} alt={user.name || user.username} />
+                        <AvatarFallback>{(user.name || user.username).charAt(0).toUpperCase()}</AvatarFallback>
                       </Avatar>
                       <div>
-                        <div className="font-medium text-foreground">{user.name || user.email}</div>
+                        <div className="font-medium text-foreground">{user.name || user.username}</div>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                  <TableCell>{getRoleLabel(user.roles?.[0]?.role?.name)}</TableCell>
+                  <TableCell className="text-muted-foreground font-mono text-sm">{user.username}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm">{user.email || "—"}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {user.roles && user.roles.length > 0 ? (
+                        user.roles.map((userRole) => (
+                          <Badge 
+                            key={userRole.roleId} 
+                            variant="secondary"
+                            className="text-xs"
+                          >
+                            {userRole.role?.name || "Unknown"}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">Chưa có vai trò</span>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>{getStatusBadge(user.status)}</TableCell>
-                  <TableCell className="text-muted-foreground">—</TableCell>
-                  <TableCell className="text-muted-foreground">—</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -193,22 +232,31 @@ export function UserManagement() {
                           </DropdownMenuItem>
                         </PermissionGuard>
                         <PermissionGuard permission={PermissionName.MANAGE_USER_PERMISSIONS}>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleAssignRole(user)}>
                           <Shield className="mr-2 h-4 w-4" />
                           Phân quyền
                         </DropdownMenuItem>
                         </PermissionGuard>
+                        <PermissionGuard permission={PermissionName.EDIT_USERS}>
+                        <DropdownMenuItem onClick={() => handleResetPassword(user)}>
+                          <Key className="mr-2 h-4 w-4" />
+                          Đặt lại mật khẩu
+                        </DropdownMenuItem>
+                        </PermissionGuard>
+                        <DropdownMenuSeparator />
+                        <PermissionGuard permission={PermissionName.EDIT_USERS}>
                         {user.status === "ACTIVE" ? (
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleToggleStatus(user)} disabled={toggleStatus.isPending}>
                             <UserX className="mr-2 h-4 w-4" />
                             Vô hiệu hóa
                           </DropdownMenuItem>
                         ) : (
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleToggleStatus(user)} disabled={toggleStatus.isPending}>
                             <UserCheck className="mr-2 h-4 w-4" />
                             Kích hoạt
                           </DropdownMenuItem>
                         )}
+                        </PermissionGuard>
                         <PermissionGuard permission={PermissionName.HARD_DELETE_USERS}>
                         <DropdownMenuItem className="text-red-400" onClick={() => handleDeleteUser(user)}>
                           <Trash2 className="mr-2 h-4 w-4" />
@@ -235,6 +283,16 @@ export function UserManagement() {
       <DeleteUserDialog 
         open={showDeleteDialog} 
         onOpenChange={setShowDeleteDialog} 
+        user={selectedUser} 
+      />
+      <AssignRoleDialog 
+        open={showAssignRoleDialog} 
+        onOpenChange={setShowAssignRoleDialog} 
+        user={selectedUser} 
+      />
+      <ResetPasswordDialog 
+        open={showResetPasswordDialog} 
+        onOpenChange={setShowResetPasswordDialog} 
         user={selectedUser} 
       />
     </div>

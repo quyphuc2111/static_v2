@@ -38,16 +38,18 @@ interface DataTableProps<TData, TValue> {
     onShowSCORMInfo?: (content: ContentItem) => void
     onEdit?: (content: ContentItem) => void
     onDownload?: (content: ContentItem) => void
-    onDelete?: (content: ContentItem) => void
     onRestore?: (content: ContentItem) => void
     onUploadFile?: (content: ContentItem) => void
     onUpdateFile?: (content: ContentItem) => void
+    onSoftDelete?: (content: ContentItem) => void
+    onHardDelete?: (content: ContentItem) => void
     copiedUrl?: string | null
     isDownloading?: boolean
-    isDeleting?: boolean
     isRestoring?: boolean
     isUploading?: boolean
     isUpdating?: boolean
+    isSoftDeleting?: boolean
+    isHardDeleting?: boolean
     currentUserId?: string
   }
   // Bulk actions (optional)
@@ -262,16 +264,18 @@ export function DataTable<TData, TValue>({
                       onShowSCORMInfo={contextMenuActions.onShowSCORMInfo!}
                       onEdit={contextMenuActions.onEdit!}
                       onDownload={contextMenuActions.onDownload!}
-                      onDelete={contextMenuActions.onDelete!}
                       onRestore={contextMenuActions.onRestore!}
                       onUploadFile={contextMenuActions.onUploadFile}
                       onUpdateFile={contextMenuActions.onUpdateFile}
+                      onSoftDelete={contextMenuActions.onSoftDelete}
+                      onHardDelete={contextMenuActions.onHardDelete}
                       copiedUrl={contextMenuActions.copiedUrl || null}
                       isDownloading={contextMenuActions.isDownloading || false}
-                      isDeleting={contextMenuActions.isDeleting || false}
                       isRestoring={contextMenuActions.isRestoring || false}
                       isUploading={contextMenuActions.isUploading || false}
                       isUpdating={contextMenuActions.isUpdating || false}
+                      isSoftDeleting={contextMenuActions.isSoftDeleting || false}
+                      isHardDeleting={contextMenuActions.isHardDeleting || false}
                       hasSCORMInfo={!!scormInfo}
                       currentUserId={contextMenuActions.currentUserId}
                     >

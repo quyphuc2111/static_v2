@@ -1,12 +1,13 @@
 import { getSession } from "@/lib/session"
 import { prisma } from "@/lib/prisma"
+import { PermissionName } from "@prisma/client"
 
 export interface PermissionCheck {
   permission: string
   userId?: string
 }
 
-export async function hasPermission(permission: string, userId?: string): Promise<boolean> {
+export async function hasPermission(permission: string | PermissionName, userId?: string): Promise<boolean> {
   try {
     const session = await getSession()
     if (!session?.user?.id) {
@@ -46,16 +47,16 @@ export async function hasPermission(permission: string, userId?: string): Promis
 
     // Check role permissions
     const rolePermissions = user.roles.flatMap(ur => 
-      ur.role.permissions.map(rp => rp.permission.name)
+      ur.role.permissions.map(rp => rp.permission.name as PermissionName)
     )
     
     // Check direct user permissions
-    const directPermissions = user.permissions.map(up => up.permission.name)
+    const directPermissions = user.permissions.map(up => up.permission.name as PermissionName)
     
     // Combine all permissions
-    const allPermissions = [...rolePermissions, ...directPermissions]
+    const allPermissions: PermissionName[] = [...rolePermissions, ...directPermissions]
     
-    return allPermissions.includes(permission)
+    return allPermissions.includes(permission as PermissionName)
   } catch (error) {
     console.error("Error checking permission:", error)
     return false

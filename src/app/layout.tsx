@@ -12,7 +12,6 @@ import { ToastContainer } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
 import Script from "next/script"
 import ScormPlayer from "@/components/scorm-player"
-
 export const metadata: Metadata = {
   title: "Hệ thống Quản lý Tài liệu",
   description: "Hệ thống quản lý tài liệu tĩnh hiện đại",
@@ -25,7 +24,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-
   return (
     <html lang="vi" suppressHydrationWarning>
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} antialiased`}>

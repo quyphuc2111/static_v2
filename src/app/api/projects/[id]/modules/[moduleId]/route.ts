@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { verifyCsrfAndOrigin } from "@/lib/csrf"
+import { hasPermission as checkPermission } from "@/lib/permissions"
+import { PermissionName } from "@prisma/client"
 
 type Params = { params: Promise<{ id: string; moduleId: string }> }
 
@@ -12,6 +14,12 @@ export async function PATCH(req: Request, { params }: Params) {
 
     const session = await getSession()
     if (!session.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+
+    // Check permission to edit modules
+    const hasAccess = await checkPermission(PermissionName.EDIT_MODULES, session.user.id)
+    if (!hasAccess) {
+      return NextResponse.json({ message: "Bạn không có quyền chỉnh sửa module" }, { status: 403 })
+    }
 
     const body = await req.json()
     const name = (body?.name ?? "").trim()
@@ -49,6 +57,12 @@ export async function DELETE(_req: Request, { params }: Params) {
 
     const session = await getSession()
     if (!session.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+
+    // Check permission to hard delete modules
+    const hasAccess = await checkPermission(PermissionName.HARD_DELETE_MODULES, session.user.id)
+    if (!hasAccess) {
+      return NextResponse.json({ message: "Bạn không có quyền xóa module" }, { status: 403 })
+    }
 
     const { moduleId } = await params
     await prisma.module.delete({ where: { id: moduleId } })

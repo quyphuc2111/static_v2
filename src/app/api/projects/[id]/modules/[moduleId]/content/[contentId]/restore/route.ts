@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
-import { hasPermission } from "@/lib/permissions"
+import { hasPermission as checkPermission } from "@/lib/permissions"
 import { PermissionName } from "@prisma/client"
 import { verifyCsrfAndOrigin } from "@/lib/csrf"
 
@@ -36,15 +36,18 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     const isAdmin = (session.user.roles || []).includes("ADMINISTRATOR")
-    const canManageAll = await hasPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id)
+    const canManageAll = await checkPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id)
+    const canRestore = await checkPermission(PermissionName.RESTORE_CONTENT, session.user.id)
+    const canManageOwn = await checkPermission(PermissionName.MANAGE_OWN_CONTENT, session.user.id)
     
-    // Permission check: owner or admin/manager
-    if (!isAdmin && !canManageAll) {
+    // Permission check: must have RESTORE_CONTENT or be admin/manager
+    if (!isAdmin && !canManageAll && !canRestore) {
+      // If no restore permission, check if owner with MANAGE_OWN_CONTENT
       const isOwner = content.ownerId === session.user.id
       
-      if (!isOwner) {
+      if (!isOwner || !canManageOwn) {
         return NextResponse.json({ 
-          error: "Forbidden: Only owner or admin can restore content" 
+          error: "Forbidden: No restore permission" 
         }, { status: 403 })
       }
     }
@@ -52,7 +55,11 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Restore content
     const restoredContent = await prisma.contentData.update({
       where: { id: contentId },
-      data: { isDeleted: false },
+      data: { 
+        isDeleted: false,
+        deletedAt: null,
+        updatedAt: new Date()
+      },
       include: {
         owner: {
           select: { id: true, name: true, email: true }

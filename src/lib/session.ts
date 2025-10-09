@@ -4,7 +4,8 @@ import { PermissionName, UserStatus } from "@prisma/client"
 
 export type SessionUser = {
   id: string
-  email: string
+  username: string
+  email?: string | null
   name?: string | null
   status: UserStatus
   roles: string[]

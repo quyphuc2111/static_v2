@@ -1,3 +1,4 @@
+// @ts-ignore - No type definitions available
 import Cookies from 'js-cookie';
 
 class StorageService {

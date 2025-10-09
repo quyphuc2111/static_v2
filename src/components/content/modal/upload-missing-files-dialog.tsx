@@ -206,9 +206,11 @@ export function UploadMissingFilesDialog({ open, onOpenChange, projectId, module
 
           // Update content with file
           await updateContentMut.mutateAsync({
-            id: item.content.id,
-            file: item.file!,
-            contentType: item.contentType
+            contentId: item.content.id,
+            payload: {
+              title: item.content.title,
+              description: item.content.description
+            }
           })
 
           setContentWithFiles(prev => prev.map(c => 

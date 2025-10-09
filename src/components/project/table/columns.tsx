@@ -11,6 +11,8 @@ export interface Project {
   name: string
   description?: string
   status: "ACTIVE" | "INACTIVE" | "ARCHIVED"
+  isDeleted: boolean
+  deletedAt?: string | null
   modules?: any[]
   createdAt: string
   updatedAt: string
@@ -45,7 +47,12 @@ export function createColumns({ onDelete }: ProjectTableProps): ColumnDef<Projec
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
           <FolderOpen className="h-4 w-4 text-blue-500" />
-          <span className="font-medium">{row.getValue("name")}</span>
+          <span className={`font-medium ${row.original.isDeleted ? 'line-through text-muted-foreground' : ''}`}>
+            {row.getValue("name")}
+          </span>
+          {row.original.isDeleted && (
+            <Badge variant="destructive" className="text-xs">Đã xóa</Badge>
+          )}
         </div>
       ),
     },
@@ -62,7 +69,15 @@ export function createColumns({ onDelete }: ProjectTableProps): ColumnDef<Projec
       accessorKey: "status",
       header: "Trạng thái",
       cell: ({ row }) => {
-        const status = row.getValue("status") as string
+        const project = row.original
+        
+        // Nếu đã xóa mềm, hiển thị trạng thái "Đã xóa" với màu đỏ
+        if (project.isDeleted) {
+          return <Badge variant="destructive">Đã xóa</Badge>
+        }
+        
+        // Nếu chưa xóa, hiển thị trạng thái gốc
+        const status = project.status
         const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
           ACTIVE: { variant: "default", label: "Đang hoạt động" },
           INACTIVE: { variant: "secondary", label: "Tạm dừng" },
@@ -84,11 +99,38 @@ export function createColumns({ onDelete }: ProjectTableProps): ColumnDef<Projec
     {
       accessorKey: "updatedAt",
       header: "Cập nhật",
-      cell: ({ row }) => (
-        <span className="text-muted-foreground text-sm">
-          {new Date(row.getValue("updatedAt")).toLocaleDateString("vi-VN")}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const project = row.original
+        
+        // Nếu đã xóa mềm, hiển thị thời gian xóa
+        if (project.isDeleted && project.deletedAt) {
+          return (
+            <div className="text-muted-foreground text-sm">
+              <div className="text-red-600 font-medium">Đã xóa:</div>
+              <div>{new Date(project.deletedAt).toLocaleString("vi-VN", {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}</div>
+            </div>
+          )
+        }
+        
+        // Nếu chưa xóa, hiển thị thời gian cập nhật
+        return (
+          <span className="text-muted-foreground text-sm">
+            {new Date(project.updatedAt).toLocaleString("vi-VN", {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
+          </span>
+        )
+      },
     },
     {
       id: "actions",

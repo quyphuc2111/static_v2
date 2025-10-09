@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { PermissionName } from "@prisma/client"
-import { hasPermission, hasAnyPermission } from "@/lib/permissions"
+import { hasPermission as checkPermission, hasAnyPermission } from "@/lib/permissions"
 import { Prisma } from "@prisma/client"
 import { writeFile, mkdir } from "fs/promises"
 import { join, dirname } from "path"
@@ -145,7 +145,7 @@ export async function POST(
 
     // Permission check for updating content
     const isAdmin = (session.user.roles || []).includes("ADMINISTRATOR")
-    const canManageAll = isAdmin || await hasPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id)
+    const canManageAll = isAdmin || await checkPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id)
     const isOwner = content.ownerId === session.user.id
 
     if (!canManageAll && !isOwner) {

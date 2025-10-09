@@ -12,7 +12,8 @@ export const Permissions = {
     DOWNLOAD: PermissionName.DOWNLOAD_CONTENT,
     SOFT_DELETE: PermissionName.SOFT_DELETE_CONTENT,
     HARD_DELETE: PermissionName.HARD_DELETE_CONTENT,
-    VIEW_DELETED: PermissionName.VIEW_DELETED_CONTENT,
+    VIEW_DELETED_ALL: PermissionName.VIEW_DELETED_ALL_CONTENT,
+    VIEW_DELETED_OWN: PermissionName.VIEW_DELETED_OWN_CONTENT,
     RESTORE: PermissionName.RESTORE_CONTENT,
   },
 

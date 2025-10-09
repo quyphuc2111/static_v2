@@ -24,7 +24,7 @@ type RoleGuardProps = {
 export function RoleGuard({ children, roles, fallback = null }: RoleGuardProps) {
   const { user, isLoading } = useAuth()
   if (isLoading) return fallback
-  const has = user?.roles?.some((r) => roles.includes(r.name))
+  const has = user?.roles?.some((r) => roles.includes(typeof r === 'string' ? r : r.name))
   if (!has) return fallback
   return children
 }

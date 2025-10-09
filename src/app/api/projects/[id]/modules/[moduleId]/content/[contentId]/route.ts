@@ -4,8 +4,9 @@ import { getSession } from "@/lib/session"
 import { rm } from "fs/promises"
 import { join } from "path"
 import { PermissionName } from "@prisma/client"
-import { hasAnyPermission, hasPermission } from "@/lib/permissions"
+import { hasAnyPermission, hasPermission as checkPermission } from "@/lib/permissions"
 import { verifyCsrfAndOrigin } from "@/lib/csrf"
+import { logContentAction } from "@/lib/audit"
 
 type Params = { params: Promise<{ id: string; moduleId: string; contentId: string }> }
 
@@ -37,8 +38,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     const isAdmin = (session.user.roles || []).includes("ADMINISTRATOR")
-    const canEditAll = await hasPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id)
-    const canEdit = await hasPermission(PermissionName.EDIT_CONTENT, session.user.id)
+    const canEditAll = await checkPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id)
+    const canEdit = await checkPermission(PermissionName.EDIT_CONTENT, session.user.id)
     
     // Check permissions
     if (!isAdmin && !canEditAll) {
@@ -61,7 +62,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         }
       } else {
         // Owner but needs EDIT_CONTENT or MANAGE_OWN_CONTENT permission
-        const canManageOwn = await hasPermission(PermissionName.MANAGE_OWN_CONTENT, session.user.id)
+        const canManageOwn = await checkPermission(PermissionName.MANAGE_OWN_CONTENT, session.user.id)
         if (!canEdit && !canManageOwn) {
           return NextResponse.json({ 
             error: "Forbidden: Missing edit permission" 
@@ -143,26 +144,46 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
     // Use transaction to ensure atomicity
     await prisma.$transaction(async (tx) => {
-      // Always mark as soft-deleted
-      await tx.contentData.update({
-        where: { id: contentId },
-        data: { isDeleted: true }
-      })
+      if (canHardDelete) {
+        // Hard delete: Remove from database completely
+        await tx.contentData.delete({
+          where: { id: contentId }
+        })
 
-      // Only admins or manage_all can remove physical files
-      if (isAdmin || canHardDelete) {
+        // Also remove physical files
         try {
           const contentDir = join(process.cwd(), 'public', content.contentUrl)
           await rm(contentDir, { recursive: true, force: true })
-          console.log(`Deleted content directory: ${contentDir}`)
+          console.log(`Hard deleted content directory: ${contentDir}`)
         } catch (fileError) {
           console.warn(`Failed to delete content directory: ${fileError}`)
           // Don't fail the transaction if file deletion fails
         }
+      } else {
+        // Soft delete: Mark as deleted but keep data and files
+        await tx.contentData.update({
+          where: { id: contentId },
+          data: { 
+            isDeleted: true,
+            deletedAt: new Date(),
+            updatedAt: new Date()
+          }
+        })
       }
     })
 
-    return NextResponse.json({ message: "Content deleted successfully" })
+    // Log audit action
+    await logContentAction(session.user.id, canHardDelete ? 'hard_deleted' : 'soft_deleted', contentId, {
+      contentTitle: content.title,
+      contentType: content.contentType,
+      projectId: content.projectId,
+      moduleId: content.moduleId,
+      hardDelete: canHardDelete
+    })
+
+    return NextResponse.json({ 
+      message: canHardDelete ? "Content permanently deleted" : "Content moved to trash"
+    })
 
   } catch (error) {
     console.error("Error deleting content:", error)

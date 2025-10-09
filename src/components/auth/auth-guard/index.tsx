@@ -17,14 +17,14 @@ export function AuthGuard({ children, fallback = null }: AuthGuardProps) {
 
 type RoleGuardProps = {
   children: ReactNode
-  roles: RoleName[]
+  roles: string[]
   fallback?: ReactNode
 }
 
 export function RoleGuard({ children, roles, fallback = null }: RoleGuardProps) {
   const { user, isLoading } = useAuth()
   if (isLoading) return fallback
-  const has = user?.roles?.some((r) => roles.includes(r))
+  const has = user?.roles?.some((r) => roles.includes(typeof r === 'string' ? r : r.name))
   if (!has) return fallback
   return children
 }

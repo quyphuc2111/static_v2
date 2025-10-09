@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
     const users = await prisma.user.findMany({
       select: {
         id: true,
+        username: true,
         name: true,
         email: true,
         status: true,
@@ -70,10 +71,17 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}))
-    const { name, email, status, roleId, password } = body as { name?: string; email?: string; status?: UserStatus; roleId?: string; password?: string }
+    const { username, name, email, status, roleId, password } = body as { 
+      username?: string; 
+      name?: string; 
+      email?: string; 
+      status?: UserStatus; 
+      roleId?: string; 
+      password?: string 
+    }
 
-    if (!email) {
-      return NextResponse.json({ message: "Email is required" }, { status: 400 })
+    if (!username) {
+      return NextResponse.json({ message: "Username is required" }, { status: 400 })
     }
 
     const generateTempPassword = (): string => {
@@ -91,7 +99,8 @@ export async function POST(req: NextRequest) {
       const passwordHash = await bcrypt.hash(plainPassword, 10)
       const newUser = await tx.user.create({
         data: {
-          email,
+          username,
+          email: email ?? null,
           name: name ?? null,
           status: status ?? UserStatus.ACTIVE,
           passwordHash,
@@ -106,6 +115,7 @@ export async function POST(req: NextRequest) {
         where: { id: newUser.id },
         select: {
           id: true,
+          username: true,
           name: true,
           email: true,
           status: true,
@@ -129,7 +139,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ data: created.user, temporaryPassword: created.temporaryPassword }, { status: 201 })
   } catch (error: any) {
     console.error("Error creating user:", error)
-    const message = error?.code === "P2002" ? "Email already exists" : "Internal server error"
+    let message = "Internal server error"
+    if (error?.code === "P2002") {
+      const target = error?.meta?.target?.[0]
+      message = target === "username" ? "Username already exists" : "Email already exists"
+    }
     return NextResponse.json({ message }, { status: 500 })
   }
 }

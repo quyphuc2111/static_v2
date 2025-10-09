@@ -46,6 +46,18 @@ export async function restoreContent(projectId: string, moduleId: string, conten
   })
 }
 
+export async function softDeleteContent(projectId: string, moduleId: string, contentId: string) {
+  return httpService.post<{ message: string; data: ContentData }>({ 
+    url: CONTENT_API_URL.SOFT_DELETE(projectId, moduleId, contentId)
+  })
+}
+
+export async function hardDeleteContent(projectId: string, moduleId: string, contentId: string) {
+  return httpService.delete<{ message: string }>({ 
+    url: CONTENT_API_URL.HARD_DELETE(projectId, moduleId, contentId)
+  })
+}
+
 export async function bulkDeleteContent(projectId: string, moduleId: string, contentIds: string[]) {
   return httpService.post<{ message: string; deletedCount: number }>({ 
     url: CONTENT_API_URL.BULK_DELETE(projectId, moduleId),

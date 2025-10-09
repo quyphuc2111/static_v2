@@ -3,9 +3,18 @@
 import { ColumnDef } from "@tanstack/react-table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { MoreHorizontal, Eye, Copy, Check, BookOpen, Edit, Download, Trash2, RotateCcw, Upload, Link, RefreshCw } from "lucide-react"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { MoreHorizontal, Eye, Copy, Check, BookOpen, Edit, Download, Trash2, RotateCcw, Upload, Link, RefreshCw, Calendar, FileText } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { useState } from "react"
+import { useUserPermissions } from "@/modules/rbac/hooks"
+import { PermissionName } from "@prisma/client"
 
 // Types
 export interface ContentItem {
@@ -19,7 +28,7 @@ export interface ContentItem {
   createdAt: string
   contentUrl: string
   isDeleted?: boolean
-  owner?: { id: string; name?: string | null; email: string } | null
+  owner?: { id: string; username?: string; name?: string | null; email?: string | null } | null
   isShared?: boolean
   sharePermissions?: {
     canView: boolean
@@ -103,24 +112,6 @@ const formatJsonValue = (value: any) => {
   return truncateText(String(value), 40)
 }
 
-// Helper function to get content URL
-const getContentUrl = (content: ContentItem) => {
-  const desc: any = content.description
-  const scorm = typeof desc === 'object' && desc ? desc.scorm : null
-  const launchFile = typeof desc === 'object' && desc ? desc.launchFile : null
-  
-  if (content.contentType === 'FILE_ZIP_SCORM' && scorm && launchFile) {
-    const raw = `/uploads${content.contentUrl}/${launchFile}`
-    return raw.replace(/\/+/g, '/').replace('/uploads/uploads', '/uploads')
-  } else if (content.contentType === 'FILE_ZIP_HTML' && launchFile) {
-    const raw = `/uploads${content.contentUrl}/${launchFile}`
-    return raw.replace(/\/+/g, '/').replace('/uploads/uploads', '/uploads')
-  } else {
-    return `/uploads${content.contentUrl}`.replace('/uploads/uploads', '/uploads')
-  }
-}
-
-// Helper function to get SCORM info
 const getSCORMInfo = (content: ContentItem) => {
   if (content.contentType === "FILE_ZIP_SCORM" && content.description) {
     const desc = content.description
@@ -143,16 +134,18 @@ interface ContentActionsProps {
   onShowSCORMInfo: (content: ContentItem) => void
   onEdit: (content: ContentItem) => void
   onDownload: (content: ContentItem) => void
-  onDelete: (content: ContentItem) => void
   onRestore: (content: ContentItem) => void
   onUploadFile?: (content: ContentItem) => void
   onUpdateFile?: (content: ContentItem) => void
+  onSoftDelete?: (content: ContentItem) => void
+  onHardDelete?: (content: ContentItem) => void
   copiedUrl: string | null
   isDownloading: boolean
-  isDeleting: boolean
   isRestoring: boolean
   isUploading?: boolean
   isUpdating?: boolean
+  isSoftDeleting?: boolean
+  isHardDeleting?: boolean
   currentUserId?: string
 }
 
@@ -163,31 +156,45 @@ function ContentActions({
   onShowSCORMInfo,
   onEdit,
   onDownload,
-  onDelete,
   onRestore,
   onUploadFile,
   onUpdateFile,
+  onSoftDelete,
+  onHardDelete,
   copiedUrl,
   isDownloading,
-  isDeleting,
   isRestoring,
   isUploading,
   isUpdating,
+  isSoftDeleting,
+  isHardDeleting,
   currentUserId
 }: ContentActionsProps) {
+  const { hasPermission, hasAnyPermission, isAdmin } = useUserPermissions()
+  
   // Determine permissions
   const isOwner = content.owner?.id === currentUserId
   const sharePerms = content.sharePermissions
   const isDeleted = content.isDeleted
   const hasFile = content.contentUrl && content.contentUrl.trim() !== ""
   
-  // If shared content, use share permissions; if owner, full access
-  const canView = isOwner || sharePerms?.canView || false
-  const canDownload = isOwner || sharePerms?.canDownload || false
-  const canEdit = isOwner || sharePerms?.canEdit || false
-  const canDelete = isOwner || sharePerms?.canDelete || false
-  const canUpload = isOwner && !hasFile && !isDeleted
-  const canUpdate = isOwner && hasFile && !isDeleted
+  // System permissions
+  const canViewSystem = hasPermission(PermissionName.VIEW_CONTENT) || isAdmin
+  const canEditSystem = hasAnyPermission([PermissionName.EDIT_CONTENT, PermissionName.MANAGE_OWN_CONTENT]) || isAdmin
+  const canDownloadSystem = hasAnyPermission([PermissionName.DOWNLOAD_CONTENT, PermissionName.MANAGE_OWN_CONTENT]) || isAdmin
+  const canRestoreSystem = hasAnyPermission([PermissionName.RESTORE_CONTENT, PermissionName.MANAGE_OWN_CONTENT]) || isAdmin
+  const canSoftDeleteSystem = hasAnyPermission([PermissionName.SOFT_DELETE_CONTENT, PermissionName.MANAGE_OWN_CONTENT]) || isAdmin
+  const canHardDeleteSystem = hasAnyPermission([PermissionName.HARD_DELETE_CONTENT, PermissionName.MANAGE_ALL_CONTENT]) || isAdmin
+  
+  // Combined permissions: system permissions + ownership/share permissions
+  const canView = canViewSystem && (isOwner || sharePerms?.canView || false)
+  const canDownload = canDownloadSystem && (isOwner || sharePerms?.canDownload || false)
+  const canEdit = canEditSystem && (isOwner || sharePerms?.canEdit || false)
+  const canRestore = canRestoreSystem && isOwner
+  const canUpload = isOwner && !hasFile && !isDeleted && canEditSystem
+  const canUpdate = isOwner && hasFile && !isDeleted && canEditSystem
+  const canSoftDelete = canSoftDeleteSystem && (isOwner || sharePerms?.canDelete || false) && !isDeleted
+  const canHardDelete = canHardDeleteSystem && isOwner && !isDeleted
   
   // If content is deleted, show restore action instead
   if (isDeleted) {
@@ -208,6 +215,18 @@ function ContentActions({
             {isRestoring ? "Đang khôi phục..." : "Khôi phục"}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
+          {
+            canHardDeleteSystem && onHardDelete && (
+              <DropdownMenuItem 
+                onClick={() => onHardDelete(content)}
+                disabled={isHardDeleting}
+                className="text-red-600 focus:text-red-600"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                {isHardDeleting ? "Đang xóa cứng..." : "Xóa vĩnh viễn"}
+              </DropdownMenuItem>
+            )
+          }
           <DropdownMenuItem onClick={() => onView(content)}>
             <Eye className="mr-2 h-4 w-4" />
             Xem chi tiết
@@ -279,18 +298,25 @@ function ContentActions({
             )}
           </>
         )}
-        {canDelete && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              className="text-red-400"
-              onClick={() => onDelete(content)}
-              disabled={isDeleting}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              {isDeleting ? "Đang xóa..." : "Xóa"}
-            </DropdownMenuItem>
-          </>
+        {canSoftDelete && onSoftDelete && (
+          <DropdownMenuItem 
+            onClick={() => onSoftDelete(content)}
+            disabled={isSoftDeleting}
+            className="text-orange-400"
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            {isSoftDeleting ? "Đang xóa mềm..." : "Xóa mềm"}
+          </DropdownMenuItem>
+        )}
+        {canHardDelete && onHardDelete && (
+          <DropdownMenuItem 
+            onClick={() => onHardDelete(content)}
+            disabled={isHardDeleting}
+            className="text-red-600 focus:text-red-600"
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            {isHardDeleting ? "Đang xóa cứng..." : "Xóa vĩnh viễn"}
+          </DropdownMenuItem>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
@@ -357,7 +383,7 @@ function ContentProgress({ content }: ContentProgressProps) {
 
   return (
     <div className="flex items-center gap-2 w-full">
-      <div className="flex-1 bg-muted rounded-full h-2">
+      {/* <div className="flex-1 bg-muted rounded-full h-2">
         <div 
           className={`h-2 rounded-full transition-all duration-500 ease-out ${
             content.status === "COMPLETED" 
@@ -368,7 +394,7 @@ function ContentProgress({ content }: ContentProgressProps) {
           }`}
           style={{ width: `${content.progress}%` }}
         />
-      </div>
+      </div> */}
       <span className={`text-xs font-medium min-w-[3rem] text-right ${
         content.status === "COMPLETED" 
           ? "text-green-400" 
@@ -390,17 +416,19 @@ export const createContentColumns = (
     onShowSCORMInfo: (content: ContentItem) => void
     onEdit: (content: ContentItem) => void
     onDownload: (content: ContentItem) => void
-    onDelete: (content: ContentItem) => void
     onRestore: (content: ContentItem) => void
     onDescriptionClick: (content: ContentItem) => void
     onUploadFile?: (content: ContentItem) => void
     onUpdateFile?: (content: ContentItem) => void
+    onSoftDelete?: (content: ContentItem) => void
+    onHardDelete?: (content: ContentItem) => void
     copiedUrl: string | null
     isDownloading: boolean
-    isDeleting: boolean
     isRestoring: boolean
     isUploading?: boolean
     isUpdating?: boolean
+    isSoftDeleting?: boolean
+    isHardDeleting?: boolean
   },
   options?: { isAdmin?: boolean; currentUserId?: string }
 ): ColumnDef<ContentItem>[] => [
@@ -412,12 +440,12 @@ export const createContentColumns = (
       const pageSize = table.getState().pagination.pageSize
       const index = pageIndex * pageSize + row.index + 1
       return (
-        <div className=" text-muted-foreground font-medium">
+        <div className="text-xs text-muted-foreground font-medium w-8">
           {index}
         </div>
       )
     },
-    size: 60,
+    size: 40,
     enableSorting: false,
   },
   {
@@ -426,65 +454,42 @@ export const createContentColumns = (
     cell: ({ row }) => {
       const isDeleted = row.original.isDeleted
       const isShared = row.original.isShared
+      const contentType = row.original.contentType
       return (
-        <div className="font-medium text-foreground flex items-center gap-2">
-          <span>{row.getValue("title")}</span>
-          {isShared && (
-            <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">Được chia sẻ</Badge>
-          )}
-          {isDeleted && (
-            <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">Đã xoá mềm</Badge>
-          )}
+        <div className="flex flex-col gap-1 max-w-md">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-foreground truncate">{row.getValue("title")}</span>
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Badge variant="outline" className={`text-xs ${getContentTypeColor(contentType)}`}>
+              {getContentTypeLabel(contentType)}
+            </Badge>
+            {isShared && (
+              <Badge variant="outline" className="text-xs text-purple-400">Shared</Badge>
+            )}
+            {isDeleted && (
+              <Badge variant="outline" className="text-xs text-amber-400">Deleted</Badge>
+            )}
+          </div>
         </div>
       )
     },
-  },
-  {
-    accessorKey: "description",
-    header: "Mô tả",
-    cell: ({ row }) => (
-      <ContentDescription 
-        content={row.original} 
-        onDescriptionClick={actions.onDescriptionClick}
-      />
-    ),
-  },
-  {
-    accessorKey: "contentType",
-    header: "Loại",
-    cell: ({ row }) => (
-      <span className={`font-mono text-sm ${getContentTypeColor(row.getValue("contentType"))}`}>
-        {getContentTypeLabel(row.getValue("contentType"))}
-      </span>
-    ),
-  },
-  {
-    accessorKey: "fileSize",
-    header: "Kích thước",
-    cell: ({ row }) => (
-      <div className="text-muted-foreground">
-        {formatFileSize(row.getValue("fileSize"))}
-      </div>
-    ),
+    size: 250,
   },
   {
     accessorKey: "contentUrl",
-    header: "File Path",
+    header: "Đường dẫn",
     cell: ({ row }) => {
       const contentUrl = row.getValue("contentUrl") as string
       const hasFile = contentUrl && contentUrl.trim() !== ""
       const content = row.original
       const isOwner = content.owner?.id === options?.currentUserId
       const canUpload = isOwner && !hasFile && !content.isDeleted
-      const canUpdate = isOwner && hasFile && !content.isDeleted
       
       if (!hasFile) {
         return (
-          <div className="flex items-center gap-2">
-            {/* <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">
-              Chưa có file
-            </Badge> */}
-            {canUpload && actions.onUploadFile && (
+          <div className="flex items-center">
+            {canUpload && actions.onUploadFile ? (
               <Button
                 size="sm"
                 variant="outline"
@@ -493,58 +498,140 @@ export const createContentColumns = (
                 disabled={actions.isUploading}
               >
                 <Upload className="h-3 w-3 mr-1" />
-                {actions.isUploading ? "..." : "Upload"}
+                Upload
               </Button>
+            ) : (
+              <span className="text-xs text-muted-foreground italic">No file</span>
             )}
           </div>
         )
       }
       
       return (
-        <div className="flex items-center gap-2 max-w-xs">
-          <Link className="h-4 w-4 text-green-400 flex-shrink-0" />
-          <span className="text-xs text-muted-foreground truncate" title={contentUrl}>
-            {truncateText(contentUrl, 30)}
-          </span>
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-1.5 max-w-[150px] cursor-help">
+                <Link className="h-3 w-3 text-green-400 flex-shrink-0" />
+                <span className="text-xs text-muted-foreground truncate">
+                  ...{contentUrl.split('/').pop() || contentUrl.slice(-20)}
+                </span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-md bg-popover border-border">
+              <p className="text-xs font-mono break-all text-foreground">{contentUrl}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )
+    },
+    size: 180,
+  },
+  {
+    accessorKey: "description",
+    header: "Mô tả",
+    cell: ({ row }) => (
+      <div className="max-w-[220px]">
+        <ContentDescription 
+          content={row.original} 
+          onDescriptionClick={actions.onDescriptionClick}
+        />
+      </div>
+    ),
+    size: 220,
+  },
+  {
+    id: "info",
+    header: "Kích thước / Ngày tạo",
+    cell: ({ row }) => {
+      const fileSize = row.original.fileSize
+      const createdAt = row.original.createdAt
+      const date = new Date(createdAt)
+      
+      return (
+        <div className="flex flex-col gap-1 text-xs min-w-[110px]">
+          <div className="flex items-center gap-1.5">
+            <FileText className="h-3 w-3 text-muted-foreground" />
+            <span className="font-medium text-foreground">{formatFileSize(fileSize)}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Calendar className="h-3 w-3 text-muted-foreground" />
+            <span className="text-muted-foreground whitespace-nowrap">
+              {date.toLocaleDateString('vi-VN', { 
+                day: '2-digit', 
+                month: '2-digit', 
+                year: '2-digit' 
+              })}
+              {' '}
+              {date.toLocaleTimeString('vi-VN', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              })}
+            </span>
+          </div>
         </div>
       )
     },
+    size: 130,
   },
   {
     accessorKey: "status",
     header: "Trạng thái",
-    cell: ({ row }) => getStatusBadge(row.getValue("status"), row.original.progress),
-  },
-  {
-    accessorKey: "progress",
-    header: "Tiến độ",
-    cell: ({ row }) => <ContentProgress content={row.original} />,
-  },
-  {
-    accessorKey: "createdAt",
-    header: "Ngày tạo",
-    cell: ({ row }) => (
-      <div className="text-muted-foreground">
-        {new Date(row.getValue("createdAt")).toLocaleDateString('vi-VN')}
-      </div>
-    ),
-  },
-  ...(options?.isAdmin
-    ? [{
-        id: "owner",
-        header: "Owner",
-        cell: ({ row }: any) => {
-          const owner = row.original.owner
-          if (!owner) return <span className="text-muted-foreground">-</span>
-          return (
-            <div className="flex flex-col leading-tight">
-              <span className="text-foreground text-sm">{owner.name || owner.email}</span>
-              {owner.name && <span className="text-muted-foreground text-xs">{owner.email}</span>}
+    cell: ({ row }) => {
+      const status = row.getValue("status") as string
+      const progress = row.original.progress
+      
+      return (
+        <div className="flex flex-col gap-1">
+          {getStatusBadge(status, progress)}
+          {status === "PROCESSING" && progress !== undefined && (
+            <div className="flex items-center gap-1">
+              <div className="w-16 bg-muted rounded-full h-1">
+                <div 
+                  className="bg-blue-400 h-1 rounded-full transition-all"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <span className="text-xs text-blue-400">{progress}%</span>
             </div>
-          )
-        },
-      }] as ColumnDef<ContentItem>[]
-    : []),
+          )}
+        </div>
+      )
+    },
+    size: 120,
+  },
+  {
+    id: "owner",
+    header: "Người tạo",
+    cell: ({ row }) => {
+      const owner = row.original.owner
+      if (!owner) return <span className="text-xs text-muted-foreground italic">Không có người tạo</span>
+      
+      const displayName = owner.name || owner.username || owner.email || 'Unknown'
+      const displaySub = owner.username ? `@${owner.username}` : owner.email
+      
+      return (
+        <div className="flex items-center gap-2 max-w-[180px]">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
+              {displayName.charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="text-xs font-medium text-foreground truncate" title={displayName}>
+              {displayName}
+            </span>
+            {displaySub && (
+              <span className="text-xs text-muted-foreground truncate" title={displaySub}>
+                {displaySub}
+              </span>
+            )}
+          </div>
+        </div>
+      )
+    },
+    size: 160,
+  },
   {
     id: "actions",
     header: "Thao tác",
@@ -556,18 +643,21 @@ export const createContentColumns = (
         onShowSCORMInfo={actions.onShowSCORMInfo}
         onEdit={actions.onEdit}
         onDownload={actions.onDownload}
-        onDelete={actions.onDelete}
         onRestore={actions.onRestore}
         onUploadFile={actions.onUploadFile}
         onUpdateFile={actions.onUpdateFile}
+          onSoftDelete={actions.onSoftDelete}
+          onHardDelete={actions.onHardDelete}
         copiedUrl={actions.copiedUrl}
         isDownloading={actions.isDownloading}
-        isDeleting={actions.isDeleting}
         isRestoring={actions.isRestoring}
         isUploading={actions.isUploading}
         isUpdating={actions.isUpdating}
+          isSoftDeleting={actions.isSoftDeleting}
+          isHardDeleting={actions.isHardDeleting}
         currentUserId={options?.currentUserId}
       />
     ),
+    size: 80,
   },
 ]

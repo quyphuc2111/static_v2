@@ -15,7 +15,8 @@ async function seedRBAC() {
       { name: 'DOWNLOAD_CONTENT', nameVi: 'Tải xuống nội dung', description: 'Download content' },
       { name: 'SOFT_DELETE_CONTENT', nameVi: 'Xóa mềm nội dung', description: 'Soft delete content (recoverable)' },
       { name: 'HARD_DELETE_CONTENT', nameVi: 'Xóa vĩnh viễn nội dung', description: 'Permanently delete content' },
-      { name: 'VIEW_DELETED_CONTENT', nameVi: 'Xem nội dung đã xóa', description: 'View deleted content' },
+      { name: 'VIEW_DELETED_ALL_CONTENT', nameVi: 'Xem tất cả nội dung đã xóa', description: 'View all deleted content' },
+      { name: 'VIEW_DELETED_OWN_CONTENT', nameVi: 'Xem nội dung đã xóa của mình', description: 'View own deleted content' },
       { name: 'RESTORE_CONTENT', nameVi: 'Khôi phục nội dung', description: 'Restore deleted content' },
       
       // Content Scope
@@ -126,11 +127,18 @@ async function seedRBAC() {
       where: {
         name: {
           in: [
-            'VIEW_CONTENT', 'CREATE_CONTENT', 'EDIT_CONTENT', 'DOWNLOAD_CONTENT', 'SOFT_DELETE_CONTENT',
+            // Content permissions
+            'VIEW_CONTENT', 'CREATE_CONTENT', 'EDIT_CONTENT', 'DOWNLOAD_CONTENT', 
+            'SOFT_DELETE_CONTENT', 'VIEW_DELETED_OWN_CONTENT', 'RESTORE_CONTENT',
             'MANAGE_OWN_CONTENT', 'VIEW_OWN_CONTENT_ONLY',
             'SHARE_CONTENT_ACCESS', 'VIEW_SHARED_CONTENT',
+            // Project permissions
             'VIEW_PROJECTS', 'CREATE_PROJECTS', 'EDIT_PROJECTS',
+            'SOFT_DELETE_PROJECTS', 'VIEW_DELETED_PROJECTS', 'RESTORE_PROJECTS',
+            // Module permissions
             'VIEW_MODULES', 'CREATE_MODULES', 'EDIT_MODULES',
+            'SOFT_DELETE_MODULES', 'VIEW_DELETED_MODULES', 'RESTORE_MODULES',
+            // Other
             'VIEW_USERS', 'VIEW_DASHBOARD_STATS'
           ]
         }

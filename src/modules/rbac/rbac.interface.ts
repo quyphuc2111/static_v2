@@ -96,8 +96,9 @@ export interface BulkSharePayload {
 
 export interface UserWithRoles {
   id: string
+  username: string
   name?: string
-  email: string
+  email?: string
   status: string
   createdAt: string
   updatedAt: string
@@ -105,14 +106,16 @@ export interface UserWithRoles {
 }
 
 export interface CreateUserPayload {
+  username: string
   name?: string
-  email: string
+  email?: string
   status?: string
   roleId?: string
   password?: string
 }
 
 export interface UpdateUserPayload {
+  username?: string
   name?: string
   email?: string
   status?: string
@@ -121,5 +124,6 @@ export interface UpdateUserPayload {
 }
 
 export interface RoleWithPermissions extends Role {
+  isActive?: boolean
   permissions: (RolePermission & { permission: Permission })[]
 }

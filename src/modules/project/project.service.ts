@@ -6,6 +6,8 @@ export type Project = {
   name: string
   description?: string
   status: "ACTIVE" | "INACTIVE" | "ARCHIVED"
+  isDeleted: boolean
+  deletedAt?: string | null
   createdAt: string
   updatedAt: string
   modules?: { 
@@ -13,12 +15,19 @@ export type Project = {
     name: string
     description?: string
     status: "ACTIVE" | "INACTIVE"
+    isDeleted: boolean
+    deletedAt?: string | null
     content?: any[]
   }[]
 }
 
-export async function listProjects() {
-  const res = await httpService.get<{ data: Project[] }>({ url: PROJECTS_API_URL.ROOT })
+export async function listProjects(params?: { includeDeleted?: boolean; onlyDeleted?: boolean }) {
+  const searchParams = new URLSearchParams()
+  if (params?.includeDeleted) searchParams.set('includeDeleted', 'true')
+  if (params?.onlyDeleted) searchParams.set('onlyDeleted', 'true')
+  
+  const url = `${PROJECTS_API_URL.ROOT}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`
+  const res = await httpService.get<{ data: Project[] }>({ url })
   return res.data
 }
 

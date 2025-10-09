@@ -54,4 +54,12 @@ export async function verifyCsrfAndOrigin(req: NextRequest): Promise<{ error: st
   return null
 }
 
+/**
+ * Verify CSRF token only (without origin check)
+ */
+export async function verifyCsrfToken(token: string): Promise<boolean> {
+  const session = await getSession()
+  return !!(session.csrfToken && token && token === session.csrfToken)
+}
+
 
