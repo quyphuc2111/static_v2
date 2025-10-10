@@ -75,11 +75,12 @@ export function UserContentSharing() {
     
     const canView = true
     const canEdit = permission === "edit"
-    const canDelete = permission === "download" ? false : false
+    const canDelete = false
+    const canDownload = false
 
     const payload = shareAll 
-      ? { ownerId: sourceUser, sharedWithId: targetUser, canView, canEdit, canDelete }
-      : { contentIds: selectedContentIds, sharedWithId: targetUser, canView, canEdit, canDelete }
+      ? { ownerId: sourceUser, sharedWithId: targetUser, canView, canEdit, canDelete, canDownload }
+      : { contentIds: selectedContentIds, sharedWithId: targetUser, canView, canEdit, canDelete, canDownload }
 
     bulkShareMut.mutate(payload, {
       onSuccess: (res: any) => {
@@ -88,7 +89,21 @@ export function UserContentSharing() {
         setSelectedContentIds([])
       },
       onError: (e: any) => {
-        toast.error(e?.response?.data?.message || e?.message || "Chia sẻ thất bại")
+        const errorMessage = e?.response?.data?.message || e?.message || "Chia sẻ thất bại"
+        console.error("Share error:", e)
+        
+        // Xử lý các lỗi cụ thể
+        if (errorMessage.includes("Forbidden")) {
+          toast.error("Bạn không có quyền chia sẻ nội dung này")
+        } else if (errorMessage.includes("Unauthorized")) {
+          toast.error("Vui lòng đăng nhập lại")
+        } else if (errorMessage.includes("User not found")) {
+          toast.error("Người dùng đích không tồn tại")
+        } else if (errorMessage.includes("No content found")) {
+          toast.error("Không tìm thấy nội dung để chia sẻ")
+        } else {
+          toast.error(errorMessage)
+        }
       },
     })
   }
@@ -350,7 +365,6 @@ export function UserContentSharing() {
                     <SelectContent>
                       <SelectItem value="view">Chỉ xem</SelectItem>
                       <SelectItem value="edit">Xem và chỉnh sửa</SelectItem>
-                      <SelectItem value="download">Xem và tải xuống</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -372,7 +386,7 @@ export function UserContentSharing() {
           )}
 
           {/* Existing Shares Section */}
-          {(sourceUser || targetUser) && (
+          {/* {(sourceUser || targetUser) && (
             <div className="space-y-4">
               <h3 className="text-lg font-medium text-foreground">Chia sẻ hiện tại</h3>
               {sourceUser && (
@@ -401,7 +415,7 @@ export function UserContentSharing() {
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 @{recipient?.username} · {share.content?.title || "Nội dung"} · 
-                                {share.canEdit ? " Chỉnh sửa" : share.canDelete ? " Tải xuống" : " Chỉ xem"}
+                                {share.canEdit ? " Chỉnh sửa" : " Chỉ xem"}
                               </p>
                             </div>
                           </div>
@@ -450,7 +464,7 @@ export function UserContentSharing() {
                               </p>
                               <p className="text-xs text-muted-foreground truncate">
                                 @{sharer?.username} · {share.content?.title || "Nội dung"} · 
-                                {share.canEdit ? " Chỉnh sửa" : share.canDelete ? " Tải xuống" : " Chỉ xem"}
+                                {share.canEdit ? " Chỉnh sửa" : " Chỉ xem"}
                               </p>
                             </div>
                           </div>
@@ -473,7 +487,7 @@ export function UserContentSharing() {
                 </div>
               )}
             </div>
-          )}
+          )} */}
         </CardContent>
       </Card>
 

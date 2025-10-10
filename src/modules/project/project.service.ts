@@ -90,4 +90,11 @@ export async function deleteModule(args: { projectId: string; moduleId: string }
   return httpService.delete<{ success: boolean }>({ url: PROJECTS_API_URL.MODULE_BY_ID(args.projectId, args.moduleId) })
 }
 
+export async function getModuleContentCount(moduleId: string) {
+  const res = await httpService.get<{ data: { count: number } }>({ 
+    url: `projects/modules/${moduleId}/content/count` 
+  })
+  return res.data
+}
+
 

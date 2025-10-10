@@ -104,12 +104,20 @@ const truncateText = (text: string, maxLength: number = 50) => {
 const formatJsonValue = (value: any) => {
   if (typeof value === 'object' && value !== null) {
     if (value.title) {
-      return `"${truncateText(value.title, 30)}" (v${value.version || 'N/A'})`
+      return `"${truncateText(value.title, 25)}" (v${value.version || 'N/A'})`
     }
     const entries = Object.entries(value).slice(0, 2)
-    return entries.map(([k, v]) => `${k}: ${truncateText(String(v), 20)}`).join(', ')
+    return entries.map(([k, v]) => {
+      const val = String(v)
+      // Đặc biệt xử lý cho launchFile với đường dẫn dài
+      if (k === 'launchFile' && val.includes('/') || val.includes('\\')) {
+        const fileName = val.split('/').pop()?.split('\\').pop() || val
+        return `${k}: ${truncateText(fileName, 15)}`
+      }
+      return `${k}: ${truncateText(val, 15)}`
+    }).join(', ')
   }
-  return truncateText(String(value), 40)
+  return truncateText(String(value), 30)
 }
 
 const getSCORMInfo = (content: ContentItem) => {
@@ -175,27 +183,28 @@ function ContentActions({
   // Determine permissions
   const isOwner = content.owner?.id === currentUserId
   const sharePerms = content.sharePermissions
+  console.log("sharePerms", sharePerms)
   const isDeleted = content.isDeleted
   const hasFile = content.contentUrl && content.contentUrl.trim() !== ""
   
   // System permissions
   const canViewSystem = hasPermission(PermissionName.VIEW_CONTENT) || isAdmin
-  const canEditSystem = hasAnyPermission([PermissionName.EDIT_CONTENT, PermissionName.MANAGE_OWN_CONTENT]) || isAdmin
-  const canDownloadSystem = hasAnyPermission([PermissionName.DOWNLOAD_CONTENT, PermissionName.MANAGE_OWN_CONTENT]) || isAdmin
-  const canRestoreSystem = hasAnyPermission([PermissionName.RESTORE_CONTENT, PermissionName.MANAGE_OWN_CONTENT]) || isAdmin
-  const canSoftDeleteSystem = hasAnyPermission([PermissionName.SOFT_DELETE_CONTENT, PermissionName.MANAGE_OWN_CONTENT]) || isAdmin
+  const canEditSystem = hasAnyPermission([PermissionName.EDIT_CONTENT]) || isAdmin
+  const canDownloadSystem = hasAnyPermission([PermissionName.DOWNLOAD_CONTENT]) || isAdmin
+  const canRestoreSystem = hasAnyPermission([PermissionName.RESTORE_CONTENT]) || isAdmin
+  const canSoftDeleteSystem = hasAnyPermission([PermissionName.SOFT_DELETE_CONTENT]) || isAdmin
   const canHardDeleteSystem = hasAnyPermission([PermissionName.HARD_DELETE_CONTENT, PermissionName.MANAGE_ALL_CONTENT]) || isAdmin
   
   // Combined permissions: system permissions + ownership/share permissions
-  const canView = canViewSystem && (isOwner || sharePerms?.canView || false)
-  const canDownload = canDownloadSystem && (isOwner || sharePerms?.canDownload || false)
-  const canEdit = canEditSystem && (isOwner || sharePerms?.canEdit || false)
-  const canRestore = canRestoreSystem && isOwner
-  const canUpload = isOwner && !hasFile && !isDeleted && canEditSystem
-  const canUpdate = isOwner && hasFile && !isDeleted && canEditSystem
-  const canSoftDelete = canSoftDeleteSystem && (isOwner || sharePerms?.canDelete || false) && !isDeleted
-  const canHardDelete = canHardDeleteSystem && isOwner && !isDeleted
-  
+  const canView = canViewSystem || ( sharePerms?.canView || false)
+  const canDownload = canDownloadSystem || ( sharePerms?.canDownload || false)
+  const canEdit = canEditSystem || ( sharePerms?.canEdit || false)
+  const canRestore = canRestoreSystem 
+  const canUpload =  !hasFile && !isDeleted && canEditSystem
+  const canUpdate =  hasFile && !isDeleted && canEditSystem
+  const canSoftDelete = canSoftDeleteSystem && (( sharePerms?.canDelete || false) && !isDeleted)
+  const canHardDelete = canHardDeleteSystem &&  !isDeleted
+
   // If content is deleted, show restore action instead
   if (isDeleted) {
     return (
@@ -339,22 +348,22 @@ function ContentDescription({ content, onDescriptionClick }: ContentDescriptionP
     
     return (
       <div 
-        className="space-y-1 max-w-xs cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors"
+        className="space-y-1 max-w-full cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors"
         onClick={() => onDescriptionClick(content)}
       >
-        {entries.slice(0, 3).map(([key, value]) => (
+        {entries.slice(0, 2).map(([key, value]) => (
           <div key={key} className="flex items-start gap-2 text-xs">
             <span className="font-medium text-muted-foreground min-w-0 flex-shrink-0">
               {key}:
             </span>
-            <span className="text-foreground break-words">
+            <span className="text-foreground truncate min-w-0 flex-1">
               {formatJsonValue(value)}
             </span>
           </div>
         ))}
-        {entries.length > 3 && (
+        {entries.length > 2 && (
           <div className="text-xs text-muted-foreground">
-            +{entries.length - 3} trường khác
+            +{entries.length - 2} trường khác
           </div>
         )}
       </div>
@@ -363,10 +372,10 @@ function ContentDescription({ content, onDescriptionClick }: ContentDescriptionP
   
   return (
     <span 
-      className="text-foreground text-xs cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors block"
+      className="text-foreground text-xs cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors block max-w-full truncate"
       onClick={() => onDescriptionClick(content)}
     >
-      {truncateText(String(desc), 60)}
+      {truncateText(String(desc), 50)}
     </span>
   )
 }
@@ -445,7 +454,9 @@ export const createContentColumns = (
         </div>
       )
     },
-    size: 40,
+    size: 50,
+    minSize: 40,
+    maxSize: 60,
     enableSorting: false,
   },
   {
@@ -456,9 +467,9 @@ export const createContentColumns = (
       const isShared = row.original.isShared
       const contentType = row.original.contentType
       return (
-        <div className="flex flex-col gap-1 max-w-md">
+        <div className="flex flex-col gap-1 max-w-full min-w-[200px]">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-foreground truncate">{row.getValue("title")}</span>
+            <span className="text-sm font-medium text-foreground break-words min-w-0 flex-1">{row.getValue("title")}</span>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
             <Badge variant="outline" className={`text-xs ${getContentTypeColor(contentType)}`}>
@@ -474,7 +485,9 @@ export const createContentColumns = (
         </div>
       )
     },
-    size: 250,
+    size: 300,
+    minSize: 200,
+    maxSize: 400,
   },
   {
     accessorKey: "contentUrl",
@@ -511,10 +524,15 @@ export const createContentColumns = (
         <TooltipProvider delayDuration={300}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="flex items-center gap-1.5 max-w-[150px] cursor-help">
+              <div className="flex items-center gap-1.5 max-w-[180px] min-w-[120px] cursor-help">
                 <Link className="h-3 w-3 text-green-400 flex-shrink-0" />
-                <span className="text-xs text-muted-foreground truncate">
-                  ...{contentUrl.split('/').pop() || contentUrl.slice(-20)}
+                <span className="text-xs text-muted-foreground truncate min-w-0 flex-1">
+                  {(() => {
+                    const fileName = contentUrl.split('/').pop() || ''
+                    const maxLength = 20
+                    if (fileName.length <= maxLength) return fileName
+                    return fileName.substring(0, maxLength - 3) + '...'
+                  })()}
                 </span>
               </div>
             </TooltipTrigger>
@@ -526,19 +544,23 @@ export const createContentColumns = (
       )
     },
     size: 180,
+    minSize: 120,
+    maxSize: 200,
   },
   {
     accessorKey: "description",
     header: "Mô tả",
     cell: ({ row }) => (
-      <div className="max-w-[220px]">
+      <div className="max-w-[200px] min-w-[150px]">
         <ContentDescription 
           content={row.original} 
           onDescriptionClick={actions.onDescriptionClick}
         />
       </div>
     ),
-    size: 220,
+    size: 200,
+    minSize: 150,
+    maxSize: 250,
   },
   {
     id: "info",
@@ -549,7 +571,7 @@ export const createContentColumns = (
       const date = new Date(createdAt)
       
       return (
-        <div className="flex flex-col gap-1 text-xs min-w-[110px]">
+        <div className="flex flex-col gap-1 text-xs min-w-[120px] max-w-[150px]">
           <div className="flex items-center gap-1.5">
             <FileText className="h-3 w-3 text-muted-foreground" />
             <span className="font-medium text-foreground">{formatFileSize(fileSize)}</span>
@@ -572,7 +594,9 @@ export const createContentColumns = (
         </div>
       )
     },
-    size: 130,
+    size: 140,
+    minSize: 120,
+    maxSize: 160,
   },
   {
     accessorKey: "status",
@@ -598,7 +622,9 @@ export const createContentColumns = (
         </div>
       )
     },
-    size: 120,
+    size: 130,
+    minSize: 100,
+    maxSize: 150,
   },
   {
     id: "owner",
@@ -611,7 +637,7 @@ export const createContentColumns = (
       const displaySub = owner.username ? `@${owner.username}` : owner.email
       
       return (
-        <div className="flex items-center gap-2 max-w-[180px]">
+        <div className="flex items-center gap-2 max-w-[200px] min-w-[150px]">
           <Avatar className="h-8 w-8">
             <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
               {displayName.charAt(0).toUpperCase()}
@@ -630,7 +656,9 @@ export const createContentColumns = (
         </div>
       )
     },
-    size: 160,
+    size: 180,
+    minSize: 150,
+    maxSize: 220,
   },
   {
     id: "actions",
@@ -658,6 +686,8 @@ export const createContentColumns = (
         currentUserId={options?.currentUserId}
       />
     ),
-    size: 80,
+    size: 90,
+    minSize: 80,
+    maxSize: 100,
   },
 ]

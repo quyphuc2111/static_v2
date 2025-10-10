@@ -166,24 +166,24 @@ export function EditContentDialog({
       onOpenChange(open)
     }}>
       <DialogContent 
-        className="bg-card border-border"
-        style={{ 
-          width: '50vw', 
-          maxWidth: '50vw', 
+        className="bg-card border-border w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[80vw] xl:w-[75vw] 2xl:w-[70vw] max-w-none h-[90vh] sm:h-[85vh] md:h-[80vh] lg:h-[75vh] xl:h-[70vh] 2xl:h-[65vh]"
+        style={{
+          width: '60vw',
+          maxWidth: '60vw',
           height: '80vh',
           maxHeight: '80vh'
         }}
       >
-        <DialogHeader>
-          <DialogTitle className="text-foreground">Chỉnh sửa Nội dung</DialogTitle>
-          <DialogDescription className="text-muted-foreground">
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle className="text-lg sm:text-xl text-foreground">Chỉnh sửa Nội dung</DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm text-muted-foreground truncate">
             Cập nhật thông tin cho tài liệu: {content.title}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="h-full flex flex-col overflow-hidden">
-          <ScrollArea className="flex-1 pr-4">
-            <div className="space-y-6 pb-4">
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
+          <ScrollArea className="flex-1 pr-2 sm:pr-4 min-h-0">
+            <div className="space-y-4 sm:space-y-6 pb-4">
               {/* Content Info Card */}
               <Card className="border-muted">
                 <CardHeader className="pb-3">
@@ -259,22 +259,22 @@ export function EditContentDialog({
                 <CardContent>
                   <div className="space-y-3">
                     {descriptionItems.map((item, index) => (
-                      <div key={item.id} className="flex gap-2 items-start p-3 rounded-lg border border-muted/50 hover:border-muted transition-colors">
-                        <div className="flex-1 grid grid-cols-5 gap-3">
-                          <div className="col-span-2">
+                      <div key={item.id} className="flex flex-col sm:flex-row gap-2 items-start p-3 rounded-lg border border-muted/50 hover:border-muted transition-colors">
+                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-5 gap-2 sm:gap-3 w-full">
+                          <div className="sm:col-span-2">
                             <Input
                               value={item.key}
                               onChange={(e) => updateDescriptionItem(item.id, 'key', e.target.value)}
                               placeholder="Key (vd: author, version)"
-                              className="bg-background text-sm"
+                              className="bg-background text-xs sm:text-sm"
                             />
                           </div>
-                          <div className="col-span-3">
+                          <div className="sm:col-span-3">
                             <Textarea
                               value={item.value}
                               onChange={(e) => updateDescriptionItem(item.id, 'value', e.target.value)}
                               placeholder="Giá trị..."
-                              className="bg-background text-sm min-h-[38px] resize-none"
+                              className="bg-background text-xs sm:text-sm min-h-[36px] sm:min-h-[38px] resize-none"
                               rows={1}
                             />
                           </div>
@@ -285,7 +285,7 @@ export function EditContentDialog({
                           size="icon"
                           onClick={() => removeDescriptionItem(item.id)}
                           disabled={descriptionItems.length === 1}
-                          className="shrink-0"
+                          className="shrink-0 self-end sm:self-auto"
                         >
                           <Trash2 className="h-4 w-4 text-red-400" />
                         </Button>
@@ -302,35 +302,36 @@ export function EditContentDialog({
             </div>
           </ScrollArea>
 
-          <Separator />
+          <Separator className="flex-shrink-0" />
           
-          <DialogFooter className="mt-4 gap-2">
-            <div className="flex items-center justify-between w-full">
+          <DialogFooter className="mt-4 gap-2 flex-shrink-0 flex-col sm:flex-row">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between w-full gap-2 sm:gap-0">
               <p className="text-xs text-muted-foreground">
                 {content.isShared && (
-                  <span className="flex items-center gap-1">
-                    <Badge variant="outline" className="bg-purple-500/10 text-purple-400">
+                  <span className="flex items-center gap-1 flex-wrap">
+                    <Badge variant="outline" className="bg-purple-500/10 text-purple-400 text-xs">
                       Tài liệu được chia sẻ
                     </Badge>
                     {content.sharePermissions && !content.sharePermissions.canEdit && (
-                      <span className="text-amber-400">• Chỉ được xem</span>
+                      <span className="text-amber-400 text-xs">• Chỉ được xem</span>
                     )}
                   </span>
                 )}
               </p>
-              <div className="flex gap-2">
+              <div className="flex gap-2 w-full sm:w-auto">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => onOpenChange(false)}
                   disabled={updateContentMut.isPending}
+                  className="flex-1 sm:flex-none"
                 >
                   Hủy
                 </Button>
                 <Button
                   type="submit"
                   disabled={updateContentMut.isPending || !title.trim()}
-                  className="min-w-[120px]"
+                  className="flex-1 sm:flex-none min-w-[120px]"
                 >
                   {updateContentMut.isPending ? "Đang lưu..." : "Lưu thay đổi"}
                 </Button>

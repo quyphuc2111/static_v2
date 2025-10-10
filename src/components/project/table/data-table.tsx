@@ -25,6 +25,7 @@ import { ModuleManagementDialog } from "../modal/module-management-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { EditModuleDialog } from "../modal/edit-module-dialog"
 import { DeleteModuleDialog } from "../modal/delete-module-dialog"
+import { ModuleContentCount } from "./module-content-count"
 
 interface DataTableProps {
   data: Project[]
@@ -114,10 +115,7 @@ export function DataTable({ data, onDelete }: DataTableProps) {
                                     </p>
                                   </div>
                                   <div className="flex items-center gap-4">
-                                    <div className="text-right">
-                                      <div className="text-sm font-medium">{module.content?.length || 0}</div>
-                                      <div className="text-xs text-muted-foreground">tài liệu</div>
-                                    </div>
+                                    <ModuleContentCount moduleId={module.id} />
                                     <DropdownMenu>
                                       <DropdownMenuTrigger asChild>
                                         <Button variant="ghost" size="icon" className="h-8 w-8">
