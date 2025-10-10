@@ -1,0 +1,283 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String           @id @default(uuid())
+  email             String?
+  name              String?
+  passwordHash      String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  status            UserStatus       @default(ACTIVE)
+  username          String           @unique
+  auditLogs         AuditLog[]       @relation("UserAuditLogs")
+  ownedContents     ContentData[]    @relation("UserOwnedContent")
+  sharedContent     ContentShare[]   @relation("ContentSharedBy")
+  receivedContent   ContentShare[]   @relation("ContentSharedWith")
+  batchesSharedBy   ShareBatch[]     @relation("BatchSharedBy")
+  batchesSharedWith ShareBatch[]     @relation("BatchSharedWith")
+  permissions       UserPermission[]
+  roles             UserRole[]
+}
+
+model ContentData {
+  id          String         @id @default(uuid())
+  title       String
+  description Json?
+  contentUrl  String
+  contentType ContentType
+  status      ContentStatus  @default(PROCESSING)
+  progress    Int            @default(0)
+  fileSize    Int?
+  isDeleted   Boolean        @default(false)
+  projectId   String
+  moduleId    String
+  ownerId     String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  deletedAt   DateTime?
+  module      Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  owner       User?          @relation("UserOwnedContent", fields: [ownerId], references: [id])
+  project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  shares      ContentShare[]
+
+  @@index([moduleId], map: "ContentData_moduleId_fkey")
+  @@index([ownerId], map: "ContentData_ownerId_fkey")
+  @@index([projectId], map: "ContentData_projectId_fkey")
+}
+
+model Project {
+  id          String        @id @default(uuid())
+  name        String        @unique
+  description String?
+  status      ProjectStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+  isDeleted   Boolean       @default(false)
+  contentData ContentData[]
+  modules     Module[]
+}
+
+model Module {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  status      ModuleStatus  @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  projectId   String
+  deletedAt   DateTime?
+  isDeleted   Boolean       @default(false)
+  contentData ContentData[]
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, name])
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  description String?
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  permissions RolePermission[]
+  users       UserRole[]
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  name        PermissionName   @unique
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  nameVi      String?
+  roles       RolePermission[]
+  users       UserPermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id])
+  role         Role       @relation(fields: [roleId], references: [id])
+
+  @@id([roleId, permissionId])
+  @@index([permissionId], map: "RolePermission_permissionId_fkey")
+}
+
+model UserRole {
+  userId String
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@id([userId, roleId])
+  @@index([roleId], map: "UserRole_roleId_fkey")
+}
+
+model UserPermission {
+  userId       String
+  permissionId String
+  allow        Boolean    @default(true)
+  permission   Permission @relation(fields: [permissionId], references: [id])
+  user         User       @relation(fields: [userId], references: [id])
+
+  @@id([userId, permissionId])
+  @@index([permissionId], map: "UserPermission_permissionId_fkey")
+}
+
+model ContentShare {
+  id           String      @id @default(uuid())
+  contentId    String
+  sharedById   String
+  sharedWithId String
+  batchId      String?
+  canView      Boolean     @default(true)
+  canEdit      Boolean     @default(false)
+  canDelete    Boolean     @default(false)
+  canDownload  Boolean     @default(true)
+  status       ShareStatus @default(ACTIVE)
+  revokedAt    DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  batch        ShareBatch? @relation(fields: [batchId], references: [id])
+  content      ContentData @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  sharedBy     User        @relation("ContentSharedBy", fields: [sharedById], references: [id])
+  sharedWith   User        @relation("ContentSharedWith", fields: [sharedWithId], references: [id])
+
+  @@index([contentId, sharedWithId])
+  @@index([sharedById])
+  @@index([sharedWithId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([batchId], map: "ContentShare_batchId_fkey")
+}
+
+model ShareBatch {
+  id           String         @id @default(uuid())
+  scope        ShareScope
+  sharedById   String
+  sharedWithId String
+  projectId    String?
+  moduleId     String?
+  ownerId      String?
+  canView      Boolean        @default(true)
+  canEdit      Boolean        @default(false)
+  canDelete    Boolean        @default(false)
+  canDownload  Boolean        @default(true)
+  status       ShareStatus    @default(ACTIVE)
+  revokedAt    DateTime?
+  itemsCount   Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  shares       ContentShare[]
+  sharedBy     User           @relation("BatchSharedBy", fields: [sharedById], references: [id])
+  sharedWith   User           @relation("BatchSharedWith", fields: [sharedWithId], references: [id])
+
+  @@index([sharedById])
+  @@index([sharedWithId])
+  @@index([projectId])
+  @@index([moduleId])
+  @@index([ownerId])
+  @@index([status])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  actor      User?    @relation("UserAuditLogs", fields: [actorId], references: [id])
+
+  @@index([actorId], map: "AuditLog_actorId_fkey")
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum PermissionName {
+  VIEW_CONTENT
+  CREATE_CONTENT
+  EDIT_CONTENT
+  DOWNLOAD_CONTENT
+  SOFT_DELETE_CONTENT
+  HARD_DELETE_CONTENT
+  VIEW_DELETED_ALL_CONTENT
+  VIEW_DELETED_OWN_CONTENT
+  RESTORE_CONTENT
+  MANAGE_ALL_CONTENT
+  MANAGE_OWN_CONTENT
+  VIEW_OWN_CONTENT_ONLY
+  VIEW_SHARED_CONTENT
+  SHARE_CONTENT_ACCESS
+  VIEW_PROJECTS
+  CREATE_PROJECTS
+  EDIT_PROJECTS
+  SOFT_DELETE_PROJECTS
+  HARD_DELETE_PROJECTS
+  VIEW_DELETED_PROJECTS
+  RESTORE_PROJECTS
+  VIEW_MODULES
+  CREATE_MODULES
+  EDIT_MODULES
+  SOFT_DELETE_MODULES
+  HARD_DELETE_MODULES
+  VIEW_DELETED_MODULES
+  RESTORE_MODULES
+  VIEW_USERS
+  CREATE_USERS
+  EDIT_USERS
+  SOFT_DELETE_USERS
+  HARD_DELETE_USERS
+  MANAGE_USER_PERMISSIONS
+  VIEW_AUDIT_LOGS
+  VIEW_DASHBOARD_STATS
+}
+
+enum ContentType {
+  FILE_ZIP_HTML
+  FILE_ZIP_SCORM
+}
+
+enum ContentStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ProjectStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum ModuleStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ShareScope {
+  SINGLE
+  PROJECT
+  MODULE
+  OWNER
+  LIST
+}
+
+enum ShareStatus {
+  ACTIVE
+  REVOKED
+}
