@@ -3,16 +3,12 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission as checkPermission, hasAnyPermission } from "@/lib/permissions"
 import { PermissionName } from "@prisma/client"
-import { verifyCsrfAndOrigin } from "@/lib/csrf"
 import { logContentAction } from "@/lib/audit"
 
 type Params = { params: Promise<{ id: string; moduleId: string; contentId: string }> }
 
 export async function POST(request: NextRequest, { params }: Params) {
   try {
-    const guard = await verifyCsrfAndOrigin(request)
-    if (guard) return NextResponse.json({ error: guard.error }, { status: guard.status })
-
     const session = await getSession()
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

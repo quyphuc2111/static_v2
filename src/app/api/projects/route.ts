@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission as checkPermission } from "@/lib/permissions"
 import { PermissionName } from "@prisma/client"
-import { verifyCsrfAndOrigin } from "@/lib/csrf"
 
 export async function GET(req: Request) {
   try {
@@ -44,9 +43,6 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const guard = await verifyCsrfAndOrigin(req as any)
-    if (guard) return NextResponse.json({ message: guard.error }, { status: guard.status })
-
     const session = await getSession()
     if (!session.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
 

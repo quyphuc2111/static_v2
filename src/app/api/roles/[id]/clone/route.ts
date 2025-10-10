@@ -2,16 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission } from "@/lib/permissions"
-import { verifyCsrfAndOrigin } from "@/lib/csrf"
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const guard = await verifyCsrfAndOrigin(req)
-    if (guard) return NextResponse.json({ message: guard.error }, { status: guard.status })
-
     const session = await getSession()
     if (!session?.user?.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 })

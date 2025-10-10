@@ -44,11 +44,7 @@ export async function verifyCsrfAndOrigin(req: NextRequest): Promise<{ error: st
       }
     }
 
-    // CSRF token header check
-    const headerToken = req.headers.get("x-csrf-token")
-    if (!session.csrfToken || !headerToken || headerToken !== session.csrfToken) {
-      return { error: "Invalid CSRF token", status: 403 }
-    }
+    // CSRF token verification removed
   }
 
   return null

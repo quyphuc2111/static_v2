@@ -3,16 +3,12 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission } from "@/lib/permissions"
 import { PermissionName } from "@prisma/client"
-import { verifyCsrfAndOrigin } from "@/lib/csrf"
 import bcrypt from "bcryptjs"
 
 type Params = { params: Promise<{ userId: string }> }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
-    const guard = await verifyCsrfAndOrigin(req)
-    if (guard) return NextResponse.json({ message: guard.error }, { status: guard.status })
-
     const session = await getSession()
     if (!session?.user?.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 })

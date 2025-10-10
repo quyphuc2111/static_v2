@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission as checkPermission } from "@/lib/permissions"
 import { PermissionName } from "@prisma/client"
-import { verifyCsrfAndOrigin } from "@/lib/csrf"
 import { promises as fs } from "fs"
 import path from "path"
 
@@ -12,9 +11,6 @@ type Params = { params: Promise<{ id: string }> }
 export async function PATCH(_req: Request, { params }: Params) {
   const { id } = await params
   try {
-    const guard = await verifyCsrfAndOrigin(_req as any)
-    if (guard) return NextResponse.json({ message: guard.error }, { status: guard.status })
-
     const session = await getSession()
     if (!session.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
     if (!(await checkPermission(PermissionName.EDIT_PROJECTS, session.user.id))) {
@@ -45,9 +41,6 @@ export async function PATCH(_req: Request, { params }: Params) {
 export async function DELETE(_req: Request, { params }: Params) {
   const { id } = await params
   try {
-    const guard = await verifyCsrfAndOrigin(_req as any)
-    if (guard) return NextResponse.json({ message: guard.error }, { status: guard.status })
-
     const session = await getSession()
     if (!session.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
     if (!(await checkPermission(PermissionName.SOFT_DELETE_PROJECTS, session.user.id))) {

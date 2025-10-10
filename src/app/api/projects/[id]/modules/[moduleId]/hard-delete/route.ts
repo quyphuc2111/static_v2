@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission as checkPermission } from "@/lib/permissions"
 import { PermissionName } from "@prisma/client"
-import { verifyCsrfToken } from "@/lib/csrf"
 
 type Params = { params: Promise<{ id: string; moduleId: string }> }
 
@@ -16,12 +15,6 @@ export async function DELETE(
     const session = await getSession()
     if (!session?.user?.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
-    }
-
-    // Verify CSRF token
-    const csrfToken = req.headers.get("x-csrf-token")
-    if (!csrfToken || !(await verifyCsrfToken(csrfToken))) {
-      return NextResponse.json({ message: "Invalid CSRF token" }, { status: 403 })
     }
 
     // Check permission

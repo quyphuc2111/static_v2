@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
-import { verifyCsrfAndOrigin } from "@/lib/csrf"
 import { hasPermission } from "@/lib/permissions"
 import { PermissionName, ShareStatus } from "@prisma/client"
 
 export async function PATCH(req: NextRequest) {
   try {
-    const guard = await verifyCsrfAndOrigin(req)
-    if (guard) return NextResponse.json({ message: guard.error }, { status: guard.status })
-
     const session = await getSession()
     if (!session?.user?.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 })

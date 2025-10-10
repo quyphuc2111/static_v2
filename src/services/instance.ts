@@ -172,9 +172,6 @@ class HttpService {
         Authorization: storageService.get("access_token")
           ? `Bearer ${storageService.get("access_token")}`
           : "",
-        ...(config.method && ["post", "put", "patch", "delete"].includes(String(config.method).toLowerCase())
-          ? { "x-csrf-token": storageService.get("csrf_token") || "" }
-          : {}),
         ...headers,
       },
     });

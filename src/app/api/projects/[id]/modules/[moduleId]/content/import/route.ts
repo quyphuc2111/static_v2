@@ -6,7 +6,6 @@ import { PermissionName, Prisma } from "@prisma/client"
 import { mkdir } from "fs/promises"
 import { join } from "path"
 import { existsSync } from "fs"
-import { verifyCsrfAndOrigin } from "@/lib/csrf"
 
 function sanitizeName(value: string): string {
   return (value || "").normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9\s_-]/g, '').replace(/\s+/g, '_')
@@ -14,9 +13,6 @@ function sanitizeName(value: string): string {
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string; moduleId: string }> }) {
   try {
-    const guard = await verifyCsrfAndOrigin(request)
-    if (guard) return NextResponse.json({ error: guard.error }, { status: guard.status })
-
     const session = await getSession()
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 

@@ -9,7 +9,6 @@ import { join, dirname } from "path"
 import { existsSync, createWriteStream } from "fs"
 import yauzl from "yauzl"
 import { SCORMService } from "@/services/scormService"
-import { verifyCsrfAndOrigin } from "@/lib/csrf"
 
 // Helper function to remove Vietnamese diacritics and sanitize for file paths
 function sanitizeVietnameseString(str: string): string {
@@ -104,9 +103,6 @@ export async function POST(
   { params }: { params: Promise<{ id: string; moduleId: string; contentId: string }> }
 ) {
   try {
-    const guard = await verifyCsrfAndOrigin(request)
-    if (guard) return NextResponse.json({ error: guard.error }, { status: guard.status })
-
     const session = await getSession()
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

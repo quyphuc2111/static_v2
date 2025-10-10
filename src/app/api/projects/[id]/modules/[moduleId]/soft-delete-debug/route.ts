@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission as checkPermission } from "@/lib/permissions"
 import { PermissionName } from "@prisma/client"
-import { verifyCsrfToken } from "@/lib/csrf"
 
 type Params = { params: Promise<{ id: string; moduleId: string }> }
 
@@ -30,30 +29,6 @@ export async function POST(
         message: "Unauthorized",
         debug: { step: 'session', hasSession: false }
       }, { status: 401 })
-    }
-
-    // Verify CSRF token
-    const csrfToken = req.headers.get("x-csrf-token")
-    const sessionCsrf = session.csrfToken
-    console.log('CSRF from header:', csrfToken)
-    console.log('CSRF from session:', sessionCsrf)
-    console.log('CSRF match:', csrfToken === sessionCsrf)
-    
-    const csrfValid = await verifyCsrfToken(csrfToken || '')
-    console.log('CSRF valid result:', csrfValid)
-    
-    if (!csrfToken || !csrfValid) {
-      console.log('❌ FAILED: Invalid CSRF token')
-      return NextResponse.json({ 
-        message: "Invalid CSRF token",
-        debug: {
-          step: 'csrf',
-          hasCsrfHeader: !!csrfToken,
-          csrfValid,
-          csrfFromHeader: csrfToken,
-          csrfFromSession: sessionCsrf
-        }
-      }, { status: 403 })
     }
 
     // Check permission

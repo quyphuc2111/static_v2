@@ -21,8 +21,10 @@ export const sessionOptions: SessionOptions = {
   cookieName: process.env.SESSION_COOKIE_NAME || "bkt_session",
   password: process.env.SESSION_PASSWORD || "dev-secret-change-me-dev-secret-change-me",
   cookieOptions: {
-    secure: process.env.NODE_ENV === "production",
+    secure: false, // Set to false for development
     sameSite: "lax",
+    httpOnly: true,
+    path: "/",
   },
 }
 

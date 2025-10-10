@@ -5,16 +5,12 @@ import { rm } from "fs/promises"
 import { join } from "path"
 import { PermissionName } from "@prisma/client"
 import { hasAnyPermission, hasPermission as checkPermission } from "@/lib/permissions"
-import { verifyCsrfAndOrigin } from "@/lib/csrf"
 import { logContentAction } from "@/lib/audit"
 
 type Params = { params: Promise<{ id: string; moduleId: string; contentId: string }> }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
-    const guard = await verifyCsrfAndOrigin(request)
-    if (guard) return NextResponse.json({ error: guard.error }, { status: guard.status })
-
     const session = await getSession()
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -96,9 +92,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
 export async function DELETE(request: NextRequest, { params }: Params) {
   try {
-    const guard = await verifyCsrfAndOrigin(request)
-    if (guard) return NextResponse.json({ error: guard.error }, { status: guard.status })
-
     const session = await getSession()
     if (!session.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

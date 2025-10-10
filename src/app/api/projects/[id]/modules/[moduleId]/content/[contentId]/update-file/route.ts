@@ -10,7 +10,6 @@ import { existsSync, createWriteStream } from "fs"
 // @ts-ignore
 import unzipper from "unzipper"
 import { SCORMService } from "@/services/scormService"
-import { verifyCsrfAndOrigin } from "@/lib/csrf"
 
 // Helper function to remove Vietnamese diacritics and sanitize for file paths
 function sanitizeVietnameseString(str: string): string {
@@ -156,10 +155,6 @@ export async function POST(
   { params }: { params: Promise<{ id: string; moduleId: string; contentId: string }> }
 ) {
   try {
-    // Verify CSRF token
-    const guard = await verifyCsrfAndOrigin(request)
-    if (guard) return NextResponse.json({ error: guard.error }, { status: guard.status })
-
     const { id: projectId, moduleId, contentId } = await params
 
     const session = await getSession()

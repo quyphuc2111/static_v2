@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { getCsrfToken } from "@/lib/csrf-client"
 
 interface ModuleActionResponse {
   message: string
@@ -20,14 +19,12 @@ export function useSoftDeleteModule() {
       projectId: string
       moduleId: string
     }): Promise<ModuleActionResponse> => {
-      const csrfToken = await getCsrfToken()
       const response = await fetch(
         `/api/projects/${projectId}/modules/${moduleId}/soft-delete`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-csrf-token": csrfToken,
           },
         }
       )
@@ -62,14 +59,12 @@ export function useHardDeleteModule() {
       projectId: string
       moduleId: string
     }): Promise<ModuleActionResponse> => {
-      const csrfToken = await getCsrfToken()
       const response = await fetch(
         `/api/projects/${projectId}/modules/${moduleId}/hard-delete`,
         {
           method: "DELETE",
           headers: {
             "Content-Type": "application/json",
-            "x-csrf-token": csrfToken,
           },
         }
       )
@@ -104,14 +99,12 @@ export function useRestoreModule() {
       projectId: string
       moduleId: string
     }): Promise<ModuleActionResponse> => {
-      const csrfToken = await getCsrfToken()
       const response = await fetch(
         `/api/projects/${projectId}/modules/${moduleId}/restore`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-csrf-token": csrfToken,
           },
         }
       )

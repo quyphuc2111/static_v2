@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { getCsrfToken } from "@/lib/csrf-client"
 
 interface ProjectActionResponse {
   message: string
@@ -14,12 +13,10 @@ export function useSoftDeleteProject() {
 
   return useMutation({
     mutationFn: async (projectId: string): Promise<ProjectActionResponse> => {
-      const csrfToken = await getCsrfToken()
       const response = await fetch(`/api/projects/${projectId}/soft-delete`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-csrf-token": csrfToken,
         },
       })
 
@@ -44,12 +41,10 @@ export function useHardDeleteProject() {
 
   return useMutation({
     mutationFn: async (projectId: string): Promise<ProjectActionResponse> => {
-      const csrfToken = await getCsrfToken()
       const response = await fetch(`/api/projects/${projectId}/hard-delete`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
-          "x-csrf-token": csrfToken,
         },
       })
 
@@ -74,12 +69,10 @@ export function useRestoreProject() {
 
   return useMutation({
     mutationFn: async (projectId: string): Promise<ProjectActionResponse> => {
-      const csrfToken = await getCsrfToken()
       const response = await fetch(`/api/projects/${projectId}/restore`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-csrf-token": csrfToken,
         },
       })
 
