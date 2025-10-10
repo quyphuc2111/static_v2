@@ -18,8 +18,8 @@ export function ProjectModulesDialog({ projectId, count }: Props) {
   const [editingName, setEditingName] = useState("")
 
   const listQuery = useModules(projectId, open)
-  const createMut = useCreateModule(projectId)
-  const updateMut = useUpdateModule(projectId)
+  const createMut = useCreateModule()
+  const updateMut = useUpdateModule()
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -36,7 +36,10 @@ export function ProjectModulesDialog({ projectId, count }: Props) {
             <Button 
               onClick={() => {
                 if (name.trim()) {
-                  createMut.mutate(name.trim())
+                  createMut.mutate({
+                    projectId: projectId,
+                    name: name.trim()
+                  })
                   setName("")
                 }
               }} 
@@ -60,7 +63,11 @@ export function ProjectModulesDialog({ projectId, count }: Props) {
                         onBlur={() => {
                           const next = editingName.trim()
                           if (next && next !== m.name) {
-                            updateMut.mutate({ id: m.id, name: next })
+                            updateMut.mutate({ 
+                              projectId: projectId,
+                              moduleId: m.id, 
+                              name: next 
+                            })
                           } else {
                             setEditingId(null)
                             setEditingName("")
@@ -70,7 +77,11 @@ export function ProjectModulesDialog({ projectId, count }: Props) {
                           if (e.key === "Enter") {
                             const next = editingName.trim()
                             if (next && next !== m.name) {
-                              updateMut.mutate({ id: m.id, name: next })
+                              updateMut.mutate({ 
+                                projectId: projectId,
+                                moduleId: m.id, 
+                                name: next 
+                              })
                             }
                           }
                           if (e.key === "Escape") {

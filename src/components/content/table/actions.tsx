@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Eye, Copy, Check, BookOpen, Edit, Download, Trash2, ExternalLink } from "lucide-react"
+import { MoreHorizontal, Eye, Copy, Check, BookOpen, Edit, Download, Trash2, ExternalLink, RefreshCw } from "lucide-react"
 
 export interface ActionItem {
   id: string
@@ -66,12 +66,16 @@ export const createContentActions = (
     onDownload: (content: any) => void
     onDelete: (content: any) => void
     onOpenExternal?: (content: any) => void
+    onUpdateFile?: (content: any) => void
   },
   state: {
     copiedUrl: string | null
     isDownloading: boolean
     isDeleting: boolean
+    isUpdating?: boolean
     hasSCORMInfo: boolean
+    hasFile?: boolean
+    isOwner?: boolean
   }
 ): ActionItem[] => {
   const actions: ActionItem[] = [
@@ -120,7 +124,21 @@ export const createContentActions = (
       icon: Download,
       onClick: () => handlers.onDownload(content),
       disabled: state.isDownloading
-    },
+    }
+  )
+
+  // Add update file action if content has file and user is owner
+  if (state.hasFile && state.isOwner && handlers.onUpdateFile) {
+    actions.push({
+      id: "update-file",
+      label: state.isUpdating ? "Đang cập nhật..." : "Cập nhật File",
+      icon: RefreshCw,
+      onClick: () => handlers.onUpdateFile!(content),
+      disabled: state.isUpdating
+    })
+  }
+
+  actions.push(
     {
       id: "delete",
       label: state.isDeleting ? "Đang xóa..." : "Xóa",

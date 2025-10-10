@@ -2,17 +2,23 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import bcrypt from "bcryptjs"
-import { PermissionName, RoleName, UserStatus } from "@prisma/client"
+import { UserStatus } from "@prisma/client"
 
 export async function POST(req: Request) {
   try {
-    const { email, password } = await req.json()
-    if (!email || !password) {
-      return NextResponse.json({ message: "Thiếu email hoặc mật khẩu" }, { status: 400 })
+    const { login, password } = await req.json()
+    if (!login || !password) {
+      return NextResponse.json({ message: "Thiếu tên đăng nhập/email hoặc mật khẩu" }, { status: 400 })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email },
+    // Try to find user by username or email
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { username: login },
+          { email: login }
+        ]
+      },
       include: {
         roles: { include: { role: true } },
         permissions: { include: { permission: true } },
@@ -32,12 +38,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Tài khoản đã bị vô hiệu hoá" }, { status: 403 })
     }
 
-    const roles: RoleName[] = user.roles.map((ur) => ur.role.name)
-    const permissions: PermissionName[] = user.permissions.map((up) => up.permission.name)
+    const roles = user.roles.map((ur) => ur.role.name)
+    const permissions = user.permissions.map((up) => up.permission.name)
 
     const session = await getSession()
     session.user = {
       id: user.id,
+      username: user.username,
       email: user.email,
       name: user.name,
       status: user.status,

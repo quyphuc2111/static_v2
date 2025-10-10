@@ -23,8 +23,21 @@ export async function logout() {
 export async function getMe() {
   const res = await httpService.get<LoginResponse>({
     url: AUTH_API_URL.ME,
+  })
+  if ((res as any)?.csrfToken) {
+    storageService.set("csrf_token", (res as any).csrfToken)
+  }
+  return res.user
+}
+
+export async function getMeOptional() {
+  const res = await httpService.get<LoginResponse>({
+    url: AUTH_API_URL.ME,
     headers: { "X-Optional-Auth": "true" },
   })
+  if ((res as any)?.csrfToken) {
+    storageService.set("csrf_token", (res as any).csrfToken)
+  }
   return res.user
 }
 

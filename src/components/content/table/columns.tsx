@@ -3,9 +3,18 @@
 import { ColumnDef } from "@tanstack/react-table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { MoreHorizontal, Eye, Copy, Check, BookOpen, Edit, Download, Trash2 } from "lucide-react"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { MoreHorizontal, Eye, Copy, Check, BookOpen, Edit, Download, Trash2, RotateCcw, Upload, Link, RefreshCw, Calendar, FileText } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { useState } from "react"
+import { useUserPermissions } from "@/modules/rbac/hooks"
+import { PermissionName } from "@prisma/client"
 
 // Types
 export interface ContentItem {
@@ -19,7 +28,14 @@ export interface ContentItem {
   createdAt: string
   contentUrl: string
   isDeleted?: boolean
-  owner?: { id: string; name?: string | null; email: string } | null
+  owner?: { id: string; username?: string; name?: string | null; email?: string | null } | null
+  isShared?: boolean
+  sharePermissions?: {
+    canView: boolean
+    canDownload: boolean
+    canEdit: boolean
+    canDelete: boolean
+  } | null
 }
 
 // Utility functions
@@ -60,7 +76,7 @@ const getStatusBadge = (status: string, progress?: number) => {
       return (
         <div className="flex items-center gap-2">
           <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">Đang xử lý</Badge>
-          {progress !== undefined && (
+          {/* {progress !== undefined && (
             <div className="flex items-center gap-1">
               <div className="w-8 bg-muted rounded-full h-1.5">
                 <div 
@@ -70,7 +86,7 @@ const getStatusBadge = (status: string, progress?: number) => {
               </div>
               <span className="text-xs text-blue-400 font-medium">{progress}%</span>
             </div>
-          )}
+          )} */}
         </div>
       )
     case "FAILED":
@@ -88,32 +104,22 @@ const truncateText = (text: string, maxLength: number = 50) => {
 const formatJsonValue = (value: any) => {
   if (typeof value === 'object' && value !== null) {
     if (value.title) {
-      return `"${truncateText(value.title, 30)}" (v${value.version || 'N/A'})`
+      return `"${truncateText(value.title, 25)}" (v${value.version || 'N/A'})`
     }
     const entries = Object.entries(value).slice(0, 2)
-    return entries.map(([k, v]) => `${k}: ${truncateText(String(v), 20)}`).join(', ')
+    return entries.map(([k, v]) => {
+      const val = String(v)
+      // Đặc biệt xử lý cho launchFile với đường dẫn dài
+      if (k === 'launchFile' && val.includes('/') || val.includes('\\')) {
+        const fileName = val.split('/').pop()?.split('\\').pop() || val
+        return `${k}: ${truncateText(fileName, 15)}`
+      }
+      return `${k}: ${truncateText(val, 15)}`
+    }).join(', ')
   }
-  return truncateText(String(value), 40)
+  return truncateText(String(value), 30)
 }
 
-// Helper function to get content URL
-const getContentUrl = (content: ContentItem) => {
-  const desc: any = content.description
-  const scorm = typeof desc === 'object' && desc ? desc.scorm : null
-  const launchFile = typeof desc === 'object' && desc ? desc.launchFile : null
-  
-  if (content.contentType === 'FILE_ZIP_SCORM' && scorm && launchFile) {
-    const raw = `/uploads${content.contentUrl}/${launchFile}`
-    return raw.replace(/\/+/g, '/').replace('/uploads/uploads', '/uploads')
-  } else if (content.contentType === 'FILE_ZIP_HTML' && launchFile) {
-    const raw = `/uploads${content.contentUrl}/${launchFile}`
-    return raw.replace(/\/+/g, '/').replace('/uploads/uploads', '/uploads')
-  } else {
-    return `/uploads${content.contentUrl}`.replace('/uploads/uploads', '/uploads')
-  }
-}
-
-// Helper function to get SCORM info
 const getSCORMInfo = (content: ContentItem) => {
   if (content.contentType === "FILE_ZIP_SCORM" && content.description) {
     const desc = content.description
@@ -136,10 +142,19 @@ interface ContentActionsProps {
   onShowSCORMInfo: (content: ContentItem) => void
   onEdit: (content: ContentItem) => void
   onDownload: (content: ContentItem) => void
-  onDelete: (content: ContentItem) => void
+  onRestore: (content: ContentItem) => void
+  onUploadFile?: (content: ContentItem) => void
+  onUpdateFile?: (content: ContentItem) => void
+  onSoftDelete?: (content: ContentItem) => void
+  onHardDelete?: (content: ContentItem) => void
   copiedUrl: string | null
   isDownloading: boolean
-  isDeleting: boolean
+  isRestoring: boolean
+  isUploading?: boolean
+  isUpdating?: boolean
+  isSoftDeleting?: boolean
+  isHardDeleting?: boolean
+  currentUserId?: string
 }
 
 function ContentActions({
@@ -149,11 +164,87 @@ function ContentActions({
   onShowSCORMInfo,
   onEdit,
   onDownload,
-  onDelete,
+  onRestore,
+  onUploadFile,
+  onUpdateFile,
+  onSoftDelete,
+  onHardDelete,
   copiedUrl,
   isDownloading,
-  isDeleting
+  isRestoring,
+  isUploading,
+  isUpdating,
+  isSoftDeleting,
+  isHardDeleting,
+  currentUserId
 }: ContentActionsProps) {
+  const { hasPermission, hasAnyPermission, isAdmin } = useUserPermissions()
+  
+  // Determine permissions
+  const isOwner = content.owner?.id === currentUserId
+  const sharePerms = content.sharePermissions
+  console.log("sharePerms", sharePerms)
+  const isDeleted = content.isDeleted
+  const hasFile = content.contentUrl && content.contentUrl.trim() !== ""
+  
+  // System permissions
+  const canViewSystem = hasPermission(PermissionName.VIEW_CONTENT) || isAdmin
+  const canEditSystem = hasAnyPermission([PermissionName.EDIT_CONTENT]) || isAdmin
+  const canDownloadSystem = hasAnyPermission([PermissionName.DOWNLOAD_CONTENT]) || isAdmin
+  const canRestoreSystem = hasAnyPermission([PermissionName.RESTORE_CONTENT]) || isAdmin
+  const canSoftDeleteSystem = hasAnyPermission([PermissionName.SOFT_DELETE_CONTENT]) || isAdmin
+  const canHardDeleteSystem = hasAnyPermission([PermissionName.HARD_DELETE_CONTENT, PermissionName.MANAGE_ALL_CONTENT]) || isAdmin
+  
+  // Combined permissions: system permissions + ownership/share permissions
+  const canView = canViewSystem || ( sharePerms?.canView || false)
+  const canDownload = canDownloadSystem || ( sharePerms?.canDownload || false)
+  const canEdit = canEditSystem || ( sharePerms?.canEdit || false)
+  const canRestore = canRestoreSystem 
+  const canUpload =  !hasFile && !isDeleted && canEditSystem
+  const canUpdate =  hasFile && !isDeleted && canEditSystem
+  const canSoftDelete = canSoftDeleteSystem && (( sharePerms?.canDelete || false) && !isDeleted)
+  const canHardDelete = canHardDeleteSystem &&  !isDeleted
+
+  // If content is deleted, show restore action instead
+  if (isDeleted) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem 
+            onClick={() => onRestore(content)}
+            disabled={isRestoring}
+            className="text-green-400"
+          >
+            <RotateCcw className="mr-2 h-4 w-4" />
+            {isRestoring ? "Đang khôi phục..." : "Khôi phục"}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {
+            canHardDeleteSystem && onHardDelete && (
+              <DropdownMenuItem 
+                onClick={() => onHardDelete(content)}
+                disabled={isHardDeleting}
+                className="text-red-600 focus:text-red-600"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                {isHardDeleting ? "Đang xóa cứng..." : "Xóa vĩnh viễn"}
+              </DropdownMenuItem>
+            )
+          }
+          <DropdownMenuItem onClick={() => onView(content)}>
+            <Eye className="mr-2 h-4 w-4" />
+            Xem chi tiết
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  }
+  
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -162,48 +253,80 @@ function ContentActions({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => onView(content)}>
-          <Eye className="mr-2 h-4 w-4" />
-          Xem
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onCopyUrl(content)}>
-          {copiedUrl === content.id ? (
-            <>
-              <Check className="mr-2 h-4 w-4 text-green-400" />
-              <span className="text-green-400">Đã copy!</span>
-            </>
-          ) : (
-            <>
-              <Copy className="mr-2 h-4 w-4" />
-              Copy URL
-            </>
-          )}
-        </DropdownMenuItem>
-        {getSCORMInfo(content) && (
-          <DropdownMenuItem onClick={() => onShowSCORMInfo(content)}>
-            <BookOpen className="mr-2 h-4 w-4" />
-            Thông tin SCORM
+        {canView && (
+          <>
+            <DropdownMenuItem onClick={() => onView(content)}>
+              <Eye className="mr-2 h-4 w-4" />
+              Xem
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onCopyUrl(content)}>
+              {copiedUrl === content.id ? (
+                <>
+                  <Check className="mr-2 h-4 w-4 text-green-400" />
+                  <span className="text-green-400">Đã copy!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copy URL
+                </>
+              )}
+            </DropdownMenuItem>
+            {getSCORMInfo(content) && (
+              <DropdownMenuItem onClick={() => onShowSCORMInfo(content)}>
+                <BookOpen className="mr-2 h-4 w-4" />
+                Thông tin SCORM
+              </DropdownMenuItem>
+            )}
+          </>
+        )}
+        {canDownload && (
+          <DropdownMenuItem 
+            onClick={() => onDownload(content)}
+            disabled={isDownloading}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            {isDownloading ? "Đang tải..." : "Tải xuống"}
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem onClick={() => onEdit(content)}>
-          <Edit className="mr-2 h-4 w-4" />
-          Chỉnh sửa
-        </DropdownMenuItem>
-        <DropdownMenuItem 
-          onClick={() => onDownload(content)}
-          disabled={isDownloading}
-        >
-          <Download className="mr-2 h-4 w-4" />
-          {isDownloading ? "Đang tải..." : "Tải xuống"}
-        </DropdownMenuItem>
-        <DropdownMenuItem 
-          className="text-red-400"
-          onClick={() => onDelete(content)}
-          disabled={isDeleting}
-        >
-          <Trash2 className="mr-2 h-4 w-4" />
-          {isDeleting ? "Đang xóa..." : "Xóa"}
-        </DropdownMenuItem>
+        {canEdit && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onEdit(content)}>
+              <Edit className="mr-2 h-4 w-4" />
+              Chỉnh sửa
+            </DropdownMenuItem>
+            {canUpdate && onUpdateFile && (
+              <DropdownMenuItem 
+                onClick={() => onUpdateFile(content)}
+                disabled={isUpdating}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                {isUpdating ? "Đang cập nhật..." : "Cập nhật File"}
+              </DropdownMenuItem>
+            )}
+          </>
+        )}
+        {canSoftDelete && onSoftDelete && (
+          <DropdownMenuItem 
+            onClick={() => onSoftDelete(content)}
+            disabled={isSoftDeleting}
+            className="text-orange-400"
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            {isSoftDeleting ? "Đang xóa mềm..." : "Xóa mềm"}
+          </DropdownMenuItem>
+        )}
+        {canHardDelete && onHardDelete && (
+          <DropdownMenuItem 
+            onClick={() => onHardDelete(content)}
+            disabled={isHardDeleting}
+            className="text-red-600 focus:text-red-600"
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            {isHardDeleting ? "Đang xóa cứng..." : "Xóa vĩnh viễn"}
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -225,22 +348,22 @@ function ContentDescription({ content, onDescriptionClick }: ContentDescriptionP
     
     return (
       <div 
-        className="space-y-1 max-w-xs cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors"
+        className="space-y-1 max-w-full cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors"
         onClick={() => onDescriptionClick(content)}
       >
-        {entries.slice(0, 3).map(([key, value]) => (
+        {entries.slice(0, 2).map(([key, value]) => (
           <div key={key} className="flex items-start gap-2 text-xs">
             <span className="font-medium text-muted-foreground min-w-0 flex-shrink-0">
               {key}:
             </span>
-            <span className="text-foreground break-words">
+            <span className="text-foreground truncate min-w-0 flex-1">
               {formatJsonValue(value)}
             </span>
           </div>
         ))}
-        {entries.length > 3 && (
+        {entries.length > 2 && (
           <div className="text-xs text-muted-foreground">
-            +{entries.length - 3} trường khác
+            +{entries.length - 2} trường khác
           </div>
         )}
       </div>
@@ -249,10 +372,10 @@ function ContentDescription({ content, onDescriptionClick }: ContentDescriptionP
   
   return (
     <span 
-      className="text-foreground text-xs cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors block"
+      className="text-foreground text-xs cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors block max-w-full truncate"
       onClick={() => onDescriptionClick(content)}
     >
-      {truncateText(String(desc), 60)}
+      {truncateText(String(desc), 50)}
     </span>
   )
 }
@@ -269,7 +392,7 @@ function ContentProgress({ content }: ContentProgressProps) {
 
   return (
     <div className="flex items-center gap-2 w-full">
-      <div className="flex-1 bg-muted rounded-full h-2">
+      {/* <div className="flex-1 bg-muted rounded-full h-2">
         <div 
           className={`h-2 rounded-full transition-all duration-500 ease-out ${
             content.status === "COMPLETED" 
@@ -280,7 +403,7 @@ function ContentProgress({ content }: ContentProgressProps) {
           }`}
           style={{ width: `${content.progress}%` }}
         />
-      </div>
+      </div> */}
       <span className={`text-xs font-medium min-w-[3rem] text-right ${
         content.status === "COMPLETED" 
           ? "text-green-400" 
@@ -302,13 +425,21 @@ export const createContentColumns = (
     onShowSCORMInfo: (content: ContentItem) => void
     onEdit: (content: ContentItem) => void
     onDownload: (content: ContentItem) => void
-    onDelete: (content: ContentItem) => void
+    onRestore: (content: ContentItem) => void
     onDescriptionClick: (content: ContentItem) => void
+    onUploadFile?: (content: ContentItem) => void
+    onUpdateFile?: (content: ContentItem) => void
+    onSoftDelete?: (content: ContentItem) => void
+    onHardDelete?: (content: ContentItem) => void
     copiedUrl: string | null
     isDownloading: boolean
-    isDeleting: boolean
+    isRestoring: boolean
+    isUploading?: boolean
+    isUpdating?: boolean
+    isSoftDeleting?: boolean
+    isHardDeleting?: boolean
   },
-  options?: { isAdmin?: boolean }
+  options?: { isAdmin?: boolean; currentUserId?: string }
 ): ColumnDef<ContentItem>[] => [
   {
     id: "index",
@@ -318,12 +449,14 @@ export const createContentColumns = (
       const pageSize = table.getState().pagination.pageSize
       const index = pageIndex * pageSize + row.index + 1
       return (
-        <div className=" text-muted-foreground font-medium">
+        <div className="text-xs text-muted-foreground font-medium w-8">
           {index}
         </div>
       )
     },
-    size: 60,
+    size: 50,
+    minSize: 40,
+    maxSize: 60,
     enableSorting: false,
   },
   {
@@ -331,79 +464,202 @@ export const createContentColumns = (
     header: "Tên Nội dung",
     cell: ({ row }) => {
       const isDeleted = row.original.isDeleted
+      const isShared = row.original.isShared
+      const contentType = row.original.contentType
       return (
-        <div className="font-medium text-foreground flex items-center gap-2">
-          <span>{row.getValue("title")}</span>
-          {isDeleted && (
-            <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">Đã xoá mềm</Badge>
-          )}
+        <div className="flex flex-col gap-1 max-w-full min-w-[200px]">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-foreground break-words min-w-0 flex-1">{row.getValue("title")}</span>
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Badge variant="outline" className={`text-xs ${getContentTypeColor(contentType)}`}>
+              {getContentTypeLabel(contentType)}
+            </Badge>
+            {isShared && (
+              <Badge variant="outline" className="text-xs text-purple-400">Shared</Badge>
+            )}
+            {isDeleted && (
+              <Badge variant="outline" className="text-xs text-amber-400">Deleted</Badge>
+            )}
+          </div>
         </div>
       )
     },
+    size: 300,
+    minSize: 200,
+    maxSize: 400,
+  },
+  {
+    accessorKey: "contentUrl",
+    header: "Đường dẫn",
+    cell: ({ row }) => {
+      const contentUrl = row.getValue("contentUrl") as string
+      const hasFile = contentUrl && contentUrl.trim() !== ""
+      const content = row.original
+      const isOwner = content.owner?.id === options?.currentUserId
+      const canUpload = isOwner && !hasFile && !content.isDeleted
+      
+      if (!hasFile) {
+        return (
+          <div className="flex items-center">
+            {canUpload && actions.onUploadFile ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-xs"
+                onClick={() => actions.onUploadFile!(content)}
+                disabled={actions.isUploading}
+              >
+                <Upload className="h-3 w-3 mr-1" />
+                Upload
+              </Button>
+            ) : (
+              <span className="text-xs text-muted-foreground italic">No file</span>
+            )}
+          </div>
+        )
+      }
+      
+      return (
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-1.5 max-w-[180px] min-w-[120px] cursor-help">
+                <Link className="h-3 w-3 text-green-400 flex-shrink-0" />
+                <span className="text-xs text-muted-foreground truncate min-w-0 flex-1">
+                  {(() => {
+                    const fileName = contentUrl.split('/').pop() || ''
+                    const maxLength = 20
+                    if (fileName.length <= maxLength) return fileName
+                    return fileName.substring(0, maxLength - 3) + '...'
+                  })()}
+                </span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-md bg-popover border-border">
+              <p className="text-xs font-mono break-all text-foreground">{contentUrl}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )
+    },
+    size: 180,
+    minSize: 120,
+    maxSize: 200,
   },
   {
     accessorKey: "description",
     header: "Mô tả",
     cell: ({ row }) => (
-      <ContentDescription 
-        content={row.original} 
-        onDescriptionClick={actions.onDescriptionClick}
-      />
-    ),
-  },
-  {
-    accessorKey: "contentType",
-    header: "Loại",
-    cell: ({ row }) => (
-      <span className={`font-mono text-sm ${getContentTypeColor(row.getValue("contentType"))}`}>
-        {getContentTypeLabel(row.getValue("contentType"))}
-      </span>
-    ),
-  },
-  {
-    accessorKey: "fileSize",
-    header: "Kích thước",
-    cell: ({ row }) => (
-      <div className="text-muted-foreground">
-        {formatFileSize(row.getValue("fileSize"))}
+      <div className="max-w-[200px] min-w-[150px]">
+        <ContentDescription 
+          content={row.original} 
+          onDescriptionClick={actions.onDescriptionClick}
+        />
       </div>
     ),
+    size: 200,
+    minSize: 150,
+    maxSize: 250,
+  },
+  {
+    id: "info",
+    header: "Kích thước / Ngày tạo",
+    cell: ({ row }) => {
+      const fileSize = row.original.fileSize
+      const createdAt = row.original.createdAt
+      const date = new Date(createdAt)
+      
+      return (
+        <div className="flex flex-col gap-1 text-xs min-w-[120px] max-w-[150px]">
+          <div className="flex items-center gap-1.5">
+            <FileText className="h-3 w-3 text-muted-foreground" />
+            <span className="font-medium text-foreground">{formatFileSize(fileSize)}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Calendar className="h-3 w-3 text-muted-foreground" />
+            <span className="text-muted-foreground whitespace-nowrap">
+              {date.toLocaleDateString('vi-VN', { 
+                day: '2-digit', 
+                month: '2-digit', 
+                year: '2-digit' 
+              })}
+              {' '}
+              {date.toLocaleTimeString('vi-VN', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              })}
+            </span>
+          </div>
+        </div>
+      )
+    },
+    size: 140,
+    minSize: 120,
+    maxSize: 160,
   },
   {
     accessorKey: "status",
     header: "Trạng thái",
-    cell: ({ row }) => getStatusBadge(row.getValue("status"), row.original.progress),
-  },
-  {
-    accessorKey: "progress",
-    header: "Tiến độ",
-    cell: ({ row }) => <ContentProgress content={row.original} />,
-  },
-  {
-    accessorKey: "createdAt",
-    header: "Ngày tạo",
-    cell: ({ row }) => (
-      <div className="text-muted-foreground">
-        {new Date(row.getValue("createdAt")).toLocaleDateString('vi-VN')}
-      </div>
-    ),
-  },
-  ...(options?.isAdmin
-    ? [{
-        id: "owner",
-        header: "Owner",
-        cell: ({ row }: any) => {
-          const owner = row.original.owner
-          if (!owner) return <span className="text-muted-foreground">-</span>
-          return (
-            <div className="flex flex-col leading-tight">
-              <span className="text-foreground text-sm">{owner.name || owner.email}</span>
-              {owner.name && <span className="text-muted-foreground text-xs">{owner.email}</span>}
+    cell: ({ row }) => {
+      const status = row.getValue("status") as string
+      const progress = row.original.progress
+      
+      return (
+        <div className="flex flex-col gap-1">
+          {getStatusBadge(status, progress)}
+          {status === "PROCESSING" && progress !== undefined && (
+            <div className="flex items-center gap-1">
+              <div className="w-16 bg-muted rounded-full h-1">
+                <div 
+                  className="bg-blue-400 h-1 rounded-full transition-all"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <span className="text-xs text-blue-400">{progress}%</span>
             </div>
-          )
-        },
-      }] as ColumnDef<ContentItem>[]
-    : []),
+          )}
+        </div>
+      )
+    },
+    size: 130,
+    minSize: 100,
+    maxSize: 150,
+  },
+  {
+    id: "owner",
+    header: "Người tạo",
+    cell: ({ row }) => {
+      const owner = row.original.owner
+      if (!owner) return <span className="text-xs text-muted-foreground italic">Không có người tạo</span>
+      
+      const displayName = owner.name || owner.username || owner.email || 'Unknown'
+      const displaySub = owner.username ? `@${owner.username}` : owner.email
+      
+      return (
+        <div className="flex items-center gap-2 max-w-[200px] min-w-[150px]">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
+              {displayName.charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="text-xs font-medium text-foreground truncate" title={displayName}>
+              {displayName}
+            </span>
+            {displaySub && (
+              <span className="text-xs text-muted-foreground truncate" title={displaySub}>
+                {displaySub}
+              </span>
+            )}
+          </div>
+        </div>
+      )
+    },
+    size: 180,
+    minSize: 150,
+    maxSize: 220,
+  },
   {
     id: "actions",
     header: "Thao tác",
@@ -415,11 +671,23 @@ export const createContentColumns = (
         onShowSCORMInfo={actions.onShowSCORMInfo}
         onEdit={actions.onEdit}
         onDownload={actions.onDownload}
-        onDelete={actions.onDelete}
+        onRestore={actions.onRestore}
+        onUploadFile={actions.onUploadFile}
+        onUpdateFile={actions.onUpdateFile}
+          onSoftDelete={actions.onSoftDelete}
+          onHardDelete={actions.onHardDelete}
         copiedUrl={actions.copiedUrl}
         isDownloading={actions.isDownloading}
-        isDeleting={actions.isDeleting}
+        isRestoring={actions.isRestoring}
+        isUploading={actions.isUploading}
+        isUpdating={actions.isUpdating}
+          isSoftDeleting={actions.isSoftDeleting}
+          isHardDeleting={actions.isHardDeleting}
+        currentUserId={options?.currentUserId}
       />
     ),
+    size: 90,
+    minSize: 80,
+    maxSize: 100,
   },
 ]

@@ -15,48 +15,83 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { useUserPermissions } from "@/modules/rbac/hooks"
+import { PermissionName } from "@prisma/client"
 
-const navigation = [
+type NavigationItem = {
+  name: string
+  href: string
+  icon: React.ComponentType<{ className?: string }>
+  permissions?: PermissionName[]
+}
+
+const navigation: NavigationItem[] = [
   {
     name: "Dashboard",
     href: "/",
     icon: LayoutDashboard,
+    permissions: [PermissionName.VIEW_DASHBOARD_STATS, PermissionName.VIEW_AUDIT_LOGS]
   },
   {
     name: "Quản lý Dự án",
     href: "/project",
     icon: Settings,
+    permissions: [
+      PermissionName.VIEW_PROJECTS,
+      PermissionName.CREATE_PROJECTS,
+      PermissionName.EDIT_PROJECTS,
+      PermissionName.SOFT_DELETE_PROJECTS,
+      PermissionName.HARD_DELETE_PROJECTS
+    ]
   }, 
   {
     name: "Quản lý Nội dung",
     href: "/content",
     icon: FileText,
+    permissions: [PermissionName.VIEW_CONTENT, PermissionName.VIEW_OWN_CONTENT_ONLY]
   },
   {
     name: "Quản lý Người dùng",
     href: "/users",
     icon: Users,
+    permissions: [
+      PermissionName.VIEW_USERS,
+      PermissionName.CREATE_USERS,
+      PermissionName.EDIT_USERS,
+      PermissionName.SOFT_DELETE_USERS,
+      PermissionName.HARD_DELETE_USERS
+    ]
   },
   {
     name: "Quản lý Quyền hạn",
     href: "/rbac",
     icon: Shield,
+    permissions: [PermissionName.MANAGE_USER_PERMISSIONS]
   },
   {
     name: "Chia sẻ Nội dung",
     href: "/content-sharing",
     icon: Share2,
+    permissions: [PermissionName.SHARE_CONTENT_ACCESS]
   }
 ]
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
+  const { hasPermission, hasAnyPermission } = useUserPermissions()
+
+  const filteredNavigation = navigation.filter((item: NavigationItem) => {
+    if (item.permissions && item.permissions.length > 0) {
+      return hasAnyPermission(item.permissions)
+    }
+    return true
+  })
 
   return (
     <div
       className={cn(
-        "relative flex flex-col h-auto bg-card border-r border-border transition-all duration-300",
+        "relative flex flex-col h-[calc(100vh-4rem)] bg-card border-r border-border transition-all duration-300",
         collapsed ? "w-16" : "w-64",
       )}
     >
@@ -76,7 +111,7 @@ export function Sidebar() {
 
       <nav className="flex-1 px-2 pb-4">
         <ul className="space-y-1">
-          {navigation.map((item) => {
+          {filteredNavigation.map((item) => {
             const isActive = pathname === item.href
             return (
               <li key={item.name}>

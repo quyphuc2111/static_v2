@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useAuth } from "@/modules/auth/hooks/useAuth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,21 +15,27 @@ import { Eye, EyeOff, Lock, Mail, AlertCircle, Shield } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 export default function LoginPage() {
-  const { login, isAuthenticated } = useAuth()
+  const { login, isAuthenticated } = useAuth(true)
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
-  const [email, setEmail] = useState("")
+  const [loginInput, setLoginInput] = useState("")
   const [password, setPassword] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push("/")
+    }
+  }, [isAuthenticated, router])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setIsLoading(true)
     try {
-      await login({ email, password })
+      await login({ login: loginInput, password })
       router.push("/")
     } catch (err: any) {
       setError(err?.response?.data?.message ?? "Đăng nhập thất bại")
@@ -39,7 +45,6 @@ export default function LoginPage() {
   }
 
   if (isAuthenticated) {
-    router.push("/")
     return null
   }
 
@@ -71,15 +76,15 @@ export default function LoginPage() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="login">Tên đăng nhập hoặc Email</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="admin@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    id="login"
+                    type="text"
+                    placeholder="username hoặc email"
+                    value={loginInput}
+                    onChange={(e) => setLoginInput(e.target.value)}
                     className="pl-10"
                     required
                   />

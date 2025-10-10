@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
+import { hasPermission } from "@/lib/permissions"
 
 interface Params {
   params: Promise<{
@@ -13,6 +14,11 @@ export async function GET(req: NextRequest, { params }: Params) {
     const session = await getSession()
     if (!session?.user?.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    }
+
+    // Check if user has permission to view user roles
+    if (!(await hasPermission("VIEW_USERS"))) {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403 })
     }
 
     const { userId } = await params
@@ -49,6 +55,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     const session = await getSession()
     if (!session?.user?.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    }
+
+    // Check if user has permission to manage user roles
+    if (!(await hasPermission("MANAGE_USER_PERMISSIONS"))) {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403 })
     }
 
     const { userId } = await params
@@ -105,6 +116,11 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     const session = await getSession()
     if (!session?.user?.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    }
+
+    // Check if user has permission to manage user roles
+    if (!(await hasPermission("MANAGE_USER_PERMISSIONS"))) {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403 })
     }
 
     const { userId } = await params

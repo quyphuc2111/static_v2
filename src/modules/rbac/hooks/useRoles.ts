@@ -1,10 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { getRoles, createRole, updateRole, deleteRole } from "../rbac.service"
+import { getRoles, createRole, updateRole, deleteRole, cloneRole, toggleRoleStatus } from "../rbac.service"
 import { CreateRolePayload } from "../rbac.interface"
+import cachedKeys from "@/constants/cachedKeys"
 
 export function useRoles() {
   return useQuery({
-    queryKey: ["rbac", "roles"],
+    queryKey: cachedKeys.rbac.roles,
     queryFn: getRoles,
   })
 }
@@ -15,7 +16,7 @@ export function useCreateRole() {
   return useMutation({
     mutationFn: (payload: CreateRolePayload) => createRole(payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["rbac", "roles"] })
+      queryClient.invalidateQueries({ queryKey: cachedKeys.rbac.roles })
     },
   })
 }
@@ -27,7 +28,29 @@ export function useUpdateRole() {
     mutationFn: ({ roleId, payload }: { roleId: string; payload: Partial<CreateRolePayload> }) => 
       updateRole(roleId, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["rbac", "roles"] })
+      queryClient.invalidateQueries({ queryKey: cachedKeys.rbac.roles })
+    },
+  })
+}
+
+export function useCloneRole() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (roleId: string) => cloneRole(roleId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: cachedKeys.rbac.roles })
+    },
+  })
+}
+
+export function useToggleRoleStatus() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (roleId: string) => toggleRoleStatus(roleId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: cachedKeys.rbac.roles })
     },
   })
 }
@@ -38,7 +61,7 @@ export function useDeleteRole() {
   return useMutation({
     mutationFn: (roleId: string) => deleteRole(roleId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["rbac", "roles"] })
+      queryClient.invalidateQueries({ queryKey: cachedKeys.rbac.roles })
     },
   })
 }

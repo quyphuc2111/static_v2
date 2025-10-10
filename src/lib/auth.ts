@@ -1,17 +1,17 @@
-import { PermissionName, RoleName, User, UserStatus } from "@prisma/client"
+import { PermissionName, User, UserStatus } from "@prisma/client"
 
 export type AuthContext = {
   user: Pick<User, "id" | "status">
-  roles: RoleName[]
+  roles: string[]
   permissions: PermissionName[]
 }
 
-export function hasRole(ctx: AuthContext, role: RoleName): boolean {
+export function hasRole(ctx: AuthContext, role: string): boolean {
   return ctx.roles.includes(role)
 }
 
 export function hasPermission(ctx: AuthContext, perm: PermissionName): boolean {
-  return ctx.permissions.includes(perm) || ctx.roles.includes(RoleName.ADMINISTRATOR)
+  return ctx.permissions.includes(perm) || ctx.roles.includes("ADMINISTRATOR")
 }
 
 export function canViewContent(ctx: AuthContext): boolean {
@@ -20,30 +20,30 @@ export function canViewContent(ctx: AuthContext): boolean {
 
 export function canManageContent(ctx: AuthContext, ownerId?: string): boolean {
   if (ctx.user.status !== UserStatus.ACTIVE) return false
-  if (hasPermission(ctx, PermissionName.MANAGE_CONTENT)) return true
-  // Dev có thể quản lý content của chính mình (owner)
-  return hasRole(ctx, RoleName.DEV) && ownerId === ctx.user.id
+  if (hasPermission(ctx, PermissionName.MANAGE_ALL_CONTENT)) return true
+  // User can manage own content
+  return hasPermission(ctx, PermissionName.MANAGE_OWN_CONTENT) && ownerId === ctx.user.id
 }
 
 export function canViewOthersContent(ctx: AuthContext): boolean {
   if (ctx.user.status !== UserStatus.ACTIVE) return false
-  return hasPermission(ctx, PermissionName.VIEW_OTHERS_CONTENT)
+  return hasPermission(ctx, PermissionName.MANAGE_ALL_CONTENT) || !hasPermission(ctx, PermissionName.VIEW_OWN_CONTENT_ONLY)
 }
 
 export function canUpload(ctx: AuthContext): boolean {
-  return ctx.user.status === UserStatus.ACTIVE && hasPermission(ctx, PermissionName.UPLOAD_FILES)
+  return ctx.user.status === UserStatus.ACTIVE && hasPermission(ctx, PermissionName.CREATE_CONTENT)
 }
 
 export function canManageUsers(ctx: AuthContext): boolean {
-  return ctx.user.status === UserStatus.ACTIVE && hasPermission(ctx, PermissionName.MANAGE_USERS)
+  return ctx.user.status === UserStatus.ACTIVE && hasPermission(ctx, PermissionName.EDIT_USERS)
 }
 
 export function canToggleUserStatus(ctx: AuthContext): boolean {
-  return ctx.user.status === UserStatus.ACTIVE && hasPermission(ctx, PermissionName.TOGGLE_USER_STATUS)
+  return ctx.user.status === UserStatus.ACTIVE && hasPermission(ctx, PermissionName.EDIT_USERS)
 }
 
 export function canAssignRoles(ctx: AuthContext): boolean {
-  return ctx.user.status === UserStatus.ACTIVE && hasPermission(ctx, PermissionName.ASSIGN_ROLES_PERMISSIONS)
+  return ctx.user.status === UserStatus.ACTIVE && hasPermission(ctx, PermissionName.MANAGE_USER_PERMISSIONS)
 }
 
 export function canViewAuditLogs(ctx: AuthContext): boolean {

@@ -11,6 +11,7 @@ export interface Role {
 export interface Permission {
   id: string
   name: string
+  nameVi?: string
   description?: string
   createdAt: string
   updatedAt: string
@@ -77,6 +78,7 @@ export interface ShareContentPayload {
   contentId: string
   sharedWithId: string
   canView?: boolean
+  canDownload?: boolean
   canEdit?: boolean
   canDelete?: boolean
 }
@@ -94,14 +96,34 @@ export interface BulkSharePayload {
 
 export interface UserWithRoles {
   id: string
+  username: string
   name?: string
-  email: string
+  email?: string
   status: string
   createdAt: string
   updatedAt: string
   roles?: UserRole[]
 }
 
+export interface CreateUserPayload {
+  username: string
+  name?: string
+  email?: string
+  status?: string
+  roleId?: string
+  password?: string
+}
+
+export interface UpdateUserPayload {
+  username?: string
+  name?: string
+  email?: string
+  status?: string
+  password?: string
+  roleId?: string
+}
+
 export interface RoleWithPermissions extends Role {
+  isActive?: boolean
   permissions: (RolePermission & { permission: Permission })[]
 }

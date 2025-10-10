@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
-import { RoleName } from "@prisma/client"
+import { PermissionName, ShareStatus } from "@prisma/client"
+import { hasPermission as checkPermission, hasAnyPermission } from "@/lib/permissions"
 import { Prisma } from "@prisma/client"
 import { writeFile, mkdir } from "fs/promises"
 import { join, dirname } from "path"
@@ -127,29 +128,51 @@ export async function GET(
       return NextResponse.json({ error: "Module not found" }, { status: 404 })
     }
 
-    // Role-based visibility
-    const isAdmin = (session.user.roles || []).includes(RoleName.ADMINISTRATOR)
+    // Permission/Role-based visibility
+    const isAdmin = (session.user.roles || []).includes("ADMINISTRATOR")
+    const canViewAll = isAdmin || await checkPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id)
+    const canViewDeletedAll = await checkPermission(PermissionName.VIEW_DELETED_ALL_CONTENT, session.user.id)
+    const canViewDeletedOwn = await checkPermission(PermissionName.VIEW_DELETED_OWN_CONTENT, session.user.id)
 
     const whereClause: any = {
       projectId,
       moduleId,
     }
 
-    // Admin sees all, including soft-deleted of other users
-    // Non-admin (e.g., DEV) sees only their own created content
-    if (!isAdmin) {
-      whereClause.isDeleted = false
-      whereClause.OR = [
-        { ownerId: session.user.id },
-        { shares: { some: { sharedWithId: session.user.id, canView: true } } }
-      ]
+    if (canViewAll || canViewDeletedAll) {
+      // Admin or VIEW_DELETED_ALL_CONTENT: See ALL content (including deleted)
+      // No additional filters needed
+    } else {
+      // Regular users: complex visibility logic
+      const orConditions: any[] = []
+      
+      // Own content
+      if (canViewDeletedOwn) {
+        // Can see own content (both active and deleted)
+        orConditions.push({ ownerId: session.user.id })
+      } else {
+        // Can only see own ACTIVE content
+        orConditions.push({ ownerId: session.user.id, isDeleted: false })
+      }
+      
+      // Shared content - ALWAYS exclude deleted (shared users should NOT see deleted content)
+      orConditions.push({ 
+        isDeleted: false, // Critical: shared content must not be deleted
+        shares: { some: { sharedWithId: session.user.id, canView: true, status: ShareStatus.ACTIVE } } 
+      })
+      
+      whereClause.OR = orConditions
     }
 
     const content = await prisma.contentData.findMany({
       where: whereClause,
       include: {
         owner: {
-          select: { id: true, name: true, email: true }
+          select: { id: true, username: true, name: true, email: true }
+        },
+        shares: {
+          where: { sharedWithId: session.user.id, status: ShareStatus.ACTIVE },
+          select: { canView: true, canDownload: true, canEdit: true, canDelete: true, sharedById: true }
         }
       },
       orderBy: {
@@ -157,7 +180,22 @@ export async function GET(
       }
     })
 
-    return NextResponse.json({ data: content })
+    // Transform to include share permissions for current user
+    const transformedContent = content.map(item => {
+      const share = item.shares?.[0] // Get user's share if exists
+      return {
+        ...item,
+        isShared: !!share,
+        sharePermissions: share ? {
+          canView: share.canView,
+          canDownload: share.canDownload,
+          canEdit: share.canEdit,
+          canDelete: share.canDelete
+        } : null
+      }
+    })
+
+    return NextResponse.json({ data: transformedContent })
   } catch (error) {
     console.error("Error fetching content:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -190,6 +228,15 @@ export async function POST(
 
     if (!module) {
       return NextResponse.json({ error: "Module not found" }, { status: 404 })
+    }
+
+    // Permission check for creating content
+    const canCreate = await hasAnyPermission([
+      PermissionName.EDIT_CONTENT,
+      PermissionName.MANAGE_OWN_CONTENT
+    ], session.user.id)
+    if (!canCreate) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
     // Parse form data
@@ -321,7 +368,25 @@ export async function POST(
         const findIndexFile = (dir: string): string | null => {
           const files = fs.readdirSync(dir)
           
-          // Look for index files first
+          // First, look for subdirectories that might contain index.html
+          const subdirs = files.filter((file: string) => {
+            const fullPath = path.join(dir, file)
+            return fs.statSync(fullPath).isDirectory()
+          })
+          
+          // Check subdirectories for index.html first (priority)
+          for (const subdir of subdirs) {
+            const subdirPath = path.join(dir, subdir)
+            const subdirFiles = fs.readdirSync(subdirPath)
+            const indexFile = subdirFiles.find((f: string) => 
+              f.toLowerCase() === 'index.html' || f.toLowerCase() === 'index.htm'
+            )
+            if (indexFile) {
+              return path.join(subdirPath, indexFile)
+            }
+          }
+          
+          // Then look for index files in root directory
           const indexFiles = files.filter((file: string) => 
             file.toLowerCase() === 'index.html' || 
             file.toLowerCase() === 'index.htm'
@@ -331,7 +396,19 @@ export async function POST(
             return path.join(dir, indexFiles[0])
           }
           
-          // Look for any HTML file
+          // Look for any HTML file in subdirectories
+          for (const subdir of subdirs) {
+            const subdirPath = path.join(dir, subdir)
+            const subdirFiles = fs.readdirSync(subdirPath)
+            const htmlFile = subdirFiles.find((f: string) => 
+              f.toLowerCase().endsWith('.html') || f.toLowerCase().endsWith('.htm')
+            )
+            if (htmlFile) {
+              return path.join(subdirPath, htmlFile)
+            }
+          }
+          
+          // Finally, look for any HTML file in root
           const htmlFiles = files.filter((file: string) => 
             file.toLowerCase().endsWith('.html') || 
             file.toLowerCase().endsWith('.htm')
@@ -339,15 +416,6 @@ export async function POST(
           
           if (htmlFiles.length > 0) {
             return path.join(dir, htmlFiles[0])
-          }
-          
-          // Look in subdirectories
-          for (const file of files) {
-            const fullPath = path.join(dir, file)
-            if (fs.statSync(fullPath).isDirectory()) {
-              const found = findIndexFile(fullPath)
-              if (found) return found
-            }
           }
           
           return null

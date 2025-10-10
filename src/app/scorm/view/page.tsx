@@ -1,19 +1,16 @@
 "use client"
 
+import { useSearchParams } from "next/navigation"
 import ScormPlayer from "@/components/scorm-player"
 
-type PageProps = {
-  searchParams: Promise<Record<string, string | string[] | undefined>>
-}
-
-export default async function ScormViewPage({ searchParams }: PageProps) {
-  const sp = await searchParams
-  const entry = typeof sp.entry === "string" ? sp.entry : ""
+export default function ScormViewPage() {
+  const searchParams = useSearchParams()
+  const entry = searchParams.get("entry") || ""
 
   if (!entry) {
     return (
       <div className="p-6 text-foreground">
-        Thiếu tham số entry. Ví dụ: /scorm/view?entry=/uploads/content/..../course/index.html?type=scorm
+        Thiếu tham số entry. Ví dụ: /scorm/view?entry=/uploads/content/..../course/index.html
       </div>
     )
   }

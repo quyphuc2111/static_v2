@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
-import { RoleName } from "@prisma/client"
+import { PermissionName } from "@prisma/client"
+import { hasAnyPermission } from "@/lib/permissions"
 
 interface Params {
   params: Promise<{
@@ -62,10 +63,17 @@ export async function POST(req: NextRequest, { params }: Params) {
       }, { status: 400 })
     }
 
-    const isAdmin = (session.user.roles || []).includes(RoleName.ADMINISTRATOR)
+    const isAdmin = (session.user.roles || []).includes("ADMINISTRATOR")
+    const canHardDelete = isAdmin || await hasAnyPermission([PermissionName.MANAGE_ALL_CONTENT, PermissionName.HARD_DELETE_CONTENT], session.user.id)
+    const canSoftDelete = await hasAnyPermission([PermissionName.SOFT_DELETE_CONTENT, PermissionName.MANAGE_OWN_CONTENT], session.user.id)
+
+    // Permission check: must have delete permission
+    if (!canHardDelete && !canSoftDelete) {
+      return NextResponse.json({ message: "Forbidden: No delete permission" }, { status: 403 })
+    }
 
     // Non-admin permission check: all items must be owned by user or shared with canDelete
-    if (!isAdmin) {
+    if (!canHardDelete) {
       const unauthorized = await prisma.contentData.findMany({
         where: {
           id: { in: contentIds },
@@ -78,13 +86,13 @@ export async function POST(req: NextRequest, { params }: Params) {
         select: { id: true }
       })
       if (unauthorized.length > 0) {
-        return NextResponse.json({ message: "Forbidden" }, { status: 403 })
+        return NextResponse.json({ message: "Forbidden: Not owner or shared" }, { status: 403 })
       }
     }
 
     // Use transaction to ensure atomicity
     const result = await prisma.$transaction(async (tx) => {
-      if (isAdmin) {
+      if (canHardDelete) {
         // Admin: hard delete DB records
         const deleteResult = await tx.contentData.deleteMany({
           where: {
@@ -100,7 +108,11 @@ export async function POST(req: NextRequest, { params }: Params) {
             id: { in: contentIds },
             moduleId: moduleId
           },
-          data: { isDeleted: true }
+          data: { 
+            isDeleted: true,
+            deletedAt: new Date(),
+            updatedAt: new Date()
+          }
         })
         return { count: updateResult.count }
       }

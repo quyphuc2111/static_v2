@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { useRoles, useUserRoles, useAssignRoleToUser, useRemoveRoleFromUser } from "@/modules/rbac/hooks"
+import { useRoles } from "@/modules/rbac/hooks"
+import { useUserRoles } from "@/modules/rbac/hooks/useUserRoles"
 import { toast } from "react-toastify"
 import { Shield, X } from "lucide-react"
 
@@ -19,9 +20,7 @@ export function AssignRoleDialog({ open, onOpenChange, user }: AssignRoleDialogP
   const [selectedRoleId, setSelectedRoleId] = useState<string>("")
 
   const { data: roles, isLoading: rolesLoading } = useRoles()
-  const { data: userRoles, isLoading: userRolesLoading } = useUserRoles(user?.id || "")
-  const assignRoleMut = useAssignRoleToUser()
-  const removeRoleMut = useRemoveRoleFromUser()
+  const { data: userRoles, isLoading: userRolesLoading, assign: assignRoleMut, remove: removeRoleMut } = useUserRoles(user?.id)
 
   const userRoleIds = userRoles?.map(ur => ur.roleId) || []
   const availableRoles = roles?.filter(role => !userRoleIds.includes(role.id)) || []

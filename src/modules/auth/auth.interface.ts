@@ -1,17 +1,26 @@
-import { PermissionName, RoleName, UserStatus } from "@prisma/client"
+import { PermissionName, UserStatus } from "@prisma/client"
 
 export type LoginPayload = {
-  email: string
+  login: string // username or email
   password: string
 }
 
 export type AuthUser = {
   id: string
-  email: string
+  username: string
+  email?: string | null
   name?: string | null
   status: UserStatus
-  roles: RoleName[]
-  permissions: PermissionName[]
+  roles: Array<{
+    id: string
+    name: string
+    description?: string
+  }>
+  permissions: Array<{
+    id: string
+    name: PermissionName
+    description?: string
+  }>
   token?: string
 }
 

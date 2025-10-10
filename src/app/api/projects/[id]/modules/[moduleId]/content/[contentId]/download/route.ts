@@ -4,7 +4,8 @@ import { getSession } from "@/lib/session"
 import { existsSync } from "fs"
 import { join } from "path"
 import archiver from "archiver"
-import { RoleName } from "@prisma/client"
+import { PermissionName, ShareStatus } from "@prisma/client"
+import { hasAnyPermission, hasPermission } from "@/lib/permissions"
 
 type Params = { params: Promise<{ id: string; moduleId: string; contentId: string }> }
 
@@ -13,15 +14,12 @@ export async function GET(request: NextRequest, { params }: Params) {
     console.log('Download API called')
     
     const session = await getSession()
-    console.log('Session:', session)
     
     if (!session.user) {
-      console.log('No session user found')
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const { id: projectId, moduleId, contentId } = await params
-    console.log('Params:', { projectId, moduleId, contentId })
 
     // Verify content exists
     const content = await prisma.contentData.findFirst({
@@ -33,33 +31,34 @@ export async function GET(request: NextRequest, { params }: Params) {
       }
     })
 
-    console.log('Content found:', content)
-
     if (!content) {
-      console.log('Content not found')
       return NextResponse.json({ error: "Content not found" }, { status: 404 })
     }
 
-    // Permission: owner, admin, or shared canView
-    const isAdmin = (session.user.roles || []).includes(RoleName.ADMINISTRATOR)
-    if (!isAdmin) {
-      const isOwner = content.ownerId === session.user.id
-      if (!isOwner) {
-        const share = await prisma.contentShare.findFirst({
-          where: { contentId: content.id, sharedWithId: session.user.id, canView: true }
-        })
-        if (!share) {
-          return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-        }
+    // Check system permissions first
+    const isAdmin = (session.user.roles || []).includes("ADMINISTRATOR")
+    const canDownloadAny = await hasPermission(PermissionName.DOWNLOAD_CONTENT, session.user.id)
+    const canManageAll = await hasAnyPermission([PermissionName.MANAGE_ALL_CONTENT], session.user.id)
+    const canManageOwn = await hasPermission(PermissionName.MANAGE_OWN_CONTENT, session.user.id)
+    
+    // Check if user can download this specific content
+    const isOwner = content.ownerId === session.user.id
+    const canDownloadThis = isAdmin || canManageAll || canDownloadAny || (canManageOwn && isOwner)
+    
+    // If not owner and no general download permission, check sharing
+    if (!canDownloadThis) {
+      const share = await prisma.contentShare.findFirst({
+        where: { contentId: content.id, sharedWithId: session.user.id, canDownload: true, status: ShareStatus.ACTIVE }
+      })
+      if (!share) {
+        return NextResponse.json({ error: "Bạn không có quyền tải xuống nội dung này" }, { status: 403 })
       }
     }
 
     // Get the content directory path
     const contentDir = join(process.cwd(), 'public', content.contentUrl)
-    console.log('Content directory:', contentDir)
     
     if (!existsSync(contentDir)) {
-      console.log('Content directory does not exist')
       return NextResponse.json({ error: "Content files not found" }, { status: 404 })
     }
 
@@ -87,7 +86,6 @@ export async function GET(request: NextRequest, { params }: Params) {
       // Wait for archive to complete
       await new Promise<void>((resolve, reject) => {
         archive.on('end', () => {
-          console.log('Archive completed')
           resolve()
         })
         archive.on('error', reject)
@@ -96,7 +94,6 @@ export async function GET(request: NextRequest, { params }: Params) {
         archive.finalize()
       })
       
-      console.log('Archive finalized successfully')
     } catch (archiveError) {
       console.error('Error creating archive:', archiveError)
       return NextResponse.json({ error: "Failed to create ZIP archive" }, { status: 500 })
@@ -104,16 +101,24 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     // Combine all chunks
     const buffer = Buffer.concat(chunks)
-    console.log('Buffer size:', buffer.length)
+
+    // Helper function to sanitize filename
+    const sanitizeFilename = (filename: string): string => {
+      return filename
+        .normalize('NFD') // Decompose accented characters
+        .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+        .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters except spaces
+        .replace(/\s+/g, '_') // Replace spaces with underscores
+        .toLowerCase()
+    }
 
     // Set response headers
     const headers = new Headers()
     headers.set('Content-Type', 'application/zip')
-    headers.set('Content-Disposition', `attachment; filename="${content.title}.zip"`)
+    headers.set('Content-Disposition', `attachment; filename="${sanitizeFilename(content.title)}.zip"`)
     headers.set('Content-Length', buffer.length.toString())
     headers.set('Cache-Control', 'no-cache')
 
-    console.log('Returning ZIP file with size:', buffer.length)
     return new NextResponse(buffer, { headers })
 
   } catch (error) {

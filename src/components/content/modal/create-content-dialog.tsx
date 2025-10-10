@@ -89,6 +89,7 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
       // Find HTML files
       const htmlFiles: string[] = []
       const indexFiles: string[] = []
+      const subdirIndexFiles: string[] = []
       
       zip.forEach((relativePath: string, zipEntry: any) => {
         if (!zipEntry.dir) {
@@ -99,7 +100,13 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
             // Check for index files
             const baseName = fileName.split('/').pop() || ''
             if (baseName === 'index.html' || baseName === 'index.htm') {
-              indexFiles.push(relativePath)
+              // Check if it's in a subdirectory
+              const pathParts = relativePath.split('/')
+              if (pathParts.length > 1) {
+                subdirIndexFiles.push(relativePath)
+              } else {
+                indexFiles.push(relativePath)
+              }
             }
           }
         }
@@ -108,11 +115,14 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
       // Determine launch file priority
       let launchFile: string | null = null
       
-      if (indexFiles.length > 0) {
-        // Prefer index.html or index.htm
+      if (subdirIndexFiles.length > 0) {
+        // Prefer index.html in subdirectories first
+        launchFile = subdirIndexFiles[0]
+      } else if (indexFiles.length > 0) {
+        // Then index.html in root directory
         launchFile = indexFiles[0]
       } else if (htmlFiles.length > 0) {
-        // Use first HTML file found
+        // Finally, any HTML file
         launchFile = htmlFiles[0]
       }
       
@@ -212,28 +222,28 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
       onOpenChange(open)
     }}>
       <DialogContent 
-        className="bg-card border-border"
+        className="bg-card border-border overflow-hidden flex flex-col !w-[99vw] !sm:w-[98vw] !md:w-[95vw] !lg:w-[92vw] !xl:w-[90vw] !2xl:w-[88vw] max-w-none h-[95vh] sm:h-[90vh] md:h-[85vh] lg:h-[80vh] xl:h-[75vh] 2xl:h-[70vh]"
         style={{ 
           width: '60vw', 
           maxWidth: '60vw', 
-          height: '90vh',
-          maxHeight: '90vh'
+          height: '80vh',
+          maxHeight: '80vh'
         }}
       >
-        <DialogHeader>
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="text-foreground">Tạo Nội dung Mới</DialogTitle>
           <DialogDescription className="text-muted-foreground">
             Upload file ZIP (HTML hoặc SCORM) để tạo nội dung học tập
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="h-full flex flex-col overflow-hidden">
-          <ScrollArea className="flex-1 pr-2">
-            <div className="space-y-6 pr-2">
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
+          <ScrollArea className="flex-1 pr-2 min-h-0">
+            <div className="space-y-4 sm:space-y-6 pr-2">
             {/* Content Type Selection */}
             <div className="space-y-4">
               <Label className="text-foreground font-medium">Chọn loại nội dung</Label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {contentTypes.map((type) => (
                   <Card
                     key={type.id}
@@ -269,9 +279,9 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
             </div>
 
             {/* Main Content Grid */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
               {/* Left Column - Basic Info */}
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 {/* Title */}
                 <div className="space-y-2">
                   <Label htmlFor="title" className="text-foreground font-medium">
@@ -289,7 +299,7 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
 
                 {/* Description Key-Value */}
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
                     <Label className="text-foreground font-medium">
                       Mô tả chi tiết 
                       {descriptionItems.length > 3 && (
@@ -303,7 +313,7 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
                       variant="outline"
                       size="sm"
                       onClick={addDescriptionItem}
-                      className="h-8 px-3"
+                      className="h-8 px-3 w-full sm:w-auto"
                     >
                       <Plus className="h-4 w-4 mr-1" />
                       Thêm
@@ -317,57 +327,55 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
                     </div>
                   ) : (
                     <div className="border border-border rounded-lg bg-background/50 backdrop-blur-sm">
-                      <ScrollArea className="h-[250px]">
-                        <div className="p-3 space-y-3">
-                          {descriptionItems.map((item) => (
-                            <div key={item.id} className="flex gap-2 items-start">
-                              <div className="flex-1 space-y-2">
-                                <Input
-                                  placeholder="Tên thuộc tính (VD: Tác giả, Phiên bản)"
-                                  value={item.key}
-                                  onChange={(e) => updateDescriptionItem(item.id, 'key', e.target.value)}
-                                  className="bg-background border-border hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary/20"
-                                />
-                                <Input
-                                  placeholder="Giá trị (VD: Nguyễn Văn A, 1.0)"
-                                  value={item.value}
-                                  onChange={(e) => updateDescriptionItem(item.id, 'value', e.target.value)}
-                                  className="bg-background border-border hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary/20"
-                                />
-                              </div>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => removeDescriptionItem(item.id)}
-                                className="h-8 w-8 p-0 text-red-400 hover:text-red-600"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                      <div className="max-h-[200px] sm:max-h-[250px] overflow-y-auto p-3 space-y-3">
+                        {descriptionItems.map((item) => (
+                          <div key={item.id} className="flex flex-col sm:flex-row gap-2 items-start">
+                            <div className="flex-1 space-y-2 w-full">
+                              <Input
+                                placeholder="Tên thuộc tính (VD: Tác giả, Phiên bản)"
+                                value={item.key}
+                                onChange={(e) => updateDescriptionItem(item.id, 'key', e.target.value)}
+                                className="bg-background border-border hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary/20"
+                              />
+                              <Input
+                                placeholder="Giá trị (VD: Nguyễn Văn A, 1.0)"
+                                value={item.value}
+                                onChange={(e) => updateDescriptionItem(item.id, 'value', e.target.value)}
+                                className="bg-background border-border hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary/20"
+                              />
                             </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeDescriptionItem(item.id)}
+                              className="h-8 w-8 p-0 text-red-400 hover:text-red-600 flex-shrink-0"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
 
               {/* Right Column - File Upload */}
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 {/* File Upload */}
                 <div className="space-y-4">
                   <Label className="text-foreground font-medium">
                     Upload File ZIP <span className="text-red-400">*</span>
                   </Label>
-                  <div className="border-2 border-dashed border-border rounded-lg p-4 text-center hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 bg-background/30 backdrop-blur-sm">
-                    <Archive className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-                    <div className="space-y-3">
+                  <div className="border-2 border-dashed border-border rounded-lg p-3 sm:p-4 text-center hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 bg-background/30 backdrop-blur-sm">
+                    <Archive className="mx-auto h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground mb-2 sm:mb-3" />
+                    <div className="space-y-2 sm:space-y-3">
                       <div>
-                        <p className="font-medium text-foreground mb-1">
+                        <p className="font-medium text-foreground mb-1 text-sm sm:text-base">
                           Kéo thả file ZIP vào đây
                         </p>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-xs sm:text-sm text-muted-foreground">
                           Hoặc click để chọn file từ máy tính
                         </p>
                       </div>
@@ -382,7 +390,7 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
                         type="button" 
                         variant="outline" 
                         onClick={() => document.getElementById("file")?.click()}
-                        className="bg-muted/50 border-border hover:bg-muted"
+                        className="bg-muted/50 border-border hover:bg-muted w-full sm:w-auto"
                       >
                         <Upload className="mr-2 h-4 w-4" />
                         Chọn File ZIP
@@ -407,16 +415,16 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
                             {isAnalyzing ? (
                               <div className="flex items-center gap-2">
                                 <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
-                                <p className="text-sm text-muted-foreground">Đang phân tích file ZIP...</p>
+                                <p className="text-xs sm:text-sm text-muted-foreground">Đang phân tích file ZIP...</p>
                               </div>
                             ) : detectedLaunchFile ? (
                               <div className="space-y-2">
                                 <div className="flex items-center gap-2">
                                   <Code className="h-4 w-4 text-green-400" />
-                                  <p className="text-sm font-medium text-foreground">File HTML chính được phát hiện:</p>
+                                  <p className="text-xs sm:text-sm font-medium text-foreground">File HTML chính được phát hiện:</p>
                                 </div>
                                 <div className="bg-background/50 rounded p-2 border border-border">
-                                  <p className="text-sm font-mono text-foreground break-all">
+                                  <p className="text-xs sm:text-sm font-mono text-foreground break-all">
                                     {detectedLaunchFile}
                                   </p>
                                 </div>
@@ -427,7 +435,7 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
                             ) : (
                               <div className="flex items-center gap-2">
                                 <Code className="h-4 w-4 text-yellow-400" />
-                                <p className="text-sm text-muted-foreground">
+                                <p className="text-xs sm:text-sm text-muted-foreground">
                                   Không tìm thấy file HTML trong ZIP
                                 </p>
                               </div>
@@ -440,9 +448,9 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
                 </div>
 
                 {/* Requirements Info */}
-                <div className="bg-background/50 backdrop-blur-sm rounded-lg p-4 border border-border">
-                  <h4 className="font-medium text-foreground mb-2">Yêu cầu file:</h4>
-                  <ul className="text-sm text-muted-foreground space-y-1">
+                <div className="bg-background/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 border border-border">
+                  <h4 className="font-medium text-foreground mb-2 text-sm sm:text-base">Yêu cầu file:</h4>
+                  <ul className="text-xs sm:text-sm text-muted-foreground space-y-1">
                     <li>• File phải có định dạng .zip</li>
                     <li>• HTML Package: Chứa file HTML, CSS, JS</li>
                     <li>• SCORM Package: Tuân thủ chuẩn SCORM 1.2 hoặc 2004</li>
@@ -454,7 +462,7 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
             </div>
           </ScrollArea>
 
-          <DialogFooter className="gap-3 pt-4 border-t border-border flex-shrink-0">
+          <DialogFooter className="gap-2 sm:gap-3 pt-4 flex-shrink-0 flex-col sm:flex-row border-t border-border mt-4">
             <Button 
               type="button" 
               variant="outline" 
@@ -463,12 +471,13 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
                 onOpenChange(false)
               }}
               disabled={isSubmitting}
+              className="w-full sm:w-auto order-2 sm:order-1"
             >
               Hủy
             </Button>
             <Button 
               type="submit" 
-              className="bg-primary hover:bg-primary/90"
+              className="bg-primary hover:bg-primary/90 w-full sm:w-auto order-1 sm:order-2"
               disabled={isSubmitting || !selectedType || !title || !file}
             >
               {isSubmitting ? "Đang tạo..." : "Tạo Nội dung"}

@@ -3,6 +3,7 @@
 
 import { useEffect, useRef } from "react";
 // The package exposes a default export `pipwerks`
+// @ts-ignore - No type definitions available
 import pipwerks from "pipwerks-scorm-api-wrapper";
 
 type ScormPlayerProps = {

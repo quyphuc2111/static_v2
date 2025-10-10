@@ -1,26 +1,30 @@
 import { getIronSession, type SessionOptions } from "iron-session"
 import { cookies } from "next/headers"
-import { PermissionName, RoleName, UserStatus } from "@prisma/client"
+import { PermissionName, UserStatus } from "@prisma/client"
 
 export type SessionUser = {
   id: string
-  email: string
+  username: string
+  email?: string | null
   name?: string | null
   status: UserStatus
-  roles: RoleName[]
+  roles: string[]
   permissions: PermissionName[]
 }
 
 export type AppSession = {
   user?: SessionUser
+  csrfToken?: string
 }
 
 export const sessionOptions: SessionOptions = {
   cookieName: process.env.SESSION_COOKIE_NAME || "bkt_session",
   password: process.env.SESSION_PASSWORD || "dev-secret-change-me-dev-secret-change-me",
   cookieOptions: {
-    secure: process.env.NODE_ENV === "production",
+    secure: false, // Set to false for development
     sameSite: "lax",
+    httpOnly: true,
+    path: "/",
   },
 }
 
