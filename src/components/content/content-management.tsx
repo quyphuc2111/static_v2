@@ -438,7 +438,7 @@ export function ContentManagement() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0 w-[calc(100vw-40px)] md:w-full">
+        <CardContent className=" w-[calc(100vw-40px)] md:w-full">
           {contentQuery.isLoading ? (
             <div className="text-center py-8 px-4 text-muted-foreground">
               Đang tải nội dung...
@@ -455,7 +455,7 @@ export function ContentManagement() {
               searchPlaceholder="Tìm kiếm tài liệu..."
               showColumnVisibility={true}
               showPagination={true}
-              showSelection={true}
+              showSelection={false}
               pageSize={10}
               contextMenuActions={{
                 onView: handleView,
