@@ -60,7 +60,7 @@ npx prisma db push
 Hoặc nếu muốn reset database (⚠️ sẽ xóa toàn bộ data):
 
 ```bash
-npx prisma migrate reset --force
+npx prisma db push --force-reset
 ```
 
 #### c. Seed Database
