@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { deleteModule } from "../project.service"
-import cachedKeys from "@/constants/cachedKeys"
 
 export function useDeleteModule() {
   const queryClient = useQueryClient()
@@ -8,7 +7,8 @@ export function useDeleteModule() {
   return useMutation({
     mutationFn: deleteModule,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: cachedKeys.project.list() })
+      // Invalidate projects list query
+      queryClient.invalidateQueries({ queryKey: ["projects", "list"] })
     },
   })
 }

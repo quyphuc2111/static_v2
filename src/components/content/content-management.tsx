@@ -20,7 +20,7 @@ import { Plus, FileSpreadsheet, Upload, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CreateContentDialog, EditContentDialog, DeleteContentDialog, SCORMInfoDialog, DescriptionDialog, UploadMissingFilesDialog, UploadFileDialog, UpdateFileDialog } from "./modal"
+import { CreateContentDialog, EditContentDialog, DeleteContentDialog, SoftDeleteDialog, HardDeleteDialog, SCORMInfoDialog, DescriptionDialog, UploadMissingFilesDialog, UploadFileDialog, UpdateFileDialog } from "./modal"
 import { ImportExcelDialog } from "./modal/import-excel-dialog"
 import { DataTable, createContentColumns, type ContentItem } from "@/components/content/table"
 import { DescriptionFilter, applyDescriptionFilters, type DescriptionFilterValue } from "./description-filter"
@@ -64,6 +64,10 @@ export function ContentManagement() {
   const [selectedDescription, setSelectedDescription] = useState<any>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [contentToDelete, setContentToDelete] = useState<ContentItem | null>(null)
+  const [showSoftDeleteDialog, setShowSoftDeleteDialog] = useState(false)
+  const [contentToSoftDelete, setContentToSoftDelete] = useState<ContentItem | null>(null)
+  const [showHardDeleteDialog, setShowHardDeleteDialog] = useState(false)
+  const [contentToHardDelete, setContentToHardDelete] = useState<ContentItem | null>(null)
   const [descriptionFilters, setDescriptionFilters] = useState<DescriptionFilterValue[]>([])
   const [showDeleted, setShowDeleted] = useState(false)
 
@@ -225,9 +229,8 @@ export function ContentManagement() {
       return
     }
     
-    if (confirm(`Bạn có muốn chuyển nội dung "${content.title}" vào thùng rác?`)) {
-      softDeleteContentMut.mutate(content.id)
-    }
+    setContentToSoftDelete(content)
+    setShowSoftDeleteDialog(true)
   }
 
   const handleHardDelete = (content: ContentItem) => {
@@ -237,8 +240,29 @@ export function ContentManagement() {
       return
     }
     
-    if (confirm(`Bạn có chắc chắn muốn XÓA VĨNH VIỄN nội dung "${content.title}"? Hành động này không thể hoàn tác!`)) {
-      hardDeleteContentMut.mutate(content.id)
+    setContentToHardDelete(content)
+    setShowHardDeleteDialog(true)
+  }
+
+  const handleConfirmSoftDelete = () => {
+    if (contentToSoftDelete) {
+      softDeleteContentMut.mutate(contentToSoftDelete.id, {
+        onSuccess: () => {
+          setShowSoftDeleteDialog(false)
+          setContentToSoftDelete(null)
+        }
+      })
+    }
+  }
+
+  const handleConfirmHardDelete = () => {
+    if (contentToHardDelete) {
+      hardDeleteContentMut.mutate(contentToHardDelete.id, {
+        onSuccess: () => {
+          setShowHardDeleteDialog(false)
+          setContentToHardDelete(null)
+        }
+      })
     }
   }
 
@@ -438,7 +462,7 @@ export function ContentManagement() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0 w-[calc(100vw-40px)] md:w-full">
+        <CardContent className=" w-[calc(100vw-40px)] md:w-full">
           {contentQuery.isLoading ? (
             <div className="text-center py-8 px-4 text-muted-foreground">
               Đang tải nội dung...
@@ -455,7 +479,7 @@ export function ContentManagement() {
               searchPlaceholder="Tìm kiếm tài liệu..."
               showColumnVisibility={true}
               showPagination={true}
-              showSelection={true}
+              showSelection={false}
               pageSize={10}
               contextMenuActions={{
                 onView: handleView,
@@ -554,6 +578,22 @@ export function ContentManagement() {
         content={contentToUpdate}
         projectId={projectId}
         moduleId={moduleId}
+      />
+
+      <SoftDeleteDialog
+        open={showSoftDeleteDialog}
+        onOpenChange={setShowSoftDeleteDialog}
+        content={contentToSoftDelete}
+        onConfirm={handleConfirmSoftDelete}
+        isDeleting={softDeleteContentMut.isPending}
+      />
+
+      <HardDeleteDialog
+        open={showHardDeleteDialog}
+        onOpenChange={setShowHardDeleteDialog}
+        content={contentToHardDelete}
+        onConfirm={handleConfirmHardDelete}
+        isDeleting={hardDeleteContentMut.isPending}
       />
     </div>
   )

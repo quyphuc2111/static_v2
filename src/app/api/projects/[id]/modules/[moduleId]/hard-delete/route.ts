@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission as checkPermission } from "@/lib/permissions"
 import { PermissionName } from "@prisma/client"
+import { logModuleAction } from "@/lib/audit"
 
 type Params = { params: Promise<{ id: string; moduleId: string }> }
 
@@ -19,8 +20,8 @@ export async function DELETE(
 
     // Check permission
     const hasAccess = await checkPermission(
-      session.user.id,
-      PermissionName.HARD_DELETE_MODULES
+      PermissionName.HARD_DELETE_MODULES,
+      session.user.id
     )
     if (!hasAccess) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403 })
@@ -45,6 +46,18 @@ export async function DELETE(
     await prisma.module.delete({
       where: { id: mId as any },
     })
+    
+    // Log audit
+    await logModuleAction(
+      session.user.id,
+      'hard_deleted',
+      String(mId),
+      {
+        moduleName: module.name,
+        description: module.description,
+        deletedContentCount: module.contentData.length
+      }
+    )
 
     return NextResponse.json({
       message: "Module permanently deleted successfully",

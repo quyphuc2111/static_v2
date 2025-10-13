@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { PermissionName } from "@prisma/client"
 import { hasPermission as checkPermission, hasAnyPermission } from "@/lib/permissions"
+import { logContentAction } from "@/lib/audit"
 import { Prisma } from "@prisma/client"
 import { writeFile, mkdir } from "fs/promises"
 import { join, dirname } from "path"
@@ -184,10 +185,22 @@ export async function POST(
 
     // Check permissions
     const isOwner = Number(content.owner?.id ?? NaN) === Number(session.user.id)
-    const hasManageOwnContent = await checkPermission(session.user.id, PermissionName.MANAGE_OWN_CONTENT)
-    const hasManageAllContent = await checkPermission(session.user.id, PermissionName.MANAGE_ALL_CONTENT)
+    const hasManageOwnContent = await checkPermission(PermissionName.MANAGE_OWN_CONTENT, session.user.id)
+    const hasManageAllContent = await checkPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id)
 
-    if (!isOwner && !hasManageAllContent) {
+    // Check if user has edit permission via content sharing
+    const sharedContent = await prisma.contentShare.findFirst({
+      where: {
+        contentId: cId as any,
+        sharedWithId: Number(session.user.id) as any,
+        status: 'ACTIVE',
+        canEdit: true
+      }
+    })
+
+    const hasEditPermissionViaShare = !!sharedContent
+
+    if (!isOwner && !hasManageAllContent && !hasEditPermissionViaShare) {
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 })
     }
 
@@ -553,6 +566,18 @@ export async function POST(
       }
     }, 2000)
 
+    // Log audit
+    await logContentAction(
+      session.user.id,
+      'file_updated',
+      String(cId),
+      {
+        contentTitle: content.title,
+        fileSize: file.size,
+        contentType: contentType
+      }
+    )
+    
     return NextResponse.json({ 
       message: "File update started successfully",
       contentId: cId 

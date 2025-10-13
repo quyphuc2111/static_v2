@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission as checkPermission } from "@/lib/permissions"
 import { PermissionName } from "@prisma/client"
+import { logProjectAction } from "@/lib/audit"
 import { promises as fs } from "fs"
 import path from "path"
 
@@ -31,9 +32,51 @@ export async function PATCH(_req: Request, { params }: Params) {
     const updated = await prisma.project.update({ 
       where: { id: projectId as any }, 
       data: updateData,
-      include: { modules: true }
+      include: { 
+        modules: {
+          include: {
+            contentData: {
+              where: { isDeleted: false },
+              select: { id: true }
+            }
+          }
+        }
+      }
     })
-    return NextResponse.json({ data: updated })
+    
+    // Transform to add _count for active content only
+    const updatedWithCount = {
+      ...updated,
+      modules: updated.modules.map(module => ({
+        id: module.id,
+        name: module.name,
+        description: module.description,
+        createdAt: module.createdAt,
+        updatedAt: module.updatedAt,
+        isDeleted: module.isDeleted,
+        deletedAt: module.deletedAt,
+        status: module.status,
+        projectId: module.projectId,
+        _count: {
+          content: module.contentData.length
+        }
+      }))
+    }
+    
+    // Log audit
+    await logProjectAction(
+      session.user.id,
+      'updated',
+      String(projectId),
+      {
+        projectName: updated.name,
+        description: updated.description,
+        status: updated.status,
+        changes: updateData
+      }
+    )
+    
+    return NextResponse.json({ data: updatedWithCount })
   } catch (e) {
     return NextResponse.json({ message: "Server error" }, { status: 500 })
   }
@@ -120,6 +163,18 @@ export async function DELETE(_req: Request, { params }: Params) {
 
     // Xóa project (sẽ cascade xóa modules và contentData)
     await prisma.project.delete({ where: { id: projectId as any } })
+    
+    // Log audit
+    await logProjectAction(
+      session.user.id,
+      'hard_deleted',
+      String(projectId),
+      {
+        projectName: project.name,
+        deletedContentCount: project.contentData.length,
+        deletedModulesCount: project.modules.length
+      }
+    )
     
     return NextResponse.json({ success: true })
   } catch (e) {

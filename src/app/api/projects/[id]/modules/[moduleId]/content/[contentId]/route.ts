@@ -104,6 +104,17 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         }
       }
     })
+    
+    // Log audit
+    await logContentAction(
+      session.user.id,
+      'updated',
+      String(cId),
+      {
+        contentTitle: updatedContent.title,
+        changes: { title, description }
+      }
+    )
 
     return NextResponse.json({ data: updatedContent })
   } catch (error) {

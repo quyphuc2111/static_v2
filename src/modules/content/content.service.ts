@@ -96,7 +96,7 @@ export async function softDeleteContent(projectId: string, moduleId: string, con
 }
 
 export async function hardDeleteContent(projectId: string, moduleId: string, contentId: string) {
-  return httpService.post<{ message: string }>({ 
+  return httpService.delete<{ message: string }>({ 
     url: CONTENT_API_URL.HARD_DELETE(projectId, moduleId, contentId)
   })
 }

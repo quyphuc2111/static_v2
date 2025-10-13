@@ -1,4 +1,4 @@
-# Static Content Server
+# Static Content Server - Node Version 22
 
 ## 📝 Mô tả
 

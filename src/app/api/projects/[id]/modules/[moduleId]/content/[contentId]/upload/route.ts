@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { PermissionName } from "@prisma/client"
 import { hasPermission as checkPermission, hasAnyPermission } from "@/lib/permissions"
+import { logContentAction } from "@/lib/audit"
 import { Prisma } from "@prisma/client"
 import { writeFile, mkdir } from "fs/promises"
 import { join, dirname } from "path"
@@ -144,7 +145,18 @@ export async function POST(
     const canManageAll = isAdmin || await checkPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id)
     const isOwner = content.ownerId === Number(session.user.id) as any
 
-    if (!canManageAll && !isOwner) {
+    // Check if user has edit permission via content sharing
+    const sharedContent = await prisma.contentShare.findFirst({
+      where: {
+        contentId: content.id as any,
+        sharedWithId: Number(session.user.id) as any,
+        status: 'ACTIVE',
+        canEdit: true
+      }
+    })
+    const hasEditPermissionViaShare = !!sharedContent
+
+    if (!canManageAll && !isOwner && !hasEditPermissionViaShare) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
@@ -153,7 +165,7 @@ export async function POST(
       PermissionName.MANAGE_OWN_CONTENT
     ], session.user.id)
     
-    if (!canUpdate) {
+    if (!canUpdate && !hasEditPermissionViaShare) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
@@ -457,6 +469,18 @@ export async function POST(
         }
       }
     }, 2000)
+    
+    // Log audit
+    await logContentAction(
+      session.user.id,
+      'uploaded',
+      contentId,
+      {
+        contentTitle: content.title,
+        fileSize: file.size,
+        contentType: contentType
+      }
+    )
 
     return NextResponse.json({ 
       message: "File upload started successfully",

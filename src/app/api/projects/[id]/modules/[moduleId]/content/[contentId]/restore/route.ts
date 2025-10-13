@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission as checkPermission } from "@/lib/permissions"
 import { PermissionName } from "@prisma/client"
+import { logContentAction } from "@/lib/audit"
 
 type Params = { params: Promise<{ id: string; moduleId: string; contentId: string }> }
 
@@ -65,6 +66,17 @@ export async function POST(request: NextRequest, { params }: Params) {
         }
       }
     })
+    
+    // Log audit
+    await logContentAction(
+      session.user.id,
+      'restored',
+      String(cId),
+      {
+        contentTitle: restoredContent.title,
+        contentType: restoredContent.contentType
+      }
+    )
 
     return NextResponse.json({ 
       data: restoredContent,

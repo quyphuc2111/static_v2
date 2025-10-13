@@ -10,12 +10,16 @@ export interface AuditLogData {
 
 export async function createAuditLog(data: AuditLogData) {
   try {
+    // Convert IDs to proper types
+    const actorId = data.actorId ? Number(data.actorId) : null
+    const entityId = String(data.entityId) // Always convert to String for schema
+    
     await prisma.auditLog.create({
       data: {
-        actorId: data.actorId as any,
+        actorId: actorId as any,
         action: data.action,
         entityType: data.entityType,
-        entityId: data.entityId as any,
+        entityId: entityId,
         metadata: data.metadata || {}
       }
     })

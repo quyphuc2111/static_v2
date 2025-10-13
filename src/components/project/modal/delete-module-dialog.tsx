@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button"
 import { useDeleteModule } from "@/modules/project/hooks/useDeleteModule"
 import { toast } from "react-toastify"
+import { AlertTriangle } from "lucide-react"
 
 interface DeleteModuleDialogProps {
   open: boolean
@@ -12,11 +13,15 @@ interface DeleteModuleDialogProps {
   module: {
     id: string
     name: string
+    _count?: {
+      content?: number
+    }
   } | null
 }
 
 export function DeleteModuleDialog({ open, onOpenChange, projectId, module }: DeleteModuleDialogProps) {
   const deleteMutation = useDeleteModule()
+  const contentCount = module?._count?.content || 0
 
   const handleDelete = async () => {
     if (!module || !projectId) return
@@ -32,20 +37,37 @@ export function DeleteModuleDialog({ open, onOpenChange, projectId, module }: De
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[460px]">
+      <DialogContent className="max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Xóa module?</DialogTitle>
-          <DialogDescription>
-            Hành động này không thể hoàn tác. Module
-            {module ? ` "${module.name}"` : ""} sẽ bị xóa vĩnh viễn.
+          <DialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            Xóa module?
+          </DialogTitle>
+          <DialogDescription className="space-y-3 pt-2">
+          Hành động này không thể hoàn tác. Module
+          {module ? ` "${module.name}"` : ""} sẽ bị xóa vĩnh viễn.
+            {contentCount > 0 && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 space-y-2">
+                <p className="text-destructive font-medium text-sm">
+                  ⚠️ Module này chứa {contentCount} tài liệu
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Bạn cần xóa hết tài liệu trong module trước hoặc sử dụng chức năng "Xóa mềm" để giữ lại dữ liệu có thể khôi phục.
+                </p>
+              </div>
+            )}
           </DialogDescription>
         </DialogHeader>
         <div className="flex gap-2 justify-end">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Hủy
           </Button>
-          <Button variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending}>
-            {deleteMutation.isPending ? "Đang xoá..." : "Xóa"}
+          <Button 
+            variant="destructive" 
+            onClick={handleDelete} 
+            disabled={deleteMutation.isPending || contentCount > 0}
+          >
+            {deleteMutation.isPending ? "Đang xoá..." : "Xóa vĩnh viễn"}
           </Button>
         </div>
       </DialogContent>

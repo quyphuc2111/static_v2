@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission } from "@/lib/permissions"
 import { PermissionName, UserStatus } from "@prisma/client"
+import { logUserAction } from "@/lib/audit"
 
 type Params = { params: Promise<{ userId: string }> }
 
@@ -50,6 +51,17 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         },
       },
     })
+    
+    // Log audit
+    await logUserAction(
+      session.user.id,
+      'status_toggled',
+      userId,
+      {
+        userName: updated.name,
+        newStatus: updated.status
+      }
+    )
 
     return NextResponse.json({ data: updated })
   } catch (error) {
