@@ -33,9 +33,38 @@ export async function GET(req: Request) {
     const projects = await prisma.project.findMany({ 
       where,
       orderBy: { createdAt: "desc" }, 
-      include: { modules: true } 
+      include: { 
+        modules: {
+          include: {
+            contentData: {
+              where: { isDeleted: false },
+              select: { id: true }
+            }
+          }
+        }
+      } 
     })
-    return NextResponse.json({ data: projects })
+    
+    // Transform to add _count for active content only
+    const projectsWithCount = projects.map(project => ({
+      ...project,
+      modules: project.modules.map(module => ({
+        id: module.id,
+        name: module.name,
+        description: module.description,
+        createdAt: module.createdAt,
+        updatedAt: module.updatedAt,
+        isDeleted: module.isDeleted,
+        deletedAt: module.deletedAt,
+        status: module.status,
+        projectId: module.projectId,
+        _count: {
+          content: module.contentData.length
+        }
+      }))
+    }))
+    
+    return NextResponse.json({ data: projectsWithCount })
   } catch (e) {
     return NextResponse.json({ message: "Server error" }, { status: 500 })
   }
@@ -73,9 +102,38 @@ export async function POST(req: Request) {
               }
             : undefined,
         },
-        include: { modules: true },
+        include: { 
+          modules: {
+            include: {
+              contentData: {
+                where: { isDeleted: false },
+                select: { id: true }
+              }
+            }
+          }
+        },
       })
-      return NextResponse.json({ data: created }, { status: 201 })
+      
+      // Transform to add _count
+      const createdWithCount = {
+        ...created,
+        modules: created.modules.map(module => ({
+          id: module.id,
+          name: module.name,
+          description: module.description,
+          createdAt: module.createdAt,
+          updatedAt: module.updatedAt,
+          isDeleted: module.isDeleted,
+          deletedAt: module.deletedAt,
+          status: module.status,
+          projectId: module.projectId,
+          _count: {
+            content: module.contentData.length
+          }
+        }))
+      }
+      
+      return NextResponse.json({ data: createdWithCount }, { status: 201 })
     } catch (err: any) {
       if (err?.code === "P2002") {
         return NextResponse.json({ message: "Tên dự án đã tồn tại" }, { status: 409 })

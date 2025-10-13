@@ -31,9 +31,38 @@ export async function PATCH(_req: Request, { params }: Params) {
     const updated = await prisma.project.update({ 
       where: { id: projectId as any }, 
       data: updateData,
-      include: { modules: true }
+      include: { 
+        modules: {
+          include: {
+            contentData: {
+              where: { isDeleted: false },
+              select: { id: true }
+            }
+          }
+        }
+      }
     })
-    return NextResponse.json({ data: updated })
+    
+    // Transform to add _count for active content only
+    const updatedWithCount = {
+      ...updated,
+      modules: updated.modules.map(module => ({
+        id: module.id,
+        name: module.name,
+        description: module.description,
+        createdAt: module.createdAt,
+        updatedAt: module.updatedAt,
+        isDeleted: module.isDeleted,
+        deletedAt: module.deletedAt,
+        status: module.status,
+        projectId: module.projectId,
+        _count: {
+          content: module.contentData.length
+        }
+      }))
+    }
+    
+    return NextResponse.json({ data: updatedWithCount })
   } catch (e) {
     return NextResponse.json({ message: "Server error" }, { status: 500 })
   }

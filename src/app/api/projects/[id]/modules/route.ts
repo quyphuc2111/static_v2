@@ -19,8 +19,34 @@ export async function GET(_req: Request, { params }: Params) {
 
     const { id } = await params
     const pId = Number(id)
-    const modules = await prisma.module.findMany({ where: { projectId: pId as any }, orderBy: { createdAt: "desc" } })
-    return NextResponse.json({ data: modules })
+    const modules = await prisma.module.findMany({ 
+      where: { projectId: pId as any }, 
+      orderBy: { createdAt: "desc" },
+      include: {
+        contentData: {
+          where: { isDeleted: false },
+          select: { id: true }
+        }
+      }
+    })
+    
+    // Transform to add _count for active content only
+    const modulesWithCount = modules.map(module => ({
+      id: module.id,
+      name: module.name,
+      description: module.description,
+      createdAt: module.createdAt,
+      updatedAt: module.updatedAt,
+      isDeleted: module.isDeleted,
+      deletedAt: module.deletedAt,
+      status: module.status,
+      projectId: module.projectId,
+      _count: {
+        content: module.contentData.length
+      }
+    }))
+    
+    return NextResponse.json({ data: modulesWithCount })
   } catch (e) {
     return NextResponse.json({ message: "Server error" }, { status: 500 })
   }
@@ -53,9 +79,32 @@ export async function POST(req: Request, { params }: Params) {
           description: description || null,
           status,
           projectId: pId as any 
-        } 
+        },
+        include: {
+          contentData: {
+            where: { isDeleted: false },
+            select: { id: true }
+          }
+        }
       })
-      return NextResponse.json({ data: created }, { status: 201 })
+      
+      // Transform to add _count
+      const createdWithCount = {
+        id: created.id,
+        name: created.name,
+        description: created.description,
+        createdAt: created.createdAt,
+        updatedAt: created.updatedAt,
+        isDeleted: created.isDeleted,
+        deletedAt: created.deletedAt,
+        status: created.status,
+        projectId: created.projectId,
+        _count: {
+          content: created.contentData.length
+        }
+      }
+      
+      return NextResponse.json({ data: createdWithCount }, { status: 201 })
     } catch (err: any) {
       if (err?.code === "P2002") {
         return NextResponse.json({ message: "Module đã tồn tại trong dự án" }, { status: 409 })
