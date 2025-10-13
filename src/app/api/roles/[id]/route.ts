@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission } from "@/lib/permissions"
+import { createAuditLog } from "@/lib/audit"
 
 export async function PATCH(
   req: NextRequest,
@@ -57,6 +58,18 @@ export async function PATCH(
 
       return updatedRole
     })
+    
+    // Log audit
+    await createAuditLog({
+      actorId: session.user.id,
+      action: 'updated',
+      entityType: 'Role',
+      entityId: roleId,
+      metadata: {
+        roleName: role.name,
+        changes: { name, description, permissionIds, isActive }
+      }
+    })
 
     return NextResponse.json({ data: role })
   } catch (error) {
@@ -85,6 +98,12 @@ export async function DELETE(
 
     const { id: roleId } = await params
     const numericRoleId = Number(roleId)
+    
+    // Get role info before deleting
+    const role = await prisma.role.findUnique({
+      where: { id: numericRoleId as any },
+      select: { name: true, description: true }
+    })
 
     // Check if role is being used by any users
     const usersWithRole = await prisma.userRole.findFirst({
@@ -110,6 +129,20 @@ export async function DELETE(
         where: { id: numericRoleId as any }
       })
     })
+    
+    // Log audit
+    if (role) {
+      await createAuditLog({
+        actorId: session.user.id,
+        action: 'deleted',
+        entityType: 'Role',
+        entityId: roleId,
+        metadata: {
+          roleName: role.name,
+          description: role.description
+        }
+      })
+    }
 
     return NextResponse.json({ message: "Role deleted successfully" })
   } catch (error) {

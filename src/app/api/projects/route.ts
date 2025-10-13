@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission as checkPermission } from "@/lib/permissions"
 import { PermissionName } from "@prisma/client"
+import { logProjectAction } from "@/lib/audit"
 
 export async function GET(req: Request) {
   try {
@@ -132,6 +133,19 @@ export async function POST(req: Request) {
           }
         }))
       }
+      
+      // Log audit
+      await logProjectAction(
+        session.user.id,
+        'created',
+        String(created.id),
+        {
+          projectName: created.name,
+          description: created.description,
+          status: created.status,
+          modulesCount: created.modules.length
+        }
+      )
       
       return NextResponse.json({ data: createdWithCount }, { status: 201 })
     } catch (err: any) {

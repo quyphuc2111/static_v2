@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import bcrypt from "bcryptjs"
 import { UserStatus } from "@prisma/client"
+import { createAuditLog } from "@/lib/audit"
 
 export async function POST(req: Request) {
   try {
@@ -52,6 +53,20 @@ export async function POST(req: Request) {
       permissions,
     }
     await session.save()
+    
+    // Log audit for login
+    await createAuditLog({
+      actorId: String(user.id),
+      action: 'login',
+      entityType: 'User',
+      entityId: String(user.id),
+      metadata: {
+        userName: user.name,
+        email: user.email,
+        username: user.username,
+        loginMethod: login.includes('@') ? 'email' : 'username'
+      }
+    })
 
     return NextResponse.json({ user: session.user })
   } catch (error) {

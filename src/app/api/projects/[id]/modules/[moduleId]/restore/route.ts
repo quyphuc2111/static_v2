@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission as checkPermission } from "@/lib/permissions"
 import { PermissionName } from "@prisma/client"
+import { logModuleAction } from "@/lib/audit"
 
 type Params = { params: Promise<{ id: string; moduleId: string }> }
 
@@ -19,8 +20,8 @@ export async function POST(
 
     // Check permission
     const hasAccess = await checkPermission(
-      session.user.id,
-      PermissionName.RESTORE_MODULES
+      PermissionName.RESTORE_MODULES,
+      session.user.id
     )
     if (!hasAccess) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403 })
@@ -73,6 +74,17 @@ export async function POST(
 
       return module
     })
+    
+    // Log audit
+    await logModuleAction(
+      session.user.id,
+      'restored',
+      String(mId),
+      {
+        moduleName: restoredModule.name,
+        description: restoredModule.description
+      }
+    )
 
     return NextResponse.json({
       message: "Module restored successfully",

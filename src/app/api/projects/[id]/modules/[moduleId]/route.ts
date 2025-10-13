@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission as checkPermission } from "@/lib/permissions"
 import { PermissionName } from "@prisma/client"
+import { logModuleAction } from "@/lib/audit"
 
 type Params = { params: Promise<{ id: string; moduleId: string }> }
 
@@ -58,6 +59,19 @@ export async function PATCH(req: Request, { params }: Params) {
         }
       }
       
+      // Log audit
+      await logModuleAction(
+        session.user.id,
+        'updated',
+        String(mId),
+        {
+          moduleName: updated.name,
+          description: updated.description,
+          status: updated.status,
+          changes: updateData
+        }
+      )
+      
       return NextResponse.json({ data: updatedWithCount })
     } catch (err: any) {
       if (err?.code === "P2002") {
@@ -98,8 +112,27 @@ export async function DELETE(_req: Request, { params }: Params) {
         contentCount 
       }, { status: 400 })
     }
+    
+    // Get module info before deleting
+    const module = await prisma.module.findUnique({
+      where: { id: mId as any }
+    })
 
     await prisma.module.delete({ where: { id: mId as any } })
+    
+    // Log audit
+    if (module) {
+      await logModuleAction(
+        session.user.id,
+        'hard_deleted',
+        String(mId),
+        {
+          moduleName: module.name,
+          description: module.description
+        }
+      )
+    }
+    
     return NextResponse.json({ success: true })
   } catch (e: any) {
     console.error("Error deleting module:", e)

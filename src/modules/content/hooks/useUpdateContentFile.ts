@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import httpService from "@/services/instance"
 import { toast } from "react-toastify"
 import { useEffect, useRef } from "react"
+import cachedKeys from "@/constants/cachedKeys"
 
 interface UpdateContentFilePayload {
   contentType: "FILE_ZIP_HTML" | "FILE_ZIP_SCORM"
@@ -62,8 +63,12 @@ export function useUpdateContentFile(projectId: string, moduleId: string) {
 
   const stopPolling = () => {
     if (pollingIntervalRef.current) {
+      console.log(`🛑 [UPDATE FILE POLLING] Stopping polling...`)
       clearInterval(pollingIntervalRef.current)
       pollingIntervalRef.current = null
+      console.log(`✅ [UPDATE FILE POLLING] Polling stopped successfully`)
+    } else {
+      console.log(`⚠️ [UPDATE FILE POLLING] stopPolling called but interval ref is already null`)
     }
   }
 
@@ -72,45 +77,76 @@ export function useUpdateContentFile(projectId: string, moduleId: string) {
     stopPolling()
 
     let pollCount = 0
-    const maxPolls = 60 // 2 minutes (60 * 2 seconds)
+    let hasSeenProcessing = false // Track if we've seen PROCESSING status
+    const maxPolls = 30 // 1 minutes (30 * 2 seconds)
+    const maxPollsWithoutProcessing = 10 // 20 seconds (10 * 2 seconds) - if no PROCESSING seen, assume done
+
+    console.log(`🔄 [UPDATE FILE POLLING] Started for project ${projectId}, module ${moduleId}`)
 
     // Poll every 2 seconds to check for processing status updates
     pollingIntervalRef.current = setInterval(() => {
       // Check if interval should still be running
       if (!pollingIntervalRef.current) {
+        console.log(`⚠️ [UPDATE FILE POLLING] Interval ref is null, stopping`)
         return
       }
 
       pollCount++
+      console.log(`🔄 [UPDATE FILE POLLING] Poll #${pollCount}/${maxPolls}`)
       
       // Fetch fresh data and check status
-      const queryKey = ["content", projectId, moduleId]
+      const queryKey = cachedKeys.content.list(projectId, moduleId)
+      console.log(`🔍 [UPDATE FILE POLLING] Refetching with key:`, queryKey)
+      
       queryClient.refetchQueries({ queryKey }).then(() => {
         // Double check if interval is still running before processing
         if (!pollingIntervalRef.current) {
+          console.log(`⚠️ [UPDATE FILE POLLING] Interval ref is null after refetch, stopping`)
           return
         }
 
         // Get the latest data from cache after refetch
         const data = queryClient.getQueryData(queryKey) as any
+        console.log(`📦 [UPDATE FILE POLLING] Data from cache:`, data)
         
         // Data is either an array directly OR { data: array }
         const contentArray = Array.isArray(data) ? data : data?.data
+        console.log(`📋 [UPDATE FILE POLLING] Content array:`, contentArray)
         
         if (contentArray && Array.isArray(contentArray)) {
           const processingItems = contentArray.filter((item: any) => item.status === "PROCESSING")
           const hasProcessing = processingItems.length > 0
           
-          // Stop polling if no content is processing
-          if (!hasProcessing) {
+          console.log(`📊 [UPDATE FILE POLLING] Processing items: ${processingItems.length}, hasSeenProcessing: ${hasSeenProcessing}`)
+          
+          // Track if we've seen PROCESSING
+          if (hasProcessing) {
+            hasSeenProcessing = true
+            console.log(`✅ [UPDATE FILE POLLING] Detected PROCESSING status, flag set to true`)
+          }
+          
+          // Only stop polling if we've seen PROCESSING and now there's none
+          if (hasSeenProcessing && !hasProcessing) {
+            console.log(`🎉 [UPDATE FILE POLLING] Processing complete! Stopping polling`)
             toast.success("Xử lý file hoàn tất!")
             stopPolling()
             return
           }
+          
+          // If we haven't seen PROCESSING after maxPollsWithoutProcessing, assume it's done
+          if (!hasSeenProcessing && pollCount >= maxPollsWithoutProcessing) {
+            console.log(`⚡ [UPDATE FILE POLLING] No PROCESSING status detected after ${maxPollsWithoutProcessing} polls (${maxPollsWithoutProcessing * 2}s). Assuming processing is already complete or very fast.`)
+            toast.success("Xử lý file hoàn tất!")
+            stopPolling()
+            return
+          }
+        } else {
+          console.log(`⚠️ [UPDATE FILE POLLING] No valid content array found`)
         }
         
         // Safety: stop after max polls (2 minutes)
         if (pollCount >= maxPolls) {
+          console.log(`⏱️ [UPDATE FILE POLLING] Reached max polls (${maxPolls}), stopping`)
           stopPolling()
         }
       })
@@ -120,19 +156,27 @@ export function useUpdateContentFile(projectId: string, moduleId: string) {
   return useMutation({
     mutationFn: ({ contentId, payload }: { contentId: string; payload: UpdateContentFilePayload }) =>
       updateContentFile(projectId, moduleId, contentId, payload),
-    onSuccess: () => {
+    onSuccess: async () => {
+      console.log(`🚀 [UPDATE FILE] Upload successful, starting processing...`)
       toast.success("Đang xử lý file...")
       
-      // Immediately refresh to show the updated content with PROCESSING status
-      queryClient.invalidateQueries({ 
-        queryKey: ["content", projectId, moduleId] 
+      // Invalidate and wait for refetch to complete
+      console.log(`🔄 [UPDATE FILE] Invalidating queries...`)
+      await queryClient.invalidateQueries({ 
+        queryKey: cachedKeys.content.list(projectId, moduleId) 
       })
-      queryClient.invalidateQueries({ 
-        queryKey: ["content", "stats"] 
+      await queryClient.invalidateQueries({ 
+        queryKey: cachedKeys.content.stats(projectId) 
       })
+      console.log(`✅ [UPDATE FILE] Queries invalidated`)
       
-      // Start polling to get real-time progress updates
-      startPolling()
+      // Wait a bit to ensure backend has started processing
+      console.log(`⏳ [UPDATE FILE] Waiting 1s before starting polling...`)
+      setTimeout(() => {
+        console.log(`🎬 [UPDATE FILE] Starting polling now...`)
+        // Start polling to get real-time progress updates
+        startPolling()
+      }, 1000)
     },
     onError: (error: any) => {
       console.error("Update content file error:", error)

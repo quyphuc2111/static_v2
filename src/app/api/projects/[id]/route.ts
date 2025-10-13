@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission as checkPermission } from "@/lib/permissions"
 import { PermissionName } from "@prisma/client"
+import { logProjectAction } from "@/lib/audit"
 import { promises as fs } from "fs"
 import path from "path"
 
@@ -61,6 +62,19 @@ export async function PATCH(_req: Request, { params }: Params) {
         }
       }))
     }
+    
+    // Log audit
+    await logProjectAction(
+      session.user.id,
+      'updated',
+      String(projectId),
+      {
+        projectName: updated.name,
+        description: updated.description,
+        status: updated.status,
+        changes: updateData
+      }
+    )
     
     return NextResponse.json({ data: updatedWithCount })
   } catch (e) {
@@ -149,6 +163,18 @@ export async function DELETE(_req: Request, { params }: Params) {
 
     // Xóa project (sẽ cascade xóa modules và contentData)
     await prisma.project.delete({ where: { id: projectId as any } })
+    
+    // Log audit
+    await logProjectAction(
+      session.user.id,
+      'hard_deleted',
+      String(projectId),
+      {
+        projectName: project.name,
+        deletedContentCount: project.contentData.length,
+        deletedModulesCount: project.modules.length
+      }
+    )
     
     return NextResponse.json({ success: true })
   } catch (e) {

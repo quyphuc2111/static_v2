@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission as checkPermission } from "@/lib/permissions"
 import { PermissionName } from "@prisma/client"
+import { logModuleAction } from "@/lib/audit"
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -103,6 +104,19 @@ export async function POST(req: Request, { params }: Params) {
           content: created.contentData.length
         }
       }
+      
+      // Log audit
+      await logModuleAction(
+        session.user.id,
+        'created',
+        String(created.id),
+        {
+          moduleName: created.name,
+          description: created.description,
+          status: created.status,
+          projectId: pId
+        }
+      )
       
       return NextResponse.json({ data: createdWithCount }, { status: 201 })
     } catch (err: any) {

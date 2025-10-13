@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasAnyPermission } from "@/lib/permissions"
 import { PermissionName, Prisma } from "@prisma/client"
+import { logContentAction } from "@/lib/audit"
 import { mkdir } from "fs/promises"
 import { join } from "path"
 import { existsSync } from "fs"
@@ -80,6 +81,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         } as any
       })
       created.push(content)
+    }
+    
+    // Log audit for each imported content
+    for (const item of created) {
+      await logContentAction(
+        session.user.id,
+        'imported',
+        String(item.id),
+        {
+          contentTitle: item.title,
+          source: 'import',
+          count: created.length
+        }
+      )
     }
 
     return NextResponse.json({ data: created }, { status: 201 })

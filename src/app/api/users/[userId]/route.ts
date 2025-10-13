@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission } from "@/lib/permissions"
 import { PermissionName, UserStatus } from "@prisma/client"
+import { logUserAction } from "@/lib/audit"
 
 type Params = { params: Promise<{ userId: string }> }
 
@@ -77,6 +78,17 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         },
       },
     })
+    
+    // Log audit
+    await logUserAction(
+      session.user.id,
+      'updated',
+      userId,
+      {
+        userName: updated.name,
+        changes: updateData
+      }
+    )
 
     return NextResponse.json({ data: updated })
   } catch (error: any) {
@@ -103,6 +115,12 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
     const { userId } = await params
     const numericUserId = Number(userId)
+    
+    // Get user info before deleting
+    const user = await prisma.user.findUnique({
+      where: { id: numericUserId as any },
+      select: { id: true, name: true, email: true, username: true }
+    })
 
     // Delete related records first to avoid foreign key constraint violations
     await prisma.$transaction(async (tx) => {
@@ -145,6 +163,20 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       // Finally delete the user
       await tx.user.delete({ where: { id: numericUserId as any } })
     })
+    
+    // Log audit
+    if (user) {
+      await logUserAction(
+        session.user.id,
+        'deleted',
+        userId,
+        {
+          userName: user.name,
+          email: user.email,
+          username: user.username
+        }
+      )
+    }
 
     return NextResponse.json({ message: "User deleted" })
   } catch (error) {
