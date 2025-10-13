@@ -10,6 +10,7 @@ export async function GET(
 ) {
   try {
     const { moduleId } = await params
+    const mId = Number(moduleId)
 
     // Auth and permission check
     const session = await getSession()
@@ -19,7 +20,7 @@ export async function GET(
 
     // Verify module exists
     const module = await prisma.module.findUnique({
-      where: { id: moduleId },
+      where: { id: mId as any },
       include: { project: true }
     })
 
@@ -34,12 +35,12 @@ export async function GET(
     // Get content count for this module with scope
     const count = await prisma.contentData.count({
       where: {
-        moduleId,
+        moduleId: mId as any,
         isDeleted: false,
         ...(canViewAll ? {} : {
           OR: [
-            { ownerId: session.user.id },
-            { shares: { some: { sharedWithId: session.user.id, canView: true, status: ShareStatus.ACTIVE } } }
+            { ownerId: Number(session.user.id) as any },
+            { shares: { some: { sharedWithId: Number(session.user.id) as any, canView: true, status: ShareStatus.ACTIVE } } }
           ]
         })
       }

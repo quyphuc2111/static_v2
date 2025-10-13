@@ -20,13 +20,16 @@ export async function GET(request: NextRequest, { params }: Params) {
     }
 
     const { id: projectId, moduleId, contentId } = await params
+    const pId = Number(projectId)
+    const mId = Number(moduleId)
+    const cId = Number(contentId)
 
     // Verify content exists
     const content = await prisma.contentData.findFirst({
       where: {
-        id: contentId,
-        projectId,
-        moduleId,
+        id: cId as any,
+        projectId: pId as any,
+        moduleId: mId as any,
         isDeleted: false
       }
     })
@@ -42,13 +45,13 @@ export async function GET(request: NextRequest, { params }: Params) {
     const canManageOwn = await hasPermission(PermissionName.MANAGE_OWN_CONTENT, session.user.id)
     
     // Check if user can download this specific content
-    const isOwner = content.ownerId === session.user.id
+    const isOwner = Number(content.ownerId) === Number(session.user.id)
     const canDownloadThis = isAdmin || canManageAll || canDownloadAny || (canManageOwn && isOwner)
     
     // If not owner and no general download permission, check sharing
     if (!canDownloadThis) {
       const share = await prisma.contentShare.findFirst({
-        where: { contentId: content.id, sharedWithId: session.user.id, canDownload: true, status: ShareStatus.ACTIVE }
+        where: { contentId: content.id as any, sharedWithId: Number(session.user.id) as any, canDownload: true, status: ShareStatus.ACTIVE }
       })
       if (!share) {
         return NextResponse.json({ error: "Bạn không có quyền tải xuống nội dung này" }, { status: 403 })

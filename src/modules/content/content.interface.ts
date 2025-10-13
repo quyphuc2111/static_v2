@@ -1,19 +1,14 @@
-export type ContentData = {
-  id: string
+import { SoftDeletableEntity, StatusEntity, NamedEntity, OwnedEntity } from "@/types/common"
+
+export interface ContentData extends SoftDeletableEntity, StatusEntity, NamedEntity, OwnedEntity {
   title: string
-  description?: string
   contentUrl: string
   contentType: "FILE_ZIP_HTML" | "FILE_ZIP_SCORM"
   status: "PROCESSING" | "COMPLETED" | "FAILED"
   progress: number
   fileSize?: number
-  isDeleted: boolean
   projectId: string
   moduleId: string
-  ownerId?: string
-  owner?: { id: string; name?: string | null; email: string } | null
-  createdAt: string
-  updatedAt: string
 }
 
 export type CreateContentPayload = {

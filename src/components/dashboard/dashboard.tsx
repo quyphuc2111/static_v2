@@ -11,22 +11,22 @@ export function Dashboard() {
   const { stats, isLoading } = useDashboard()
 
   return (
-    <div className="flex h-[calc(100vh-4rem)]">
+    <div className="flex min-h-[calc(100vh-4rem)]">
       {/* <Sidebar /> */}
       <div className="flex-1">
-        <div className="p-6 space-y-6">
+        <div className="space-y-4 md:space-y-6">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h2>
-            <p className="text-muted-foreground">Tổng quan hệ thống quản lý tài liệu</p>
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Dashboard</h2>
+            <p className="text-sm md:text-base text-muted-foreground">Tổng quan hệ thống quản lý tài liệu</p>
           </div>
 
           <StatsCards />
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-            <div className="col-span-4">
+          <div className="grid gap-4 md:gap-6 lg:grid-cols-7">
+            <div className="lg:col-span-4">
               <RecentActivity />
             </div>
-            <div className="col-span-3">
+            <div className="lg:col-span-3">
               <div className="grid gap-4">
                 <Card className="bg-card border-border">
                   <CardHeader>
@@ -67,7 +67,7 @@ export function Dashboard() {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-card border-border">
+                {/* <Card className="bg-card border-border">
                   <CardHeader>
                     <CardTitle className="text-foreground">Trạng thái Hệ thống</CardTitle>
                   </CardHeader>
@@ -87,7 +87,7 @@ export function Dashboard() {
                           <span className="text-sm text-green-400">Kết nối</span>
                         </div>
                       </div>
-                      {/* <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Tăng trưởng</span>
                         <div className="flex items-center gap-2">
                           <div className={`h-2 w-2 rounded-full ${
@@ -99,10 +99,10 @@ export function Dashboard() {
                             {stats?.content.growthRate || 0}%
                           </span>
                         </div>
-                      </div> */}
+                      </div>
                     </div>
                   </CardContent>
-                </Card>
+                </Card> */}
               </div>
             </div>
           </div>

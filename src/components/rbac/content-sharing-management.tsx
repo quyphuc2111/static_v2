@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useContentShares, useRemoveContentShare } from "@/modules/rbac/hooks"
-import { ShareContentDialog } from "./share-content-dialog"
+import { ShareContentDialog } from "./modal/share-content-dialog"
 import { PermissionGuard } from "./permission-guard"
 import { PermissionName } from "@prisma/client"
 
@@ -75,7 +75,7 @@ export function ContentSharingManagement() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {new Set(shares?.map(share => share.contentId) || []).size}
+              {new Set(shares?.map((share: any) => share.contentId) || []).size}
             </div>
             <p className="text-xs text-muted-foreground">Nội dung riêng biệt</p>
           </CardContent>
@@ -117,7 +117,7 @@ export function ContentSharingManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {shares.map((share) => (
+                {shares.map((share: any) => (
                   <TableRow key={share.id}>
                     <TableCell>
                       <div>
@@ -170,7 +170,7 @@ export function ContentSharingManagement() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleRemoveShare(share.contentId, share.sharedWithId)}
+                          onClick={() => handleRemoveShare(share.contentId as any, share.sharedWithId as any)}
                           className="text-red-400 hover:text-red-600"
                         >
                           <Trash2 className="h-4 w-4" />

@@ -1,3 +1,6 @@
+// Load environment variables
+require('dotenv').config()
+
 const { PrismaClient } = require('@prisma/client')
 const bcrypt = require('bcryptjs')
 
@@ -21,6 +24,7 @@ async function seedTestUsers() {
       {
         email: 'admin@example.com',
         name: 'Nguyễn Văn Admin',
+      username: 'admin',
         passwordHash: await bcrypt.hash('admin123', 10),
         status: 'ACTIVE',
         roleId: adminRole.id,
@@ -29,6 +33,7 @@ async function seedTestUsers() {
       {
         email: 'dev@example.com',
         name: 'Trần Thị Developer',
+      username: 'dev',
         passwordHash: await bcrypt.hash('dev123', 10),
         status: 'ACTIVE',
         roleId: devRole.id,
@@ -37,6 +42,7 @@ async function seedTestUsers() {
       {
         email: 'tester@example.com',
         name: 'Lê Văn Tester',
+      username: 'tester',
         passwordHash: await bcrypt.hash('tester123', 10),
         status: 'ACTIVE',
         roleId: testerRole.id,
@@ -47,7 +53,7 @@ async function seedTestUsers() {
     for (const userData of testUsers) {
       // Create user
       const user = await prisma.user.upsert({
-        where: { email: userData.email },
+        where: { username: userData.username },
         update: {
           name: userData.name,
           passwordHash: userData.passwordHash,
@@ -56,6 +62,7 @@ async function seedTestUsers() {
         create: {
           email: userData.email,
           name: userData.name,
+          username: userData.username,
           passwordHash: userData.passwordHash,
           status: userData.status
         }

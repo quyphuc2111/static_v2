@@ -11,7 +11,7 @@ export async function GET() {
     }
 
     const dbUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: Number(session.user.id) as any },
       include: {
         roles: {
           include: {
@@ -42,8 +42,8 @@ export async function GET() {
     const directPermissionObjects = dbUser.permissions.map(up => up.permission)
     const permissionMap = new Map<string, { id: string; name: any; description?: string }>()
     for (const p of [...rolePermissionObjects, ...directPermissionObjects]) {
-      if (!permissionMap.has(p.id)) {
-        permissionMap.set(p.id, { id: p.id, name: p.name, description: p.description ?? undefined })
+      if (!permissionMap.has(p.id.toString())) {
+        permissionMap.set(p.id.toString(), { id: p.id.toString(), name: p.name, description: p.description ?? undefined })
       }
     }
 
@@ -57,10 +57,8 @@ export async function GET() {
       roles,
       permissions,
     }
-
-    const csrfToken = await getOrCreateCsrfToken()
-
-    return NextResponse.json({ user: me, csrfToken })
+    
+    return NextResponse.json({ user: me })
   } catch (e) {
     console.error("/api/auth/me error:", e)
     return NextResponse.json({ message: "Server error" }, { status: 500 })

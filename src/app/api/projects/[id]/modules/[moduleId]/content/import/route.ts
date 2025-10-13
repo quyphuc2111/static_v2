@@ -17,6 +17,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { id: projectId, moduleId } = await params
+    const pId = Number(projectId)
+    const mId = Number(moduleId)
 
     const canCreate = await hasAnyPermission([
       PermissionName.EDIT_CONTENT,
@@ -30,8 +32,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "No items to import" }, { status: 400 })
     }
 
-    const project = await prisma.project.findUnique({ where: { id: projectId } })
-    const module = await prisma.module.findUnique({ where: { id: moduleId } })
+    const project = await prisma.project.findUnique({ where: { id: pId as any } })
+    const module = await prisma.module.findUnique({ where: { id: mId as any } })
     if (!project || !module) return NextResponse.json({ error: "Project or Module not found" }, { status: 404 })
 
     const created: any[] = []
@@ -72,9 +74,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           contentUrl: relativePath,
           status: 'PROCESSING' as any,
           progress: 0,
-          projectId,
-          moduleId,
-          ownerId: session.user.id,
+          projectId: pId as any,
+          moduleId: mId as any,
+          ownerId: Number(session.user.id) as any,
         } as any
       })
       created.push(content)

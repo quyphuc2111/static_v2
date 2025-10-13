@@ -18,7 +18,7 @@ import { useModules } from "@/modules/project/hooks/useModules"
 import { useCreateModule } from "@/modules/project/hooks/useCreateModule"
 import { useUpdateModule } from "@/modules/project/hooks/useUpdateModule"
 import { useDeleteModule } from "@/modules/project/hooks/useDeleteModule"
-import { Project as ProjectType } from "@/modules/project/project.service"
+import type { Project as ProjectType } from "@/modules/project/project.interface"
 
 interface Module {
   id: string

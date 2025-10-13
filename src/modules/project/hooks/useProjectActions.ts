@@ -1,9 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-
-interface ProjectActionResponse {
-  message: string
-  data?: any
-}
+import { softDeleteProject, hardDeleteProject, restoreProject } from "../project.service"
+import cachedKeys from "@/constants/cachedKeys"
 
 /**
  * Hook for soft deleting a project
@@ -12,23 +9,9 @@ export function useSoftDeleteProject() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (projectId: string): Promise<ProjectActionResponse> => {
-      const response = await fetch(`/api/projects/${projectId}/soft-delete`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || "Failed to soft delete project")
-      }
-
-      return response.json()
-    },
+    mutationFn: softDeleteProject,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] })
+      queryClient.invalidateQueries({ queryKey: ["projects", "list"] })
     },
   })
 }
@@ -40,23 +23,9 @@ export function useHardDeleteProject() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (projectId: string): Promise<ProjectActionResponse> => {
-      const response = await fetch(`/api/projects/${projectId}/hard-delete`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || "Failed to hard delete project")
-      }
-
-      return response.json()
-    },
+    mutationFn: hardDeleteProject,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] })
+      queryClient.invalidateQueries({ queryKey: ["projects", "list"] })
     },
   })
 }
@@ -68,23 +37,9 @@ export function useRestoreProject() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (projectId: string): Promise<ProjectActionResponse> => {
-      const response = await fetch(`/api/projects/${projectId}/restore`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || "Failed to restore project")
-      }
-
-      return response.json()
-    },
+    mutationFn: restoreProject,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] })
+      queryClient.invalidateQueries({ queryKey: ["projects", "list"] })
     },
   })
 }

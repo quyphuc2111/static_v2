@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import httpService from "@/services/instance"
-import cachedKeys from "@/constants/cachedKeys"
 import { toast } from "react-toastify"
+import { useEffect, useRef } from "react"
 
 interface UpdateContentFilePayload {
   contentType: "FILE_ZIP_HTML" | "FILE_ZIP_SCORM"
@@ -49,57 +49,90 @@ async function updateContentFile(
 
 export function useUpdateContentFile(projectId: string, moduleId: string) {
   const queryClient = useQueryClient()
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Function to poll for completion
-  const startPollingForCompletion = () => {
-    const pollInterval = setInterval(async () => {
-      try {
-        // Refetch content data to check for completion
-        await queryClient.refetchQueries({
-          queryKey: cachedKeys.content.list(projectId, moduleId)
-        })
-        
-        // Check if there are any processing items
-        const contentData = queryClient.getQueryData(cachedKeys.content.list(projectId, moduleId)) as any[]
-        const hasProcessing = contentData?.some((item: any) => item.status === "PROCESSING")
-        
-        if (!hasProcessing) {
-          // No more processing items, stop polling
-          clearInterval(pollInterval)
-        }
-      } catch (error) {
-        console.error("Error polling for completion:", error)
-        clearInterval(pollInterval)
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
       }
-    }, 2000) // Poll every 2 seconds
-    
-    // Stop polling after 5 minutes to prevent infinite polling
-    setTimeout(() => {
-      clearInterval(pollInterval)
-    }, 5 * 60 * 1000)
+    }
+  }, [])
+
+  const stopPolling = () => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current)
+      pollingIntervalRef.current = null
+    }
+  }
+
+  const startPolling = () => {
+    // Clear any existing interval
+    stopPolling()
+
+    let pollCount = 0
+    const maxPolls = 60 // 2 minutes (60 * 2 seconds)
+
+    // Poll every 2 seconds to check for processing status updates
+    pollingIntervalRef.current = setInterval(() => {
+      // Check if interval should still be running
+      if (!pollingIntervalRef.current) {
+        return
+      }
+
+      pollCount++
+      
+      // Fetch fresh data and check status
+      const queryKey = ["content", projectId, moduleId]
+      queryClient.refetchQueries({ queryKey }).then(() => {
+        // Double check if interval is still running before processing
+        if (!pollingIntervalRef.current) {
+          return
+        }
+
+        // Get the latest data from cache after refetch
+        const data = queryClient.getQueryData(queryKey) as any
+        
+        // Data is either an array directly OR { data: array }
+        const contentArray = Array.isArray(data) ? data : data?.data
+        
+        if (contentArray && Array.isArray(contentArray)) {
+          const processingItems = contentArray.filter((item: any) => item.status === "PROCESSING")
+          const hasProcessing = processingItems.length > 0
+          
+          // Stop polling if no content is processing
+          if (!hasProcessing) {
+            toast.success("Xử lý file hoàn tất!")
+            stopPolling()
+            return
+          }
+        }
+        
+        // Safety: stop after max polls (2 minutes)
+        if (pollCount >= maxPolls) {
+          stopPolling()
+        }
+      })
+    }, 2000)
   }
 
   return useMutation({
     mutationFn: ({ contentId, payload }: { contentId: string; payload: UpdateContentFilePayload }) =>
       updateContentFile(projectId, moduleId, contentId, payload),
     onSuccess: () => {
-      // Invalidate and refetch content data immediately
+      toast.success("Đang xử lý file...")
+      
+      // Immediately refresh to show the updated content with PROCESSING status
       queryClient.invalidateQueries({ 
-        queryKey: cachedKeys.content.list(projectId, moduleId) 
+        queryKey: ["content", projectId, moduleId] 
       })
       queryClient.invalidateQueries({ 
-        queryKey: cachedKeys.content.stats(projectId) 
+        queryKey: ["content", "stats"] 
       })
       
-      // Force refetch to get updated data
-      queryClient.refetchQueries({
-        queryKey: cachedKeys.content.list(projectId, moduleId)
-      })
-      
-      // Since API now updates status to COMPLETED immediately, no need for polling
-      // startPollingForCompletion()
-      
-      toast.success("Cập nhật file thành công!")
+      // Start polling to get real-time progress updates
+      startPolling()
     },
     onError: (error: any) => {
       console.error("Update content file error:", error)
@@ -116,6 +149,8 @@ export function useUpdateContentFile(projectId: string, moduleId: string) {
         message = "Bị cấm truy cập"
       } else if (error?.response?.status === 404) {
         message = "Không tìm thấy tài liệu"
+      } else if (error?.response?.status === 409) {
+        message = error?.response?.data?.error || "Tiêu đề đã tồn tại"
       } else if (error?.message) {
         // Check if it's a validation error from our new logic
         if (error.message.includes("File ZIP không chứa file HTML")) {

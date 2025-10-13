@@ -19,10 +19,11 @@ export async function POST(
     }
 
     const { id: roleId } = await params
+    const numericRoleId = Number(roleId)
 
     // Get current role
     const currentRole = await prisma.role.findUnique({
-      where: { id: roleId }
+      where: { id: numericRoleId as any }
     })
 
     if (!currentRole) {
@@ -38,7 +39,7 @@ export async function POST(
 
     // Toggle status
     const updatedRole = await prisma.role.update({
-      where: { id: roleId },
+      where: { id: numericRoleId as any },
       data: {
         isActive: !currentRole.isActive
       }

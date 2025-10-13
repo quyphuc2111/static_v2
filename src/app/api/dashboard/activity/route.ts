@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 
     // Get user's role to determine data scope
     const userRoles = await prisma.userRole.findMany({
-      where: { userId: session.user.id },
+      where: { userId: Number(session.user.id) as any },
       include: { role: true }
     })
 
@@ -33,8 +33,8 @@ export async function GET(req: NextRequest) {
     let contentWhereClause: any = { isDeleted: false }
     if (!isAdmin && !canManageAll) {
       contentWhereClause.OR = [
-        { ownerId: session.user.id },
-        { shares: { some: { sharedWithId: session.user.id, canView: true, status: 'ACTIVE' } } }
+        { ownerId: Number(session.user.id) as any },
+        { shares: { some: { sharedWithId: Number(session.user.id) as any, canView: true, status: 'ACTIVE' } } }
       ]
     }
 
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
     const recentActivities = await prisma.auditLog.findMany({
       where: {
         OR: [
-          { actorId: session.user.id }, // User's own actions
+          { actorId: Number(session.user.id) as any }, // User's own actions
           ...(isAdmin || canManageAll ? [{}] : []) // Admin can see all
         ]
       },

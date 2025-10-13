@@ -21,6 +21,7 @@ export async function PATCH(
     }
 
     const { shareId } = await params
+    const numericShareId = Number(shareId)
     const body = await req.json()
     const { canView, canEdit, canDelete, canDownload } = body
 
@@ -34,9 +35,9 @@ export async function PATCH(
 
     const share = await prisma.contentShare.findFirst({
       where: {
-        id: shareId,
+        id: numericShareId as any,
         status: 'ACTIVE',
-        ...(isAdmin || canManageAll ? {} : { sharedById: session.user.id })
+        ...(isAdmin || canManageAll ? {} : { sharedById: Number(session.user.id) as any })
       }
     })
 
@@ -46,7 +47,7 @@ export async function PATCH(
 
     // Update share permissions
     const updatedShare = await prisma.contentShare.update({
-      where: { id: shareId },
+      where: { id: numericShareId as any },
         data: {
           canView,
           canEdit,

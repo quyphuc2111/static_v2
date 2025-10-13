@@ -37,7 +37,7 @@ export async function createRole(payload: CreateRolePayload): Promise<Role> {
   return res.data
 }
 
-export async function updateRole(roleId: string, payload: Partial<CreateRolePayload>): Promise<Role> {
+export async function updateRole(roleId: number, payload: Partial<CreateRolePayload>): Promise<Role> {
   const res = await httpService.patch<{ data: Role }>({ 
     url: `${RBAC_API_URL.ROLES}/${roleId}`,
     data: payload
@@ -45,20 +45,20 @@ export async function updateRole(roleId: string, payload: Partial<CreateRolePayl
   return res.data
 }
 
-export async function deleteRole(roleId: string): Promise<void> {
+export async function deleteRole(roleId: number): Promise<void> {
   return httpService.delete({ 
     url: `${RBAC_API_URL.ROLES}/${roleId}`
   })
 }
 
-export async function cloneRole(roleId: string): Promise<Role> {
+export async function cloneRole(roleId: number): Promise<Role> {
   const res = await httpService.post<{ data: Role }>({ 
     url: `${RBAC_API_URL.ROLES}/${roleId}/clone`
   })
   return res.data
 }
 
-export async function toggleRoleStatus(roleId: string): Promise<Role> {
+export async function toggleRoleStatus(roleId: number): Promise<Role> {
   const res = await httpService.post<{ data: Role }>({ 
     url: `${RBAC_API_URL.ROLES}/${roleId}/toggle`
   })
@@ -72,31 +72,31 @@ export async function getPermissions(): Promise<Permission[]> {
   return res.data
 }
 
-export async function getUserRoles(userId: string): Promise<UserRole[]> {
+export async function getUserRoles(userId: number): Promise<UserRole[]> {
   const res = await httpService.get<{ data: UserRole[] }>({ 
-    url: RBAC_API_URL.USER_ROLES(userId)
+    url: RBAC_API_URL.USER_ROLES(userId.toString())
   })
   return res.data
 }
 
 export async function assignRoleToUser(payload: AssignRolePayload): Promise<UserRole> {
   const res = await httpService.post<{ data: UserRole }>({ 
-    url: RBAC_API_URL.USER_ROLES(payload.userId),
+    url: RBAC_API_URL.USER_ROLES(payload.userId.toString()),
     data: { roleId: payload.roleId }
   })
   return res.data
 }
 
-export async function removeRoleFromUser(userId: string, roleId: string): Promise<void> {
+export async function removeRoleFromUser(userId: number, roleId: number): Promise<void> {
   return httpService.delete({ 
-    url: `${RBAC_API_URL.USER_ROLES(userId)}?roleId=${roleId}`
+    url: `${RBAC_API_URL.USER_ROLES(userId.toString())}?roleId=${roleId}`
   })
 }
 
-export async function getContentShares(userId?: string, contentId?: string): Promise<ContentShare[]> {
+export async function getContentShares(userId?: number, contentId?: number): Promise<ContentShare[]> {
   const params = new URLSearchParams()
-  if (userId) params.append('userId', userId)
-  if (contentId) params.append('contentId', contentId)
+  if (userId) params.append('userId', userId.toString())
+  if (contentId) params.append('contentId', contentId.toString())
   
   const res = await httpService.get<{ data: ContentShare[] }>({ 
     url: `${RBAC_API_URL.CONTENT_SHARING}?${params.toString()}`
@@ -112,7 +112,7 @@ export async function shareContent(payload: ShareContentPayload): Promise<Conten
   return res.data
 }
 
-export async function removeContentShare(contentId: string, sharedWithId: string): Promise<void> {
+export async function removeContentShare(contentId: number, sharedWithId: number): Promise<void> {
   return httpService.delete({ 
     url: `${RBAC_API_URL.CONTENT_SHARING}?contentId=${contentId}&sharedWithId=${sharedWithId}`
   })
@@ -126,14 +126,14 @@ export async function bulkShareContent(payload: BulkSharePayload): Promise<{ cou
   return res.data
 }
 
-export async function revokeContentShare(shareId?: string, batchId?: string): Promise<void> {
+export async function revokeContentShare(shareId?: number, batchId?: number): Promise<void> {
   return httpService.patch({ 
     url: `${RBAC_API_URL.CONTENT_SHARING}/revoke`,
     data: { shareId, batchId }
   })
 }
 
-export async function updateContentShare(shareId: string, canView: boolean, canDownload: boolean, canEdit: boolean, canDelete: boolean): Promise<ContentShare> {
+export async function updateContentShare(shareId: number, canView: boolean, canDownload: boolean, canEdit: boolean, canDelete: boolean): Promise<ContentShare> {
   const res = await httpService.patch<{ data: ContentShare }>({ 
     url: `${RBAC_API_URL.CONTENT_SHARING}/${shareId}`,
     data: { canView, canDownload, canEdit, canDelete }
@@ -141,11 +141,16 @@ export async function updateContentShare(shareId: string, canView: boolean, canD
   return res.data
 }
 
-export async function getUsers(): Promise<UserWithRoles[]> {
-  const res = await httpService.get<{ data: UserWithRoles[] }>({ 
-    url: "users"
+export async function getUsers(params?: { page?: number; pageSize?: number; search?: string }): Promise<{ data: UserWithRoles[]; pagination: { total: number; page: number; pageSize: number; totalPages: number } }> {
+  const sp = new URLSearchParams()
+  if (params?.page) sp.set('page', String(params.page))
+  if (params?.pageSize) sp.set('pageSize', String(params.pageSize))
+  if (params?.search) sp.set('search', params.search)
+  const q = sp.toString()
+  const res = await httpService.get<{ data: UserWithRoles[]; pagination: { total: number; page: number; pageSize: number; totalPages: number } }>({ 
+    url: q ? `users?${q}` : "users"
   })
-  return res.data
+  return res
 }
 
 export async function createUser(payload: CreateUserPayload): Promise<{ data: UserWithRoles; tempPassword?: string }> {
@@ -157,7 +162,7 @@ export async function createUser(payload: CreateUserPayload): Promise<{ data: Us
   return res
 }
 
-export async function updateUser(userId: string, payload: UpdateUserPayload): Promise<UserWithRoles> {
+export async function updateUser(userId: number, payload: UpdateUserPayload): Promise<UserWithRoles> {
   const res = await httpService.patch<{ data: UserWithRoles }>({
     url: `users/${userId}`,
     data: payload,
@@ -165,18 +170,18 @@ export async function updateUser(userId: string, payload: UpdateUserPayload): Pr
   return res.data
 }
 
-export async function deleteUser(userId: string): Promise<void> {
+export async function deleteUser(userId: number): Promise<void> {
   await httpService.delete({ url: `users/${userId}` })
 }
 
-export async function toggleUserStatus(userId: string): Promise<UserWithRoles> {
+export async function toggleUserStatus(userId: number): Promise<UserWithRoles> {
   const res = await httpService.patch<{ data: UserWithRoles }>({
     url: `users/${userId}/toggle-status`,
   })
   return res.data
 }
 
-export async function resetUserPassword(userId: string, newPassword: string): Promise<UserWithRoles> {
+export async function resetUserPassword(userId: number, newPassword: string): Promise<UserWithRoles> {
   const res = await httpService.patch<{ data: UserWithRoles }>({
     url: `users/${userId}/reset-password`,
     data: { newPassword },

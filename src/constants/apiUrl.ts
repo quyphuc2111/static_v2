@@ -13,6 +13,13 @@ export const PROJECTS_API_URL = {
     BY_ID: (id: string) => `projects/${id}`,
     MODULES: (id: string) => `projects/${id}/modules`,
     MODULE_BY_ID: (projectId: string, moduleId: string) => `projects/${projectId}/modules/${moduleId}`,
+    SOFT_DELETE: (id: string) => `projects/${id}/soft-delete`,
+    HARD_DELETE: (id: string) => `projects/${id}/hard-delete`,
+    RESTORE: (id: string) => `projects/${id}/restore`,
+    MODULE_SOFT_DELETE: (projectId: string, moduleId: string) => `projects/${projectId}/modules/${moduleId}/soft-delete`,
+    MODULE_HARD_DELETE: (projectId: string, moduleId: string) => `projects/${projectId}/modules/${moduleId}/hard-delete`,
+    MODULE_RESTORE: (projectId: string, moduleId: string) => `projects/${projectId}/modules/${moduleId}/restore`,
+    MODULE_CONTENT_COUNT: (moduleId: string) => `projects/modules/${moduleId}/content/count`,
 }
 
 export const CONTENT_API_URL = {

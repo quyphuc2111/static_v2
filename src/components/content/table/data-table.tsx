@@ -21,6 +21,8 @@ import { ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Tr
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ContentContextMenu } from "./context-menu"
 import { ContentItem } from "./columns"
+import { ScrollArea } from "@radix-ui/react-scroll-area"
+import { ScrollBar } from "@/components/ui/scroll-area"
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -153,17 +155,17 @@ export function DataTable<TData, TValue>({
   return (
     <div className={`space-y-4 ${className}`}>
       {/* Search and Filters */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-4 sm:px-6 pt-4">
+        <div className="flex items-center space-x-2 w-full sm:w-auto">
           {searchKey && (
-            <div className="relative">
+            <div className="relative w-full sm:w-auto">
               <Input
                 placeholder={searchPlaceholder}
                 value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
                 onChange={(event) =>
                   table.getColumn(searchKey)?.setFilterValue(event.target.value)
                 }
-                className="max-w-sm"
+                className="w-full sm:max-w-sm"
               />
             </div>
           )}
@@ -171,7 +173,7 @@ export function DataTable<TData, TValue>({
         {showColumnVisibility && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="ml-auto">
+              <Button variant="outline" className="ml-auto w-full sm:w-auto">
                 Cột <ChevronDown className="ml-2 h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -200,18 +202,19 @@ export function DataTable<TData, TValue>({
 
       {/* Bulk Actions */}
       {showSelection && bulkActions && selectedItems.length > 0 && (
-        <div className="flex items-center justify-between bg-muted/50 p-3 rounded-lg border">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-muted/50 p-3 rounded-lg border mx-4 sm:mx-6">
           <div className="flex items-center space-x-2">
             <span className="text-sm font-medium">
               {selectedItems.length} mục đã chọn
             </span>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <Button
               variant="destructive"
               size="sm"
               onClick={() => bulkActions.onBulkDelete?.(selectedItems)}
               disabled={bulkActions.isBulkDeleting}
+              className="w-full sm:w-auto"
             >
               <Trash2 className="mr-2 h-4 w-4" />
               {bulkActions.isBulkDeleting ? "Đang xóa..." : `Xóa ${selectedItems.length} mục`}
@@ -220,6 +223,7 @@ export function DataTable<TData, TValue>({
               variant="outline"
               size="sm"
               onClick={() => table.toggleAllPageRowsSelected(false)}
+              className="w-full sm:w-auto"
             >
               Bỏ chọn tất cả
             </Button>
@@ -228,8 +232,7 @@ export function DataTable<TData, TValue>({
       )}
 
       {/* Table */}
-      <div className="rounded-md border overflow-x-auto">
-        <div className="min-w-full">
+      <div className="w-full overflow-x-auto">
           <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -325,18 +328,17 @@ export function DataTable<TData, TValue>({
           </TableBody>
         </Table>
         </div>
-      </div>
 
       {/* Pagination */}
       {showPagination && (
-        <div className="flex items-center justify-between space-x-2 py-4">
-          <div className="flex-1 text-sm text-muted-foreground">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between px-4 sm:px-6 py-4 border-t">
+          <div className="text-sm text-muted-foreground text-center sm:text-left">
             Hiển thị {table.getFilteredRowModel().rows.length} trong tổng số{" "}
             {data.length} mục.
           </div>
-          <div className="flex items-center space-x-6 lg:space-x-8">
-            <div className="flex items-center space-x-2">
-              <p className="text-sm font-medium">Hàng mỗi trang</p>
+          <div className="flex flex-col sm:flex-row items-center gap-4 sm:space-x-6 lg:space-x-8">
+            <div className="flex items-center space-x-2 w-full sm:w-auto justify-center">
+              <p className="text-sm font-medium whitespace-nowrap">Hàng mỗi trang</p>
               <select
                 value={table.getState().pagination.pageSize}
                 onChange={(e) => {
@@ -351,47 +353,49 @@ export function DataTable<TData, TValue>({
                 ))}
               </select>
             </div>
-            <div className="flex w-[100px] items-center justify-center text-sm font-medium">
-              Trang {table.getState().pagination.pageIndex + 1} /{" "}
-              {table.getPageCount()}
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                className="hidden h-8 w-8 p-0 lg:flex"
-                onClick={() => table.setPageIndex(0)}
-                disabled={!table.getCanPreviousPage()}
-              >
-                <span className="sr-only">Đi đến trang đầu</span>
-                <ChevronsLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                className="h-8 w-8 p-0"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-              >
-                <span className="sr-only">Trang trước</span>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                className="h-8 w-8 p-0"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-              >
-                <span className="sr-only">Trang tiếp</span>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                className="hidden h-8 w-8 p-0 lg:flex"
-                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                disabled={!table.getCanNextPage()}
-              >
-                <span className="sr-only">Đi đến trang cuối</span>
-                <ChevronsRight className="h-4 w-4" />
-              </Button>
+            <div className="flex items-center justify-center gap-4">
+              <div className="flex items-center justify-center text-sm font-medium whitespace-nowrap">
+                Trang {table.getState().pagination.pageIndex + 1} /{" "}
+                {table.getPageCount()}
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  className="hidden h-8 w-8 p-0 lg:flex"
+                  onClick={() => table.setPageIndex(0)}
+                  disabled={!table.getCanPreviousPage()}
+                >
+                  <span className="sr-only">Đi đến trang đầu</span>
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-8 w-8 p-0"
+                  onClick={() => table.previousPage()}
+                  disabled={!table.getCanPreviousPage()}
+                >
+                  <span className="sr-only">Trang trước</span>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-8 w-8 p-0"
+                  onClick={() => table.nextPage()}
+                  disabled={!table.getCanNextPage()}
+                >
+                  <span className="sr-only">Trang tiếp</span>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  className="hidden h-8 w-8 p-0 lg:flex"
+                  onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                  disabled={!table.getCanNextPage()}
+                >
+                  <span className="sr-only">Đi đến trang cuối</span>
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </div>

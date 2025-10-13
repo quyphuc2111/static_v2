@@ -27,10 +27,11 @@ export async function POST(
     }
 
     const { moduleId } = params
+    const mId = Number(moduleId)
 
     // Check if module exists and not already deleted
     const module = await prisma.module.findUnique({
-      where: { id: moduleId },
+      where: { id: mId as any },
     })
 
     if (!module) {
@@ -48,7 +49,7 @@ export async function POST(
     const updatedModule = await prisma.$transaction(async (tx) => {
       // Soft delete the module
       const module = await tx.module.update({
-        where: { id: moduleId },
+        where: { id: mId as any },
         data: {
           isDeleted: true,
           deletedAt: new Date(),
@@ -60,7 +61,7 @@ export async function POST(
       // Soft delete all content in this module
       await tx.contentData.updateMany({
         where: { 
-          moduleId: moduleId,
+          moduleId: mId as any,
           isDeleted: false 
         },
         data: {

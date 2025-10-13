@@ -18,10 +18,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
 
     const { userId } = await params
+    const numericUserId = Number(userId)
 
     // Get current user
     const user = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: numericUserId as any },
       select: { status: true }
     })
 
@@ -33,7 +34,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const newStatus = user.status === UserStatus.ACTIVE ? UserStatus.DISABLED : UserStatus.ACTIVE
 
     const updated = await prisma.user.update({
-      where: { id: userId },
+      where: { id: numericUserId as any },
       data: { status: newStatus },
       select: {
         id: true,

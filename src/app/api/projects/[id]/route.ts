@@ -10,6 +10,7 @@ type Params = { params: Promise<{ id: string }> }
 
 export async function PATCH(_req: Request, { params }: Params) {
   const { id } = await params
+  const projectId = Number(id)
   try {
     const session = await getSession()
     if (!session.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
@@ -28,7 +29,7 @@ export async function PATCH(_req: Request, { params }: Params) {
     if (status !== undefined) updateData.status = status
     
     const updated = await prisma.project.update({ 
-      where: { id }, 
+      where: { id: projectId as any }, 
       data: updateData,
       include: { modules: true }
     })
@@ -40,6 +41,7 @@ export async function PATCH(_req: Request, { params }: Params) {
 
 export async function DELETE(_req: Request, { params }: Params) {
   const { id } = await params
+  const projectId = Number(id)
   try {
     const session = await getSession()
     if (!session.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
@@ -49,7 +51,7 @@ export async function DELETE(_req: Request, { params }: Params) {
 
     // Lấy thông tin project và tất cả content trước khi xóa
     const project = await prisma.project.findUnique({
-      where: { id },
+      where: { id: projectId as any },
       include: {
         contentData: true,
         modules: {
@@ -117,7 +119,7 @@ export async function DELETE(_req: Request, { params }: Params) {
     }
 
     // Xóa project (sẽ cascade xóa modules và contentData)
-    await prisma.project.delete({ where: { id } })
+    await prisma.project.delete({ where: { id: projectId as any } })
     
     return NextResponse.json({ success: true })
   } catch (e) {

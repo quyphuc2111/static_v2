@@ -17,7 +17,29 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403 })
     }
 
+    const { searchParams } = new URL(req.url)
+    const pageParam = Number(searchParams.get('page') || '1')
+    const pageSizeParam = Number(searchParams.get('pageSize') || '10')
+    const search = (searchParams.get('search') || '').trim()
+
+    const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1
+    const pageSizeRaw = Number.isFinite(pageSizeParam) && pageSizeParam > 0 ? pageSizeParam : 20
+    const pageSize = Math.min(pageSizeRaw, 100)
+    const skip = (page - 1) * pageSize
+
+    const where: any = {}
+    if (search) {
+      where.OR = [
+        { username: { contains: search } },
+        { name: { contains: search } },
+        { email: { contains: search } },
+      ]
+    }
+
+    const total = await prisma.user.count({ where })
+
     const users = await prisma.user.findMany({
+      where,
       select: {
         id: true,
         username: true,
@@ -40,12 +62,23 @@ export async function GET(req: NextRequest) {
           }
         }
       },
-      orderBy: {
-        createdAt: 'desc'
-      }
+      orderBy: [
+        { createdAt: 'desc' },
+        { id: 'desc' }
+      ],
+      skip,
+      take: pageSize,
     })
 
-    return NextResponse.json({ data: users })
+    return NextResponse.json({ 
+      data: users,
+      pagination: {
+        total,
+        page,
+        pageSize,
+        totalPages: Math.max(1, Math.ceil(total / pageSize))
+      }
+    })
   } catch (error) {
     console.error("Error fetching users:", error)
     return NextResponse.json(
@@ -67,14 +100,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}))
-    const { username, name, email, status, roleId, password } = body as { 
-      username?: string; 
-      name?: string; 
-      email?: string; 
-      status?: UserStatus; 
-      roleId?: string; 
-      password?: string 
-    }
+    const { username, name, email, status, roleId, password } = body
 
     if (!username) {
       return NextResponse.json({ message: "Username is required" }, { status: 400 })

@@ -25,7 +25,7 @@ export function useUpdateRole() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ roleId, payload }: { roleId: string; payload: Partial<CreateRolePayload> }) => 
+    mutationFn: ({ roleId, payload }: { roleId: number; payload: Partial<CreateRolePayload> }) => 
       updateRole(roleId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: cachedKeys.rbac.roles })
@@ -37,7 +37,7 @@ export function useCloneRole() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (roleId: string) => cloneRole(roleId),
+    mutationFn: (roleId: number) => cloneRole(roleId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: cachedKeys.rbac.roles })
     },
@@ -48,7 +48,7 @@ export function useToggleRoleStatus() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (roleId: string) => toggleRoleStatus(roleId),
+    mutationFn: (roleId: number) => toggleRoleStatus(roleId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: cachedKeys.rbac.roles })
     },
@@ -59,7 +59,7 @@ export function useDeleteRole() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (roleId: string) => deleteRole(roleId),
+    mutationFn: (roleId: number) => deleteRole(roleId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: cachedKeys.rbac.roles })
     },

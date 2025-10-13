@@ -12,10 +12,10 @@ export async function createAuditLog(data: AuditLogData) {
   try {
     await prisma.auditLog.create({
       data: {
-        actorId: data.actorId,
+        actorId: data.actorId as any,
         action: data.action,
         entityType: data.entityType,
-        entityId: data.entityId,
+        entityId: data.entityId as any,
         metadata: data.metadata || {}
       }
     })

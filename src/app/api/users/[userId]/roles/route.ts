@@ -22,10 +22,11 @@ export async function GET(req: NextRequest, { params }: Params) {
     }
 
     const { userId } = await params
+    const numericUserId = Number(userId)
 
     const userRoles = await prisma.userRole.findMany({
       where: {
-        userId
+        userId: numericUserId as any
       },
       include: {
         role: {
@@ -63,7 +64,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     const { userId } = await params
+    const numericUserId = Number(userId)
     const { roleId } = await req.json()
+    const numericRoleId = roleId != null ? Number(roleId) : undefined
 
     if (!roleId) {
       return NextResponse.json({ message: "Role ID is required" }, { status: 400 })
@@ -73,8 +76,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     const existingRole = await prisma.userRole.findUnique({
       where: {
         userId_roleId: {
-          userId,
-          roleId
+          userId: numericUserId as any,
+          roleId: numericRoleId as any
         }
       }
     })
@@ -85,8 +88,8 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const userRole = await prisma.userRole.create({
       data: {
-        userId,
-        roleId
+        userId: numericUserId as any,
+        roleId: numericRoleId as any
       },
       include: {
         role: {
@@ -124,8 +127,10 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     }
 
     const { userId } = await params
+    const numericUserId = Number(userId)
     const { searchParams } = new URL(req.url)
     const roleId = searchParams.get('roleId')
+    const numericRoleId = roleId != null ? Number(roleId) : undefined
 
     if (!roleId) {
       return NextResponse.json({ message: "Role ID is required" }, { status: 400 })
@@ -134,8 +139,8 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     await prisma.userRole.delete({
       where: {
         userId_roleId: {
-          userId,
-          roleId
+          userId: numericUserId as any,
+          roleId: numericRoleId as any
         }
       }
     })

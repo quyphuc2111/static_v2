@@ -18,6 +18,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
 
     const { userId } = await params
+    const numericUserId = Number(userId)
     const body = await req.json().catch(() => ({}))
     const { username, name, email, status, password, roleId } = body as { 
       username?: string;
@@ -25,7 +26,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       email?: string; 
       status?: UserStatus;
       password?: string;
-      roleId?: string;
+      roleId?: number;
     }
 
     // Prepare update data - only include fields that are provided
@@ -46,20 +47,20 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (roleId) {
       // First, remove all existing roles for this user
       await prisma.userRole.deleteMany({
-        where: { userId }
+        where: { userId: numericUserId }
       })
       
       // Then add the new role
       await prisma.userRole.create({
         data: {
-          userId,
-          roleId
+          userId: numericUserId,
+          roleId: roleId
         }
       })
     }
 
     const updated = await prisma.user.update({
-      where: { id: userId },
+      where: { id: numericUserId as any },
       data: updateData,
       select: {
         id: true,
@@ -101,25 +102,26 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     }
 
     const { userId } = await params
+    const numericUserId = Number(userId)
 
     // Delete related records first to avoid foreign key constraint violations
     await prisma.$transaction(async (tx) => {
       // Delete user roles
       await tx.userRole.deleteMany({
-        where: { userId }
+        where: { userId: numericUserId as any }
       })
 
       // Delete user permissions
       await tx.userPermission.deleteMany({
-        where: { userId }
+        where: { userId: numericUserId as any }
       })
 
       // Delete content shares where user is sharedBy or sharedWith
       await tx.contentShare.deleteMany({
         where: {
           OR: [
-            { sharedById: userId },
-            { sharedWithId: userId }
+            { sharedById: numericUserId as any },
+            { sharedWithId: numericUserId as any }
           ]
         }
       })
@@ -128,20 +130,20 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       await tx.shareBatch.deleteMany({
         where: {
           OR: [
-            { sharedById: userId },
-            { sharedWithId: userId }
+            { sharedById: numericUserId as any },
+            { sharedWithId: numericUserId as any }
           ]
         }
       })
 
       // Update content ownership to null (set ownerId to null)
       await tx.contentData.updateMany({
-        where: { ownerId: userId },
+        where: { ownerId: numericUserId as any },
         data: { ownerId: null }
       })
 
       // Finally delete the user
-      await tx.user.delete({ where: { id: userId } })
+      await tx.user.delete({ where: { id: numericUserId as any } })
     })
 
     return NextResponse.json({ message: "User deleted" })

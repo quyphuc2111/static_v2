@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { RevokeShareDialog } from "./modal/revoke-share-dialog"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
@@ -31,13 +32,13 @@ export function UserContentSharing() {
   const revokeShareMut = useRevokeContentShare()
   const { data: userContent, isLoading: contentLoading } = useUserOwnedContent(sourceUser)
 
-  const sourceUserData = useMemo(() => (users || []).find((u: any) => u.id === sourceUser), [users, sourceUser])
-  const targetUserData = useMemo(() => (users || []).find((u: any) => u.id === targetUser), [users, targetUser])
+  const sourceUserData = useMemo(() => (users?.data || []).find((u: any) => u.id === sourceUser), [users, sourceUser])
+  const targetUserData = useMemo(() => (users?.data || []).find((u: any) => u.id === targetUser), [users, targetUser])
 
   const handleRevoke = () => {
     if (!revokeShareId) return
     revokeShareMut.mutate(
-      { shareId: revokeShareId },
+      { shareId: parseInt(revokeShareId) },
       {
         onSuccess: () => {
           toast.success("Đã thu hồi chia sẻ thành công")
@@ -79,8 +80,8 @@ export function UserContentSharing() {
     const canDownload = false
 
     const payload = shareAll 
-      ? { ownerId: sourceUser, sharedWithId: targetUser, canView, canEdit, canDelete, canDownload }
-      : { contentIds: selectedContentIds, sharedWithId: targetUser, canView, canEdit, canDelete, canDownload }
+      ? { ownerId: parseInt(sourceUser), sharedWithId: parseInt(targetUser), canView, canEdit, canDelete, canDownload }
+      : { contentIds: selectedContentIds.map(id => parseInt(id)), sharedWithId: parseInt(targetUser), canView, canEdit, canDelete, canDownload }
 
     bulkShareMut.mutate(payload, {
       onSuccess: (res: any) => {
@@ -125,8 +126,8 @@ export function UserContentSharing() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-3">
+    <div className="space-y-4 md:space-y-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Tổng Chia sẻ</CardTitle>
@@ -163,10 +164,10 @@ export function UserContentSharing() {
 
       <Card className="bg-card border-border">
         <CardHeader>
-          <CardTitle className="text-foreground">Chia sẻ Nội dung giữa Người dùng</CardTitle>
+          <CardTitle className="text-foreground text-lg sm:text-xl">Chia sẻ Nội dung giữa Người dùng</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-3">
+        <CardContent className="space-y-4 md:space-y-6">
+          <div className="grid gap-4 md:gap-6 lg:grid-cols-3">
             <div className="space-y-2">
               <Label className="text-foreground">Người dùng nguồn</Label>
               <Select value={sourceUser} onValueChange={setSourceUser}>
@@ -174,7 +175,7 @@ export function UserContentSharing() {
                   <SelectValue placeholder="Chọn người dùng" />
                 </SelectTrigger>
                 <SelectContent className="max-h-[300px]">
-                  {(users || []).map((user: any) => (
+                  {(users?.data || []).map((user: any) => (
                     <SelectItem key={user.id} value={user.id}>
                       <div className="flex flex-col gap-0.5">
                         <span className="font-medium">{user.name || user.username}</span>
@@ -189,7 +190,7 @@ export function UserContentSharing() {
               </Select>
             </div>
 
-            <div className="flex items-end justify-center">
+            <div className="hidden lg:flex items-end justify-center">
               <ArrowRight className="h-8 w-8 text-primary" />
             </div>
 
@@ -200,7 +201,7 @@ export function UserContentSharing() {
                   <SelectValue placeholder="Chọn người dùng" />
                 </SelectTrigger>
                 <SelectContent className="max-h-[300px]">
-                  {(users || [])
+                  {(users?.data || [])
                     .filter((u: any) => u.id !== sourceUser)
                     .map((user: any) => (
                       <SelectItem key={user.id} value={user.id}>
@@ -219,35 +220,33 @@ export function UserContentSharing() {
           </div>
 
           {sourceUser && targetUser && (
-            <div className="space-y-4 p-4 border border-border rounded-lg bg-muted/20">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <Avatar className="h-12 w-12">
-                    <AvatarFallback className="bg-primary text-primary-foreground">
+            <div className="space-y-4 p-3 md:p-4 border border-border rounded-lg bg-muted/20">
+              <div className="flex flex-col lg:flex-row items-center lg:justify-between gap-4">
+                <div className="flex items-center gap-3 w-full lg:w-auto">
+                  <Avatar className="h-10 w-10 sm:h-12 sm:w-12">
+                    <AvatarFallback className="bg-primary text-primary-foreground text-sm">
                       {(sourceUserData?.name || sourceUserData?.email || "").charAt(0)}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
-                    <p className="font-medium text-foreground">{sourceUserData?.name || sourceUserData?.username}</p>
-                    <p className="text-xs text-muted-foreground">
+                  <div className="flex-1 lg:flex-initial">
+                    <p className="font-medium text-foreground text-sm sm:text-base">{sourceUserData?.name || sourceUserData?.username}</p>
+                    <p className="text-xs text-muted-foreground truncate">
                       @{sourceUserData?.username}
-                      {sourceUserData?.email && ` · ${sourceUserData?.email}`}
                     </p>
                   </div>
                 </div>
 
-                <ArrowRight className="h-6 w-6 text-primary" />
+                <ArrowRight className="h-5 w-5 lg:h-6 lg:w-6 text-primary flex-shrink-0" />
 
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <p className="font-medium text-foreground">{targetUserData?.name || targetUserData?.username}</p>
-                    <p className="text-xs text-muted-foreground">
+                <div className="flex items-center gap-3 w-full lg:w-auto">
+                  <div className="flex-1 lg:flex-initial lg:text-right">
+                    <p className="font-medium text-foreground text-sm sm:text-base">{targetUserData?.name || targetUserData?.username}</p>
+                    <p className="text-xs text-muted-foreground truncate">
                       @{targetUserData?.username}
-                      {targetUserData?.email && ` · ${targetUserData?.email}`}
                     </p>
                   </div>
-                  <Avatar className="h-12 w-12">
-                    <AvatarFallback className="bg-primary text-primary-foreground">
+                  <Avatar className="h-10 w-10 sm:h-12 sm:w-12">
+                    <AvatarFallback className="bg-primary text-primary-foreground text-sm">
                       {(targetUserData?.name || targetUserData?.email || "").charAt(0)}
                     </AvatarFallback>
                   </Avatar>
@@ -373,147 +372,30 @@ export function UserContentSharing() {
                   <Button
                     onClick={handleShare}
                     disabled={!sourceUser || !targetUser || usersLoading || bulkShareMut.isPending || (!shareAll && selectedContentIds.length === 0)}
-                    className="bg-primary hover:bg-primary/90"
+                    className="bg-primary hover:bg-primary/90 w-full sm:w-auto"
                   >
                     <UserCheck className="mr-2 h-4 w-4" />
-                    {bulkShareMut.isPending ? "Đang chia sẻ..." : (
-                      shareAll ? "Chia sẻ toàn bộ" : `Chia sẻ ${selectedContentIds.length} nội dung`
-                    )}
+                    <span className="text-sm">
+                      {bulkShareMut.isPending ? "Đang chia sẻ..." : (
+                        shareAll ? "Chia sẻ toàn bộ" : `Chia sẻ ${selectedContentIds.length} nội dung`
+                      )}
+                    </span>
                   </Button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Existing Shares Section */}
-          {/* {(sourceUser || targetUser) && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium text-foreground">Chia sẻ hiện tại</h3>
-              {sourceUser && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-muted-foreground">
-                    Nội dung {sourceUserData?.name || sourceUserData?.username} đã chia sẻ cho người khác
-                  </h4>
-                  {getUserSharesAsSharer(sourceUser).length === 0 ? (
-                    <div className="text-sm text-muted-foreground text-center py-4 border border-dashed border-border rounded-lg">
-                      Chưa chia sẻ nội dung nào
-                    </div>
-                  ) : (
-                    getUserSharesAsSharer(sourceUser).map((share: any) => {
-                      const recipient = (users || []).find((u: any) => u.id === share.sharedWithId)
-                      return (
-                        <div key={share.id} className="flex items-center justify-between p-3 border border-border rounded-lg bg-muted/20">
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <Avatar className="h-8 w-8">
-                              <AvatarFallback className="bg-green-600 text-white text-xs">
-                                {(recipient?.name || recipient?.username || "").charAt(0).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-foreground">
-                                Chia sẻ cho: {recipient?.name || recipient?.username}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                @{recipient?.username} · {share.content?.title || "Nội dung"} · 
-                                {share.canEdit ? " Chỉnh sửa" : " Chỉ xem"}
-                              </p>
-                            </div>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setRevokeShareId(share.id)
-                              setShowRevokeDialog(true)
-                            }}
-                            className="text-destructive hover:text-destructive flex-shrink-0"
-                          >
-                            <UserMinus className="h-4 w-4 mr-1" />
-                            Thu hồi
-                          </Button>
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
-              )}
-              
-              {targetUser && targetUser !== sourceUser && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-muted-foreground">
-                    Nội dung được chia sẻ cho {targetUserData?.name || targetUserData?.username}
-                  </h4>
-                  {getUserSharesAsRecipient(targetUser).length === 0 ? (
-                    <div className="text-sm text-muted-foreground text-center py-4 border border-dashed border-border rounded-lg">
-                      Chưa nhận chia sẻ nào
-                    </div>
-                  ) : (
-                    getUserSharesAsRecipient(targetUser).map((share: any) => {
-                      const sharer = (users || []).find((u: any) => u.id === share.sharedById)
-                      return (
-                        <div key={share.id} className="flex items-center justify-between p-3 border border-border rounded-lg bg-muted/20">
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <Avatar className="h-8 w-8">
-                              <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                                {(sharer?.name || sharer?.username || "").charAt(0).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-foreground">
-                                Từ: {sharer?.name || sharer?.username}
-                              </p>
-                              <p className="text-xs text-muted-foreground truncate">
-                                @{sharer?.username} · {share.content?.title || "Nội dung"} · 
-                                {share.canEdit ? " Chỉnh sửa" : " Chỉ xem"}
-                              </p>
-                            </div>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setRevokeShareId(share.id)
-                              setShowRevokeDialog(true)
-                            }}
-                            className="text-destructive hover:text-destructive flex-shrink-0"
-                          >
-                            <UserMinus className="h-4 w-4 mr-1" />
-                            Thu hồi
-                          </Button>
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
-              )}
-            </div>
-          )} */}
+       
         </CardContent>
       </Card>
 
-      {/* Revoke Confirmation Dialog */}
-      <Dialog open={showRevokeDialog} onOpenChange={setShowRevokeDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Xác nhận thu hồi chia sẻ</DialogTitle>
-            <DialogDescription>
-              Bạn có chắc chắn muốn thu hồi quyền chia sẻ này không? Hành động này không thể hoàn tác.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRevokeDialog(false)}>
-              Hủy
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleRevoke}
-              disabled={revokeShareMut.isPending}
-            >
-              {revokeShareMut.isPending ? "Đang thu hồi..." : "Thu hồi"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <RevokeShareDialog
+        open={showRevokeDialog}
+        onOpenChange={setShowRevokeDialog}
+        onConfirm={handleRevoke}
+        isPending={revokeShareMut.isPending}
+      />
     </div>
   )
 }

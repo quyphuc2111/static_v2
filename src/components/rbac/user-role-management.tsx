@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Search, MoreHorizontal, UserCog, Shield, History, Mail } from "lucide-react"
 import { useUsers, useRoles } from "@/modules/rbac/hooks"
-import { AssignRoleDialog } from "./assign-role-dialog"
+import { AssignRoleDialog } from "./modal/assign-role-dialog"
 
 // Mock role history data - in real app this would come from API
 const roleHistory = [
@@ -64,10 +64,12 @@ export function UserRoleManagement() {
   const [isChangeRoleDialogOpen, setIsChangeRoleDialogOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<any>(null)
 
-  const { data: users, isLoading: usersLoading } = useUsers()
+  const { data: usersResponse, isLoading: usersLoading } = useUsers()
   const { data: roles, isLoading: rolesLoading } = useRoles()
 
-  const filteredUsers = users?.filter((user) => {
+  const users = usersResponse?.data || []
+
+  const filteredUsers = users.filter((user: any) => {
     const matchesSearch =
       (user.name?.toLowerCase().includes(searchQuery.toLowerCase()) || false) ||
       (user.username?.toLowerCase().includes(searchQuery.toLowerCase()) || false) ||
@@ -75,7 +77,7 @@ export function UserRoleManagement() {
     const matchesRole = filterRole === "all" || 
       (user.roles?.some((userRole: any) => userRole.role?.name === filterRole) || false)
     return matchesSearch && matchesRole
-  }) || []
+  })
 
   const handleChangeRole = (user: any) => {
     setSelectedUser(user)
@@ -106,52 +108,51 @@ export function UserRoleManagement() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4 flex-1">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Tìm kiếm người dùng..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8"
-            />
-          </div>
-          <Select value={filterRole} onValueChange={setFilterRole}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Lọc theo vai trò" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tất cả vai trò</SelectItem>
-              {roles?.map((role) => (
-                <SelectItem key={role.id} value={role.name}>
-                  {role.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 md:gap-4">
+        <div className="relative flex-1 max-w-full sm:max-w-md">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Tìm kiếm người dùng..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-8"
+          />
         </div>
+        <Select value={filterRole} onValueChange={setFilterRole}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Lọc theo vai trò" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tất cả vai trò</SelectItem>
+            {roles?.map((role) => (
+              <SelectItem key={role.id} value={role.name}>
+                {role.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Danh sách người dùng</CardTitle>
-          <CardDescription>Quản lý vai trò và quyền hạn của từng người dùng</CardDescription>
+          <CardTitle className="text-lg sm:text-xl">Danh sách người dùng</CardTitle>
+          <CardDescription className="text-sm">Quản lý vai trò và quyền hạn của từng người dùng</CardDescription>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Người dùng</TableHead>
-                {/* <TableHead>Phòng ban</TableHead> */}
-                <TableHead>Vai trò</TableHead>
-                <TableHead>Ngày gán</TableHead>
-                <TableHead>Đăng nhập cuối</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead className="w-12"></TableHead>
-              </TableRow>
-            </TableHeader>
+        <CardContent className="overflow-x-auto">
+          <div className="table-scroll-container">
+            <Table className="min-w-[800px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Người dùng</TableHead>
+                  {/* <TableHead>Phòng ban</TableHead> */}
+                  <TableHead>Vai trò</TableHead>
+                  <TableHead>Ngày gán</TableHead>
+                  <TableHead>Đăng nhập cuối</TableHead>
+                  <TableHead>Trạng thái</TableHead>
+                  <TableHead className="w-12"></TableHead>
+                </TableRow>
+              </TableHeader>
             <TableBody>
               {filteredUsers.map((user) => (
                 <TableRow key={user.id}>
@@ -223,35 +224,36 @@ export function UserRoleManagement() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Lịch sử thay đổi vai trò</CardTitle>
-          <CardDescription>Theo dõi các thay đổi vai trò gần đây</CardDescription>
+          <CardTitle className="text-lg sm:text-xl">Lịch sử thay đổi vai trò</CardTitle>
+          <CardDescription className="text-sm">Theo dõi các thay đổi vai trò gần đây</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-3 md:space-y-4">
             {roleHistory.map((history) => (
-              <div key={history.id} className="flex items-center justify-between p-4 rounded-lg border">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{history.user}</span>
-                    <span className="text-muted-foreground">•</span>
-                    <span className="text-sm text-muted-foreground">{history.action}</span>
+              <div key={history.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 md:p-4 rounded-lg border">
+                <div className="space-y-1 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-sm sm:text-base">{history.user}</span>
+                    <span className="text-muted-foreground hidden sm:inline">•</span>
+                    <span className="text-xs sm:text-sm text-muted-foreground">{history.action}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm">
+                  <div className="flex items-center gap-2 text-sm flex-wrap">
                     {history.from !== "-" && (
                       <>
-                        <Badge variant="outline">{history.from}</Badge>
-                        <span>→</span>
+                        <Badge variant="outline" className="text-xs">{history.from}</Badge>
+                        <span className="text-xs">→</span>
                       </>
                     )}
-                    <Badge variant="secondary">{history.to}</Badge>
+                    <Badge variant="secondary" className="text-xs">{history.to}</Badge>
                   </div>
                 </div>
-                <div className="text-right text-sm text-muted-foreground">
+                <div className="text-left sm:text-right text-xs sm:text-sm text-muted-foreground space-y-0.5">
                   <div>Bởi {history.by}</div>
                   <div>{history.date}</div>
                 </div>
@@ -262,10 +264,10 @@ export function UserRoleManagement() {
       </Card>
 
       <Dialog open={isChangeRoleDialogOpen} onOpenChange={setIsChangeRoleDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Thay đổi vai trò</DialogTitle>
-            <DialogDescription>Thay đổi vai trò cho người dùng {selectedUser?.name || selectedUser?.email}</DialogDescription>
+            <DialogTitle className="text-lg">Thay đổi vai trò</DialogTitle>
+            <DialogDescription className="text-sm">Thay đổi vai trò cho người dùng {selectedUser?.name || selectedUser?.email}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">

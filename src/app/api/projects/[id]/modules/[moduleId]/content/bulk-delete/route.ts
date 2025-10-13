@@ -19,17 +19,20 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     const { contentIds } = await req.json()
+    const numericIds = Array.isArray(contentIds) ? contentIds.map((v: any) => Number(v)) : []
     
     if (!Array.isArray(contentIds) || contentIds.length === 0) {
       return NextResponse.json({ message: "Content IDs are required" }, { status: 400 })
     }
 
     const { id: projectId, moduleId } = await params
+    const pId = Number(projectId)
+    const mId = Number(moduleId)
 
     // Verify project exists
     const project = await prisma.project.findUnique({
       where: {
-        id: projectId
+        id: pId as any
       }
     })
 
@@ -39,8 +42,8 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const module = await prisma.module.findFirst({
       where: {
-        id: moduleId,
-        projectId: projectId
+        id: mId as any,
+        projectId: pId as any
       }
     })
 
@@ -51,8 +54,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     // Verify all content items exist and belong to the module
     const existingContent = await prisma.contentData.findMany({
       where: {
-        id: { in: contentIds },
-        moduleId: moduleId
+        id: { in: numericIds as any },
+        moduleId: mId as any
       },
       select: { id: true, title: true }
     })
@@ -76,11 +79,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!canHardDelete) {
       const unauthorized = await prisma.contentData.findMany({
         where: {
-          id: { in: contentIds },
-          moduleId: moduleId,
+          id: { in: numericIds as any },
+          moduleId: mId as any,
           NOT: [
-            { ownerId: session.user.id },
-            { shares: { some: { sharedWithId: session.user.id, canDelete: true } } }
+            { ownerId: Number(session.user.id) as any },
+            { shares: { some: { sharedWithId: Number(session.user.id) as any, canDelete: true } } }
           ]
         },
         select: { id: true }
@@ -96,8 +99,8 @@ export async function POST(req: NextRequest, { params }: Params) {
         // Admin: hard delete DB records
         const deleteResult = await tx.contentData.deleteMany({
           where: {
-            id: { in: contentIds },
-            moduleId: moduleId
+            id: { in: numericIds as any },
+            moduleId: mId as any
           }
         })
         return deleteResult
@@ -105,8 +108,8 @@ export async function POST(req: NextRequest, { params }: Params) {
         // Non-admin: soft delete only
         const updateResult = await tx.contentData.updateMany({
           where: {
-            id: { in: contentIds },
-            moduleId: moduleId
+            id: { in: numericIds as any },
+            moduleId: mId as any
           },
           data: { 
             isDeleted: true,

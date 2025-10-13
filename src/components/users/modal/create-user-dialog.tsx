@@ -69,7 +69,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
       email: formData.email || undefined,
       password: formData.password || undefined,
       // status implicit ACTIVE; if needed, add toggle in UI
-      roleId: formData.role || undefined,
+      roleId: formData.role ? parseInt(formData.role) : undefined,
     })
     
     console.log("API Response:", result)
@@ -107,16 +107,16 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
   return (
     <>
       <Dialog open={open} onOpenChange={(v) => { if (!v) setShowPasswordDialog(false); onOpenChange(v) }}>
-        <DialogContent className="sm:max-w-[500px] bg-card border-border">
+        <DialogContent className="max-w-[95vw] sm:max-w-[800px] max-h-[90vh] sm:max-h-[80vh] overflow-y-auto bg-card border-border">
           <DialogHeader>
-            <DialogTitle className="text-foreground">Thêm Người dùng Mới</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
+            <DialogTitle className="text-foreground text-lg sm:text-xl">Thêm Người dùng Mới</DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
               Tạo tài khoản mới và phân quyền cho người dùng
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="username" className="text-foreground">
                 Tên đăng nhập <span className="text-red-400">*</span>
@@ -181,9 +181,9 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-foreground">
+              <Label htmlFor="name" className="text-foreground text-sm sm:text-base">
                 Họ và tên
               </Label>
               <div className="relative">
@@ -227,7 +227,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                 </SelectTrigger>
                 <SelectContent className="max-h-[300px]">
                   {(roles || []).map((role) => (
-                    <SelectItem key={role.id} value={role.id}>
+                    <SelectItem key={role.id} value={role.id.toString()}>
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{role.name}</span>
                         {role.description && (
@@ -265,11 +265,11 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
             </div>
           </div> */}
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
                 Hủy
               </Button>
-              <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={create.isPending}>
+              <Button type="submit" className="bg-primary hover:bg-primary/90 w-full sm:w-auto" disabled={create.isPending}>
                 Tạo Người dùng
               </Button>
             </DialogFooter>
@@ -279,10 +279,10 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
       
       {/* Password Dialog */}
       <Dialog open={showPasswordDialog} onOpenChange={(v) => { setShowPasswordDialog(v); if (!v) onOpenChange(false) }}>
-      <DialogContent className="sm:max-w-[460px] bg-card border-border">
+      <DialogContent className="max-w-[95vw] sm:max-w-[460px] bg-card border-border">
         <DialogHeader>
-          <DialogTitle className="text-foreground">Copy thông tin tài khoản mới</DialogTitle>
-          <DialogDescription className="text-muted-foreground">
+          <DialogTitle className="text-foreground text-lg sm:text-xl">Copy thông tin tài khoản mới</DialogTitle>
+          <DialogDescription className="text-muted-foreground text-sm">
             {formData.password ? 
               "Hãy copy thông tin tài khoản mới." : 
               "Hãy copy thông tin tài khoản mới."
@@ -290,32 +290,21 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          {/* <div>
-            <Label className="text-foreground">Email</Label>
-            <div className="mt-2 flex items-center gap-2">
-              <Input readOnly value={createdUserEmail} className="font-mono" />
-              <Button type="button" variant="outline" onClick={() => navigator.clipboard.writeText(createdUserEmail)}>Sao chép</Button>
-            </div>
-          </div> */}
-          
-          {/* <div>
-            <Label className="text-foreground">
-              {formData.password ? "Mật khẩu đã nhập" : "Mật khẩu tạm thời"}
-            </Label>
-            <div className="mt-2 flex items-center gap-2">
-              <Input readOnly value={generatedPassword} className="font-mono" />
-              <Button type="button" variant="outline" onClick={() => navigator.clipboard.writeText(generatedPassword)}>Sao chép</Button>
-            </div>
-          </div> */}
-          
           <div>
-            <Label className="text-foreground">Username | Password (để copy)</Label>
-            <div className="mt-2 flex items-center gap-2">
-              <Input readOnly value={`${createdUserEmail} | ${generatedPassword}`} className="font-mono" />
-              <Button type="button" variant="outline" onClick={() => {
-                navigator.clipboard.writeText(`${createdUserEmail} | ${generatedPassword}`)
-                toast.success("Đã copy thông tin tài khoản mới")
-              }}>Sao chép</Button>
+            <Label className="text-foreground text-sm sm:text-base">Username | Password (để copy)</Label>
+            <div className="mt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <Input readOnly value={`${createdUserEmail} | ${generatedPassword}`} className="font-mono text-xs sm:text-sm" />
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  navigator.clipboard.writeText(`${createdUserEmail} | ${generatedPassword}`)
+                  toast.success("Đã copy thông tin tài khoản mới")
+                }}
+                className="w-full sm:w-auto flex-shrink-0"
+              >
+                Sao chép
+              </Button>
             </div>
           </div>
           
@@ -327,8 +316,8 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
             }
           </p>
         </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => { setShowPasswordDialog(false); onOpenChange(false) }}>Đóng</Button>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button type="button" variant="outline" onClick={() => { setShowPasswordDialog(false); onOpenChange(false) }} className="w-full sm:w-auto">Đóng</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

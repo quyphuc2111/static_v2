@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -13,7 +13,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio",
-    "prisma:seed": "node prisma/seed.js"
+    "prisma:seed": "node scripts/seed-rbac.js && node scripts/seed-test-users.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.906.0",
@@ -62,6 +62,7 @@
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
     "date-fns": "4.1.0",
+    "dotenv": "^17.2.3",
     "embla-carousel-react": "8.5.1",
     "framer-motion": "^11.18.2",
     "geist": "^1.5.1",
@@ -74,6 +75,7 @@
     "lucide-react": "^0.544.0",
     "next": "15.5.4",
     "next-themes": "^0.4.6",
+    "nuqs": "^2.7.1",
     "pipwerks-scorm-api-wrapper": "^0.1.2",
     "react": "^19",
     "react-day-picker": "9.8.0",

@@ -17,13 +17,16 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     }
 
     const { id: projectId, moduleId, contentId } = await params
+    const pId = Number(projectId)
+    const mId = Number(moduleId)
+    const cId = Number(contentId)
 
     // Check if content exists
     const content = await prisma.contentData.findFirst({
       where: {
-        id: contentId,
-        projectId,
-        moduleId
+        id: cId as any,
+        projectId: pId as any,
+        moduleId: mId as any
       }
     })
 
@@ -41,7 +44,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
     // Check ownership for non-admin users
     if (!isAdmin) {
-      const isOwner = content.ownerId === session.user.id
+      const isOwner = Number(content.ownerId) === Number(session.user.id)
       if (!isOwner) {
         return NextResponse.json({ error: "Bạn chỉ có thể xóa vĩnh viễn nội dung của chính mình" }, { status: 403 })
       }
@@ -49,7 +52,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
     // Hard delete the content
     await prisma.contentData.delete({
-      where: { id: contentId }
+      where: { id: cId as any }
     })
 
     // Also remove physical files
@@ -63,7 +66,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     }
 
     // Log audit action
-    await logContentAction(session.user.id, 'hard_deleted', contentId, {
+    await logContentAction(session.user.id, 'hard_deleted', cId as any, {
       contentTitle: content.title,
       contentType: content.contentType,
       projectId: content.projectId,

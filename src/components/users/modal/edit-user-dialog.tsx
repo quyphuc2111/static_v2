@@ -52,7 +52,7 @@ export function EditUserDialog({ open, onOpenChange, user }: EditUserDialogProps
         username: user.username || "",
         name: user.name || "",
         email: user.email || "",
-        role: user.roles?.[0]?.role?.id || "",
+        role: user.roles?.[0]?.role?.id.toString() || "",
         password: "",
       })
     }
@@ -70,11 +70,10 @@ export function EditUserDialog({ open, onOpenChange, user }: EditUserDialogProps
     try {
       await update.mutateAsync({
         id: user.id,
-        // Don't send username - it's not editable
         name: formData.name || undefined,
         email: formData.email || undefined,
         password: formData.password || undefined,
-        roleId: formData.role || undefined,
+        roleId: formData.role ? parseInt(formData.role) : undefined,
       })
       
       toast.success("Cập nhật người dùng thành công!")
@@ -103,16 +102,16 @@ export function EditUserDialog({ open, onOpenChange, user }: EditUserDialogProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] bg-card border-border">
+      <DialogContent className="max-w-[95vw] sm:max-w-[800px] max-h-[90vh] sm:max-h-[80vh] overflow-y-auto bg-card border-border">
         <DialogHeader>
-          <DialogTitle className="text-foreground">Chỉnh sửa Người dùng</DialogTitle>
-          <DialogDescription className="text-muted-foreground">
+          <DialogTitle className="text-foreground text-lg sm:text-xl">Chỉnh sửa Người dùng</DialogTitle>
+          <DialogDescription className="text-muted-foreground text-sm">
             Cập nhật thông tin và quyền của người dùng
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="username" className="text-foreground">
                 Tên đăng nhập
@@ -177,7 +176,7 @@ export function EditUserDialog({ open, onOpenChange, user }: EditUserDialogProps
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name" className="text-foreground">
                 Họ và tên
@@ -223,7 +222,7 @@ export function EditUserDialog({ open, onOpenChange, user }: EditUserDialogProps
                 </SelectTrigger>
                 <SelectContent className="max-h-[300px]">
                   {(roles || []).map((role) => (
-                    <SelectItem key={role.id} value={role.id}>
+                    <SelectItem key={role.id} value={role.id.toString()}>
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{role.name}</span>
                         {role.description && (
@@ -237,11 +236,11 @@ export function EditUserDialog({ open, onOpenChange, user }: EditUserDialogProps
             </div>
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
               Hủy
             </Button>
-            <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={update.isPending}>
+            <Button type="submit" className="bg-primary hover:bg-primary/90 w-full sm:w-auto" disabled={update.isPending}>
               {update.isPending ? "Đang cập nhật..." : "Cập nhật"}
             </Button>
           </DialogFooter>

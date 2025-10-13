@@ -1,27 +1,36 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { useCreateRole, usePermissions } from "@/modules/rbac/hooks"
+import { useUpdateRole, usePermissions } from "@/modules/rbac/hooks"
 import { toast } from "react-toastify"
 
-interface CreateRoleDialogProps {
+interface EditRoleDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  role: any
 }
 
-export function CreateRoleDialog({ open, onOpenChange }: CreateRoleDialogProps) {
+export function EditRoleDialog({ open, onOpenChange, role }: EditRoleDialogProps) {
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
 
   const { data: permissions, isLoading: permissionsLoading } = usePermissions()
-  const createRoleMut = useCreateRole()
+  const updateRoleMut = useUpdateRole()
+
+  useEffect(() => {
+    if (role) {
+      setName(role.name || "")
+      setDescription(role.description || "")
+      setSelectedPermissions(role.permissions?.map((rp: any) => rp.permissionId) || [])
+    }
+  }, [role])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -36,22 +45,22 @@ export function CreateRoleDialog({ open, onOpenChange }: CreateRoleDialogProps) 
       return
     }
 
-    createRoleMut.mutate(
+    updateRoleMut.mutate(
       {
-        name: name.trim(),
-        description: description.trim() || undefined,
-        permissionIds: selectedPermissions,
+        roleId: role.id,
+        payload: {
+          name: name.trim(),
+          description: description.trim() || undefined,
+          permissionIds: selectedPermissions.map(id => Number(id) as any),
+        },
       },
       {
         onSuccess: () => {
-          toast.success("Tạo vai trò thành công")
+          toast.success("Cập nhật vai trò thành công")
           onOpenChange(false)
-          setName("")
-          setDescription("")
-          setSelectedPermissions([])
         },
         onError: (error: any) => {
-          toast.error(error.message || "Tạo vai trò thất bại")
+          toast.error(error.message || "Cập nhật vai trò thất bại")
         },
       }
     )
@@ -74,11 +83,13 @@ export function CreateRoleDialog({ open, onOpenChange }: CreateRoleDialogProps) 
     return acc
   }, {} as Record<string, any[]>)
 
+  if (!role) return null
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="!max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Tạo Vai trò Mới</DialogTitle>
+          <DialogTitle>Chỉnh sửa Vai trò</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -118,7 +129,7 @@ export function CreateRoleDialog({ open, onOpenChange }: CreateRoleDialogProps) 
                       {category}
                     </h4>
                     <div className="grid grid-cols-1 gap-2">
-                      {perms.map((permission) => (
+                      {perms.map((permission: any) => (
                         <div key={permission.id} className="flex items-center space-x-2">
                           <Checkbox
                             id={permission.id}
@@ -153,9 +164,9 @@ export function CreateRoleDialog({ open, onOpenChange }: CreateRoleDialogProps) 
             </Button>
             <Button 
               type="submit" 
-              disabled={createRoleMut.isPending || !name.trim() || selectedPermissions.length === 0}
+              disabled={updateRoleMut.isPending || !name.trim() || selectedPermissions.length === 0}
             >
-              {createRoleMut.isPending ? "Đang tạo..." : "Tạo vai trò"}
+              {updateRoleMut.isPending ? "Đang cập nhật..." : "Cập nhật vai trò"}
             </Button>
           </DialogFooter>
         </form>

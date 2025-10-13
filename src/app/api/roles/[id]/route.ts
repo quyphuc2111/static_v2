@@ -20,6 +20,7 @@ export async function PATCH(
 
     const { name, description, permissionIds, isActive } = await req.json()
     const { id: roleId } = await params
+    const numericRoleId = Number(roleId)
 
     if (!name) {
       return NextResponse.json({ message: "Name is required" }, { status: 400 })
@@ -28,7 +29,7 @@ export async function PATCH(
     const role = await prisma.$transaction(async (tx) => {
       // Update role
       const updatedRole = await tx.role.update({
-        where: { id: roleId },
+        where: { id: numericRoleId as any },
         data: {
           name,
           description,
@@ -40,15 +41,15 @@ export async function PATCH(
       if (permissionIds && Array.isArray(permissionIds)) {
         // Remove existing permissions
         await tx.rolePermission.deleteMany({
-          where: { roleId }
+          where: { roleId: numericRoleId as any }
         })
 
         // Add new permissions
         if (permissionIds.length > 0) {
           await tx.rolePermission.createMany({
             data: permissionIds.map((permissionId: string) => ({
-              roleId,
-              permissionId
+              roleId: numericRoleId as any,
+              permissionId: Number(permissionId) as any
             }))
           })
         }
@@ -83,10 +84,11 @@ export async function DELETE(
     }
 
     const { id: roleId } = await params
+    const numericRoleId = Number(roleId)
 
     // Check if role is being used by any users
     const usersWithRole = await prisma.userRole.findFirst({
-      where: { roleId }
+      where: { roleId: numericRoleId as any }
     })
 
     if (usersWithRole) {
@@ -100,12 +102,12 @@ export async function DELETE(
     await prisma.$transaction(async (tx) => {
       // Delete role permissions
       await tx.rolePermission.deleteMany({
-        where: { roleId }
+        where: { roleId: numericRoleId as any }
       })
 
       // Delete role
       await tx.role.delete({
-        where: { id: roleId }
+        where: { id: numericRoleId as any }
       })
     })
 

@@ -72,7 +72,13 @@ export function ActionButtons({ project, onDelete }: ActionButtonsProps) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8" data-testid={`project-row-actions-${project.id}`}>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8" 
+            data-testid={`project-row-actions-${project.id}`}
+            onClick={(e) => e.stopPropagation()}
+          >
             <MoreVertical className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>

@@ -43,7 +43,7 @@ export async function POST(req: Request) {
 
     const session = await getSession()
     session.user = {
-      id: user.id,
+      id: user.id as any,
       username: user.username,
       email: user.email,
       name: user.name,

@@ -22,7 +22,7 @@ export function canManageContent(ctx: AuthContext, ownerId?: string): boolean {
   if (ctx.user.status !== UserStatus.ACTIVE) return false
   if (hasPermission(ctx, PermissionName.MANAGE_ALL_CONTENT)) return true
   // User can manage own content
-  return hasPermission(ctx, PermissionName.MANAGE_OWN_CONTENT) && ownerId === ctx.user.id
+  return hasPermission(ctx, PermissionName.MANAGE_OWN_CONTENT) && ownerId === ctx.user.id.toString()
 }
 
 export function canViewOthersContent(ctx: AuthContext): boolean {

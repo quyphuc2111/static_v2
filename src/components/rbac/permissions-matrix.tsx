@@ -1,15 +1,21 @@
 "use client"
 
-import React, { useState, useMemo, useEffect } from "react"
+import React, { useState, useMemo, useEffect, useRef } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Shield, Users, Lock, Crown, Star, Briefcase, Zap, Award, Target, Gem, Heart, Hash, Search, ChevronRight, Check, Loader2 } from "lucide-react"
+import { Shield, Users, Lock, Crown, Star, Briefcase, Zap, Award, Target, Gem, Heart, Hash, Search, ChevronRight, Check, Loader2, ChevronRight as SwipeIcon } from "lucide-react"
 import { useRoles, usePermissions } from "@/modules/rbac/hooks"
 
 export function PermissionsMatrix() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [searchTerm, setSearchTerm] = useState("")
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
+  const [showScrollHint, setShowScrollHint] = useState(true)
+  const [canScroll, setCanScroll] = useState(false)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  const { data: roles, isLoading: rolesLoading } = useRoles()
+  const { data: permissions, isLoading: permissionsLoading } = usePermissions()
 
   // Debounce search term
   useEffect(() => {
@@ -22,8 +28,34 @@ export function PermissionsMatrix() {
     }
   }, [searchTerm])
 
-  const { data: roles, isLoading: rolesLoading } = useRoles()
-  const { data: permissions, isLoading: permissionsLoading } = usePermissions()
+  // Check if table can scroll
+  useEffect(() => {
+    const checkScroll = () => {
+      if (scrollContainerRef.current) {
+        const { scrollWidth, clientWidth } = scrollContainerRef.current
+        const canScrollNow = scrollWidth > clientWidth
+        setCanScroll(canScrollNow)
+      }
+    }
+
+    checkScroll()
+    window.addEventListener("resize", checkScroll)
+    return () => window.removeEventListener("resize", checkScroll)
+  }, [roles])
+
+  // Hide hint after 5 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowScrollHint(false)
+    }, 5000)
+
+    return () => clearTimeout(timer)
+  }, [])
+
+  const handleScroll = () => {
+    setShowScrollHint(false)
+  }
+
 
   // Color palette for roles
   const colorPalette = [
@@ -109,12 +141,25 @@ export function PermissionsMatrix() {
         </div>
       </div>
 
+      {/* Scroll Hint for Mobile */}
+      {canScroll && showScrollHint && (
+        <div className="mb-3 flex items-center justify-center gap-2 text-sm text-muted-foreground animate-pulse">
+          <SwipeIcon className="h-4 w-4" />
+          <span>Vuốt để xem thêm</span>
+          <SwipeIcon className="h-4 w-4" />
+        </div>
+      )}
+
       {/* Matrix Table */}
-      <div className="border border-gray-200 rounded bg-white">
-        <div className="overflow-x-auto" style={{
-          scrollbarWidth: 'thin',
-          scrollbarColor: '#d1d5db #f3f4f6'
-        }}>
+      <div className="border border-gray-200 rounded bg-white w-[calc(100vw-2rem)] md:w-full">
+        <div 
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="overflow-x-auto table-scroll-container" 
+          style={{
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#d1d5db #f3f4f6'
+          }}>
           <style jsx>{`
             div::-webkit-scrollbar {
               height: 8px;
@@ -148,7 +193,7 @@ export function PermissionsMatrix() {
               </colgroup>
               <thead className="bg-gray-50 sticky top-0 z-10 border-b-2 border-gray-200">
                 <tr>
-                  <th className="sticky left-0 z-20 bg-gray-50 px-3 sm:px-5 py-3 text-left text-xs font-semibold text-gray-900 uppercase tracking-wide border-r border-gray-200">
+                  <th className="md:sticky left-0 z-20 bg-gray-50 px-3 sm:px-5 py-3 text-left text-xs font-semibold text-gray-900 uppercase tracking-wide border-r border-gray-200">
                     Quyền hạn
                   </th>
                   {roles?.map((role, index) => {
