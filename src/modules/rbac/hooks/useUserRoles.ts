@@ -7,7 +7,7 @@ export function useUserRoles(userId?: string) {
 
   const list = useQuery({
     queryKey: ["rbac", "user-roles", userId],
-    queryFn: () => getUserRoles(userId!),
+    queryFn: () => getUserRoles(Number(userId) as any),
     enabled: !!userId,
   })
 
@@ -21,7 +21,7 @@ export function useUserRoles(userId?: string) {
 
   const remove = useMutation({
     mutationFn: ({ userId, roleId }: { userId: string; roleId: string }) => 
-      removeRoleFromUser(userId, roleId),
+      removeRoleFromUser(Number(userId) as any, Number(roleId) as any),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["rbac", "user-roles", userId] })
       qc.invalidateQueries({ queryKey: ["rbac", "users"] })

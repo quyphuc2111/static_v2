@@ -1,25 +1,6 @@
 import httpService from "@/services/instance"
 import { PROJECTS_API_URL } from "@/constants/apiUrl"
-
-export type Project = {
-  id: string
-  name: string
-  description?: string
-  status: "ACTIVE" | "INACTIVE" | "ARCHIVED"
-  isDeleted: boolean
-  deletedAt?: string | null
-  createdAt: string
-  updatedAt: string
-  modules?: { 
-    id: string
-    name: string
-    description?: string
-    status: "ACTIVE" | "INACTIVE"
-    isDeleted: boolean
-    deletedAt?: string | null
-    content?: any[]
-  }[]
-}
+import { Project, CreateProjectPayload, UpdateProjectPayload, CreateModulePayload, UpdateModulePayload, ModuleContentCountResponse, ProjectActionResponse, ModuleActionResponse } from "./project.interface"
 
 export async function listProjects(params?: { includeDeleted?: boolean; onlyDeleted?: boolean }) {
   const searchParams = new URLSearchParams()
@@ -31,21 +12,12 @@ export async function listProjects(params?: { includeDeleted?: boolean; onlyDele
   return res.data
 }
 
-export async function createProject(payload: { 
-  name: string
-  description?: string
-  status?: "ACTIVE" | "INACTIVE" | "ARCHIVED"
-  modules?: string[] 
-}) {
+export async function createProject(payload: CreateProjectPayload) {
   const res = await httpService.post<{ data: Project }>({ url: PROJECTS_API_URL.ROOT, data: payload })
   return res.data
 }
 
-export async function updateProject(id: string, payload: { 
-  name: string
-  description?: string
-  status?: "ACTIVE" | "INACTIVE" | "ARCHIVED"
-}) {
+export async function updateProject(id: string, payload: UpdateProjectPayload) {
   const res = await httpService.patch<{ data: Project }>({ url: PROJECTS_API_URL.BY_ID(id), data: payload })
   return res.data
 }
@@ -59,12 +31,7 @@ export async function listModules(projectId: string) {
   return res.data
 }
 
-export async function createModule(payload: {
-  projectId: string
-  name: string
-  description?: string
-  status?: "ACTIVE" | "INACTIVE"
-}) {
+export async function createModule(payload: CreateModulePayload) {
   const res = await httpService.post<{ data: { id: string; name: string; description?: string; status: string } }>({ 
     url: PROJECTS_API_URL.MODULES(payload.projectId), 
     data: { name: payload.name, description: payload.description, status: payload.status || "ACTIVE" } 
@@ -72,13 +39,7 @@ export async function createModule(payload: {
   return res.data
 }
 
-export async function updateModule(payload: {
-  projectId: string
-  moduleId: string
-  name: string
-  description?: string
-  status?: "ACTIVE" | "INACTIVE"
-}) {
+export async function updateModule(payload: UpdateModulePayload) {
   const res = await httpService.patch<{ data: { id: string; name: string; description?: string; status: string } }>({ 
     url: PROJECTS_API_URL.MODULE_BY_ID(payload.projectId, payload.moduleId), 
     data: { name: payload.name, description: payload.description, status: payload.status || "ACTIVE" } 
@@ -91,10 +52,54 @@ export async function deleteModule(args: { projectId: string; moduleId: string }
 }
 
 export async function getModuleContentCount(moduleId: string) {
-  const res = await httpService.get<{ data: { count: number } }>({ 
-    url: `projects/modules/${moduleId}/content/count` 
+  const res = await httpService.get<{ data: ModuleContentCountResponse }>({ 
+    url: PROJECTS_API_URL.MODULE_CONTENT_COUNT(moduleId)
   })
   return res.data
+}
+
+// Project Actions
+export async function softDeleteProject(projectId: string) {
+  const res = await httpService.post<ProjectActionResponse>({
+    url: PROJECTS_API_URL.SOFT_DELETE(projectId)
+  })
+  return res
+}
+
+export async function hardDeleteProject(projectId: string) {
+  const res = await httpService.delete<ProjectActionResponse>({
+    url: PROJECTS_API_URL.HARD_DELETE(projectId)
+  })
+  return res
+}
+
+export async function restoreProject(projectId: string) {
+  const res = await httpService.post<ProjectActionResponse>({
+    url: PROJECTS_API_URL.RESTORE(projectId)
+  })
+  return res
+}
+
+// Module Actions
+export async function softDeleteModule(projectId: string, moduleId: string) {
+  const res = await httpService.post<ModuleActionResponse>({
+    url: PROJECTS_API_URL.MODULE_SOFT_DELETE(projectId, moduleId)
+  })
+  return res
+}
+
+export async function hardDeleteModule(projectId: string, moduleId: string) {
+  const res = await httpService.delete<ModuleActionResponse>({
+    url: PROJECTS_API_URL.MODULE_HARD_DELETE(projectId, moduleId)
+  })
+  return res
+}
+
+export async function restoreModule(projectId: string, moduleId: string) {
+  const res = await httpService.post<ModuleActionResponse>({
+    url: PROJECTS_API_URL.MODULE_RESTORE(projectId, moduleId)
+  })
+  return res
 }
 
 

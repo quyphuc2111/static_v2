@@ -31,8 +31,8 @@ export async function PATCH(req: NextRequest) {
       // Revoke entire batch
       const batch = await prisma.shareBatch.findFirst({
         where: {
-          id: batchId,
-          ...(isAdmin || canManageAll ? {} : { sharedById: session.user.id })
+          id: Number(batchId) as any,
+          ...(isAdmin || canManageAll ? {} : { sharedById: Number(session.user.id) as any })
         }
       })
 
@@ -42,7 +42,7 @@ export async function PATCH(req: NextRequest) {
 
       // Update batch status
       await prisma.shareBatch.update({
-        where: { id: batchId },
+        where: { id: Number(batchId) as any },
         data: {
           status: ShareStatus.REVOKED,
           revokedAt: new Date(),
@@ -52,7 +52,7 @@ export async function PATCH(req: NextRequest) {
 
       // Update all shares in the batch
       await prisma.contentShare.updateMany({
-        where: { batchId },
+        where: { batchId: Number(batchId) as any },
         data: {
           status: ShareStatus.REVOKED,
           canView: false,
@@ -71,11 +71,11 @@ export async function PATCH(req: NextRequest) {
       // Revoke individual share
       const share = await prisma.contentShare.findFirst({
         where: {
-          id: shareId,
+          id: Number(shareId) as any,
           ...(isAdmin || canManageAll ? {} : { 
             OR: [
-              { sharedById: session.user.id },
-              { sharedWithId: session.user.id }
+              { sharedById: Number(session.user.id) as any },
+              { sharedWithId: Number(session.user.id) as any }
             ]
           })
         }
@@ -87,7 +87,7 @@ export async function PATCH(req: NextRequest) {
 
       // Update share status
       await prisma.contentShare.update({
-        where: { id: shareId },
+        where: { id: Number(shareId) as any },
         data: {
           status: ShareStatus.REVOKED,
           canView: false,

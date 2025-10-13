@@ -33,7 +33,10 @@ export function createColumns({ onDelete }: ProjectTableProps): ColumnDef<Projec
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            onClick={() => row.toggleExpanded()}
+            onClick={(e) => {
+              e.stopPropagation()
+              row.toggleExpanded()
+            }}
           >
             {row.getIsExpanded() ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
@@ -45,25 +48,29 @@ export function createColumns({ onDelete }: ProjectTableProps): ColumnDef<Projec
       accessorKey: "name",
       header: "Tên Dự án",
       cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <FolderOpen className="h-4 w-4 text-blue-500" />
-          <span className={`font-medium ${row.original.isDeleted ? 'line-through text-muted-foreground' : ''}`}>
+        <div className="flex items-center gap-1.5 min-w-[140px]">
+          <FolderOpen className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+          <span className={`font-medium text-sm ${row.original.isDeleted ? 'line-through text-muted-foreground' : ''}`}>
             {row.getValue("name")}
           </span>
           {row.original.isDeleted && (
-            <Badge variant="destructive" className="text-xs">Đã xóa</Badge>
+            <Badge variant="destructive" className="text-[10px] px-1 py-0 flex-shrink-0">Xóa</Badge>
           )}
         </div>
       ),
+      size: 160,
     },
     {
       accessorKey: "description",
       header: "Mô tả",
       cell: ({ row }) => (
-        <span className="text-muted-foreground">
-          {row.getValue("description") || "Không có mô tả"}
-        </span>
+        <div className="max-w-[120px] truncate">
+          <span className="text-muted-foreground text-xs">
+            {row.getValue("description") || "—"}
+          </span>
+        </div>
       ),
+      size: 120,
     },
     {
       accessorKey: "status",
@@ -73,28 +80,30 @@ export function createColumns({ onDelete }: ProjectTableProps): ColumnDef<Projec
         
         // Nếu đã xóa mềm, hiển thị trạng thái "Đã xóa" với màu đỏ
         if (project.isDeleted) {
-          return <Badge variant="destructive">Đã xóa</Badge>
+          return <Badge variant="destructive" className="text-xs">Đã xóa</Badge>
         }
         
         // Nếu chưa xóa, hiển thị trạng thái gốc
         const status = project.status
         const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
-          ACTIVE: { variant: "default", label: "Đang hoạt động" },
+          ACTIVE: { variant: "default", label: "Hoạt động" },
           INACTIVE: { variant: "secondary", label: "Tạm dừng" },
-          ARCHIVED: { variant: "outline", label: "Đã lưu trữ" },
+          ARCHIVED: { variant: "outline", label: "Lưu trữ" },
         }
         const config = variants[status] || variants.ACTIVE
-        return <Badge variant={config.variant}>{config.label}</Badge>
+        return <Badge variant={config.variant} className="text-xs">{config.label}</Badge>
       },
+      size: 100,
     },
     {
       id: "modules",
-      header: "Số Module",
+      header: "Module",
       cell: ({ row }) => (
-        <Badge variant="outline">
-          {row.original.modules?.length || 0} module
+        <Badge variant="outline" className="text-xs">
+          {row.original.modules?.length || 0}
         </Badge>
       ),
+      size: 80,
     },
     {
       accessorKey: "updatedAt",
@@ -105,14 +114,12 @@ export function createColumns({ onDelete }: ProjectTableProps): ColumnDef<Projec
         // Nếu đã xóa mềm, hiển thị thời gian xóa
         if (project.isDeleted && project.deletedAt) {
           return (
-            <div className="text-muted-foreground text-sm">
-              <div className="text-red-600 font-medium">Đã xóa:</div>
-              <div>{new Date(project.deletedAt).toLocaleString("vi-VN", {
-                year: 'numeric',
-                month: '2-digit',
+            <div className="text-muted-foreground text-xs whitespace-nowrap">
+              <div className="text-red-600 font-medium text-[10px]">Đã xóa</div>
+              <div>{new Date(project.deletedAt).toLocaleDateString("vi-VN", {
                 day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
+                month: '2-digit',
+                year: '2-digit'
               })}</div>
             </div>
           )
@@ -120,17 +127,16 @@ export function createColumns({ onDelete }: ProjectTableProps): ColumnDef<Projec
         
         // Nếu chưa xóa, hiển thị thời gian cập nhật
         return (
-          <span className="text-muted-foreground text-sm">
-            {new Date(project.updatedAt).toLocaleString("vi-VN", {
-              year: 'numeric',
-              month: '2-digit',
+          <span className="text-muted-foreground text-xs whitespace-nowrap">
+            {new Date(project.updatedAt).toLocaleDateString("vi-VN", {
               day: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit'
+              month: '2-digit',
+              year: '2-digit'
             })}
           </span>
         )
       },
+      size: 90,
     },
     {
       id: "actions",

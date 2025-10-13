@@ -27,11 +27,11 @@ export async function POST(
       return NextResponse.json({ message: "Forbidden" }, { status: 403 })
     }
 
-    const projectId = params.id
+    const projectId = Number(params.id)
 
     // Check if project exists and is deleted
     const project = await prisma.project.findUnique({
-      where: { id: projectId },
+      where: { id: projectId as any },
     })
 
     if (!project) {
@@ -49,7 +49,7 @@ export async function POST(
     const restoredProject = await prisma.$transaction(async (tx) => {
       // Restore the project
       const project = await tx.project.update({
-        where: { id: projectId },
+        where: { id: projectId as any },
         data: {
           isDeleted: false,
           deletedAt: null,
@@ -61,7 +61,7 @@ export async function POST(
       // Restore all modules in this project
       await tx.module.updateMany({
         where: { 
-          projectId: projectId,
+          projectId: projectId as any,
           isDeleted: true 
         },
         data: {
@@ -75,7 +75,7 @@ export async function POST(
       // Restore all content in this project
       await tx.contentData.updateMany({
         where: { 
-          projectId: projectId,
+          projectId: projectId as any,
           isDeleted: true 
         },
         data: {
@@ -89,10 +89,10 @@ export async function POST(
     })
 
     // Log audit action
-    await logProjectAction(session.user.id, 'restored', projectId, {
+    await logProjectAction(session.user.id, 'restored', projectId as any, {
       projectName: restoredProject.name,
-      modulesCount: await prisma.module.count({ where: { projectId, isDeleted: false } }),
-      contentCount: await prisma.contentData.count({ where: { projectId, isDeleted: false } })
+      modulesCount: await prisma.module.count({ where: { projectId: projectId as any, isDeleted: false } }),
+      contentCount: await prisma.contentData.count({ where: { projectId: projectId as any, isDeleted: false } })
     })
 
     return NextResponse.json({

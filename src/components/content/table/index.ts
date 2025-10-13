@@ -8,5 +8,8 @@ export { ContentContextMenu } from "./context-menu"
 // Column Definitions
 export { createContentColumns, type ContentItem } from "./columns"
 
+// Permissions
+export { calculateContentPermissions, type ContentPermissions } from "./permissions"
+
 // Re-export types
 export type { ActionItem } from "./actions"

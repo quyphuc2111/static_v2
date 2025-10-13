@@ -192,6 +192,12 @@ export function ContentManagement() {
       return
     }
     
+    // Kiểm tra xem đã chọn loại nội dung chưa
+    if (!content.contentType || content.contentType.trim() === '') {
+      toast.error("Bạn cần chọn loại nội dung trước khi upload file")
+      return
+    }
+    
     setContentToUpload(content)
     setShowUploadFileDialog(true)
   }
@@ -199,6 +205,12 @@ export function ContentManagement() {
   const handleUpdateFile = (content: ContentItem) => {
     if (!hasAnyPermission([PermissionName.EDIT_CONTENT, PermissionName.MANAGE_OWN_CONTENT]) && !isAdmin) {
       toast.error("Bạn không có quyền cập nhật file cho nội dung này")
+      return
+    }
+    
+    // Kiểm tra xem đã chọn loại nội dung chưa
+    if (!content.contentType || content.contentType.trim() === '') {
+      toast.error("Bạn cần chọn loại nội dung trước khi cập nhật file")
       return
     }
     
@@ -280,14 +292,14 @@ export function ContentManagement() {
   }), [copiedUrl, downloadContentMut.isPending, deleteContentMut.isPending, restoreContentMut.isPending, uploadContentFileMut.isPending, updateContentFileMut.isPending, softDeleteContentMut.isPending, hardDeleteContentMut.isPending, isAdmin, me?.id])
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-foreground">Quản lý Nội dung</h2>
-          <p className="text-muted-foreground">Quản lý tất cả tài liệu và nội dung trong hệ thống</p>
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Quản lý Nội dung</h2>
+          <p className="text-sm md:text-base text-muted-foreground">Quản lý tất cả tài liệu và nội dung trong hệ thống</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-56">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full lg:w-auto flex-wrap">
+          <div className="w-full sm:w-56">
             <Select value={projectId} onValueChange={(v) => { setProjectId(v); setModuleId("") }}>
               <SelectTrigger className="w-full bg-white">
                 <SelectValue placeholder={projectsQuery.isLoading ? "Đang tải dự án..." : "Chọn dự án"} />
@@ -299,7 +311,7 @@ export function ContentManagement() {
               </SelectContent>
             </Select>
           </div>
-          <div className="w-56">
+          <div className="w-full sm:w-56">
             <Select value={moduleId} onValueChange={setModuleId} disabled={!projectId || modulesQuery.isLoading}>
               <SelectTrigger className="w-full bg-white">
                 <SelectValue placeholder={!projectId ? "Chọn dự án trước" : (modulesQuery.isLoading ? "Đang tải module..." : "Chọn module")} />
@@ -312,24 +324,27 @@ export function ContentManagement() {
             </Select>
           </div>
           {projectId && moduleId && (
-          <>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <PermissionGuard permissions={[PermissionName.CREATE_CONTENT, PermissionName.MANAGE_OWN_CONTENT]}>
-              <Button onClick={() => setShowCreateDialog(true)} className="bg-primary hover:bg-primary/90">
+              <Button onClick={() => setShowCreateDialog(true)} className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
-                Tạo Nội dung Mới
+                <span className="hidden sm:inline">Tạo Nội dung mới</span>
+                <span className="sm:hidden">Tạo Mới</span>
               </Button>
             </PermissionGuard>
             <PermissionGuard permissions={[PermissionName.CREATE_CONTENT, PermissionName.MANAGE_OWN_CONTENT]}>
-            <Button variant="outline" onClick={() => setShowImportDialog(true)}>
+            <Button variant="outline" onClick={() => setShowImportDialog(true)} className="w-full sm:w-auto">
               <FileSpreadsheet className="mr-2 h-4 w-4" />
-              Nhập Excel
+              <span className="hidden sm:inline">Nhập Excel</span>
+              <span className="sm:hidden">Excel</span>
             </Button>
-          </PermissionGuard></>
+          </PermissionGuard>
+          </div>
           )}
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className=" gap-4 md:grid-cols-4 hidden md:grid">
         <Card className={`bg-card border-border ${showDeleted ? 'opacity-50' : ''}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -392,20 +407,20 @@ export function ContentManagement() {
         </Card>
       </div>
 
-      <Card className="bg-card border-border">
+      <Card className="bg-card border-border overflow-hidden">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <CardTitle className="text-foreground">Danh sách Tài liệu</CardTitle>
-              <CardDescription>Quản lý tất cả nội dung trong dự án và module</CardDescription>
+              <CardTitle className="text-foreground text-lg sm:text-xl">Danh sách Tài liệu</CardTitle>
+              <CardDescription className="text-sm">Quản lý tất cả nội dung trong dự án và module</CardDescription>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               {projectId && moduleId && (
                 <PermissionGuard permissions={[PermissionName.VIEW_DELETED_ALL_CONTENT, PermissionName.VIEW_DELETED_OWN_CONTENT]}>
-                  <Tabs value={showDeleted ? "deleted" : "active"} onValueChange={(v) => setShowDeleted(v === "deleted")}>
-                    <TabsList>
-                      <TabsTrigger value="active">Đang hoạt động</TabsTrigger>
-                      <TabsTrigger value="deleted">
+                  <Tabs value={showDeleted ? "deleted" : "active"} onValueChange={(v) => setShowDeleted(v === "deleted")} className="w-full sm:w-auto">
+                    <TabsList className="w-full sm:w-auto grid grid-cols-2">
+                      <TabsTrigger value="active" className="text-xs sm:text-sm">Đang hoạt động</TabsTrigger>
+                      <TabsTrigger value="deleted" className="text-xs sm:text-sm">
                         <Trash2 className="h-3 w-3 mr-1" />
                         Đã xóa
                       </TabsTrigger>
@@ -423,13 +438,13 @@ export function ContentManagement() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0 w-[calc(100vw-40px)] md:w-full">
           {contentQuery.isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-8 px-4 text-muted-foreground">
               Đang tải nội dung...
             </div>
           ) : !projectId || !moduleId ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-8 px-4 text-muted-foreground">
               Vui lòng chọn dự án và module
             </div>
           ) : (

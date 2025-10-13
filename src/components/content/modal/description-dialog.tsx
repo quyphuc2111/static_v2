@@ -80,8 +80,8 @@ export function DescriptionDialog({
       <DialogContent className="w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[80vw] xl:w-[75vw] 2xl:w-[70vw] max-w-none h-[90vh] sm:h-[85vh] md:h-[80vh] lg:h-[75vh] xl:h-[70vh] 2xl:h-[65vh]" style={{
         width: '60vw',
         maxWidth: '60vw',
-        height: '80vh',
-        maxHeight: '80vh'
+        height: '90vh',
+        maxHeight: '90vh'
       }}>
         <DialogHeader>
           <div className="flex items-center gap-2 sm:gap-3">

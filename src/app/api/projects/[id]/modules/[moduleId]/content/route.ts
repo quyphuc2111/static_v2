@@ -104,6 +104,8 @@ export async function GET(
 ) {
   try {
     const { id: projectId, moduleId } = await params
+    const pId = Number(projectId)
+    const mId = Number(moduleId)
 
     // Require authenticated session
     const session = await getSession()
@@ -113,7 +115,7 @@ export async function GET(
 
     // Verify project and module exist
     const project = await prisma.project.findUnique({
-      where: { id: projectId }
+      where: { id: pId as any }
     })
 
     if (!project) {
@@ -121,7 +123,7 @@ export async function GET(
     }
 
     const module = await prisma.module.findUnique({
-      where: { id: moduleId }
+      where: { id: mId as any }
     })
 
     if (!module) {
@@ -135,8 +137,8 @@ export async function GET(
     const canViewDeletedOwn = await checkPermission(PermissionName.VIEW_DELETED_OWN_CONTENT, session.user.id)
 
     const whereClause: any = {
-      projectId,
-      moduleId,
+      projectId: pId as any,
+      moduleId: mId as any,
     }
 
     if (canViewAll || canViewDeletedAll) {
@@ -149,16 +151,16 @@ export async function GET(
       // Own content
       if (canViewDeletedOwn) {
         // Can see own content (both active and deleted)
-        orConditions.push({ ownerId: session.user.id })
+        orConditions.push({ ownerId: Number(session.user.id) as any })
       } else {
         // Can only see own ACTIVE content
-        orConditions.push({ ownerId: session.user.id, isDeleted: false })
+        orConditions.push({ ownerId: Number(session.user.id) as any, isDeleted: false })
       }
       
       // Shared content - ALWAYS exclude deleted (shared users should NOT see deleted content)
       orConditions.push({ 
         isDeleted: false, // Critical: shared content must not be deleted
-        shares: { some: { sharedWithId: session.user.id, canView: true, status: ShareStatus.ACTIVE } } 
+        shares: { some: { sharedWithId: Number(session.user.id) as any, canView: true, status: ShareStatus.ACTIVE } } 
       })
       
       whereClause.OR = orConditions
@@ -171,7 +173,7 @@ export async function GET(
           select: { id: true, username: true, name: true, email: true }
         },
         shares: {
-          where: { sharedWithId: session.user.id, status: ShareStatus.ACTIVE },
+          where: { sharedWithId: Number(session.user.id) as any, status: ShareStatus.ACTIVE },
           select: { canView: true, canDownload: true, canEdit: true, canDelete: true, sharedById: true }
         }
       },
@@ -212,10 +214,12 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
     const { id: projectId, moduleId } = await params
+    const pId = Number(projectId)
+    const mId = Number(moduleId)
 
     // Verify project and module exist
     const project = await prisma.project.findUnique({
-      where: { id: projectId }
+      where: { id: pId as any }
     })
 
     if (!project) {
@@ -223,7 +227,7 @@ export async function POST(
     }
 
     const module = await prisma.module.findUnique({
-      where: { id: moduleId }
+      where: { id: mId as any }
     })
 
     if (!module) {
@@ -253,11 +257,12 @@ export async function POST(
       )
     }
 
-    // Check if content with same title already exists
+    // Check if content with same title already exists for this owner
     const existingContent = await prisma.contentData.findFirst({
       where: {
-        projectId,
-        moduleId,
+        projectId: pId as any,
+        moduleId: mId as any,
+        ownerId: Number(session.user.id) as any,
         title: title as any,
         isDeleted: false
       } as any
@@ -265,7 +270,7 @@ export async function POST(
 
     if (existingContent) {
       return NextResponse.json(
-        { error: "Content with this title already exists" },
+        { error: "Bạn đã có nội dung với tiêu đề này trong module này" },
         { status: 409 }
       )
     }
@@ -336,9 +341,9 @@ export async function POST(
         contentType,
         contentUrl: relativePath,
         fileSize: file.size, // Store as number instead of BigInt
-        projectId,
-        moduleId,
-        ownerId: session.user.id,
+        projectId: pId as any,
+        moduleId: mId as any,
+        ownerId: Number(session.user.id) as any,
         status: "PROCESSING" as any,
         progress: 0
       } as any

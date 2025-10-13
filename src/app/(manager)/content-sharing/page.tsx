@@ -5,7 +5,7 @@ import { ContentSharingManager } from "@/components/content-sharing/content-shar
 
 export default function ContentSharingPage() {
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       {/* <ContentSharingManagement /> */}
 <ContentSharingManager />
     </div>

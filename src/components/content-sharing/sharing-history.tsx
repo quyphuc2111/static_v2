@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { Search, Calendar, User, FileText, Clock, UserMinus, Share2, RotateCcw, Edit, MoreHorizontal, MoreVertical, Eye, EyeOff, Edit3, Trash2, Shield, Filter, SortAsc, SortDesc, Download } from "lucide-react"
+import { useMemo, useState, useEffect, useRef } from "react"
+import { Search, Calendar, User, FileText, Clock, UserMinus, Share2, RotateCcw, Edit, MoreHorizontal, MoreVertical, Eye, EyeOff, Edit3, Trash2, Shield, Filter, SortAsc, SortDesc, Download, ChevronRight } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -14,6 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { useContentShares, useRevokeContentShare, useShareContent, useUpdateContentShare } from "@/modules/rbac/hooks/useContentSharing"
+import { RevokeShareDialog } from "./modal/revoke-share-dialog"
+import { ReshareDialog } from "./modal/reshare-dialog"
+import { EditPermissionsDialog } from "./modal/edit-permissions-dialog"
+import { SharingHistoryTable } from "./table/sharing-history-table"
 import { useModules } from "@/modules/project/hooks/useModules"
 import { toast } from "react-toastify"
 
@@ -60,12 +64,40 @@ export function SharingHistory() {
     canEdit: false,
     canDelete: false
   })
+  const [showScrollHint, setShowScrollHint] = useState(true)
+  const [canScroll, setCanScroll] = useState(false)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
   
   const { data: shares, isLoading } = useContentShares()
   const { data: modules, isLoading: modulesLoading } = useModules(projectFilter !== "all" ? projectFilter : "", projectFilter !== "all")
   const revokeShareMut = useRevokeContentShare()
   const shareContentMut = useShareContent()
   const updateShareMut = useUpdateContentShare()
+
+  useEffect(() => {
+    const checkScroll = () => {
+      if (scrollContainerRef.current) {
+        const { scrollWidth, clientWidth } = scrollContainerRef.current
+        setCanScroll(scrollWidth > clientWidth)
+      }
+    }
+    checkScroll()
+    window.addEventListener('resize', checkScroll)
+    return () => window.removeEventListener('resize', checkScroll)
+  }, [shares])
+
+  useEffect(() => {
+    if (canScroll) {
+      const timer = setTimeout(() => setShowScrollHint(false), 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [canScroll])
+
+  const handleScroll = () => {
+    if (showScrollHint) {
+      setShowScrollHint(false)
+    }
+  }
 
   const filtered = useMemo(() => {
     let list = shares || []
@@ -133,7 +165,7 @@ export function SharingHistory() {
   const handleRevokeConfirm = () => {
     if (!revokeShareId) return
     revokeShareMut.mutate(
-      { shareId: revokeShareId },
+      { shareId: Number(revokeShareId) as any },
       {
         onSuccess: () => {
           toast.success("Đã thu hồi chia sẻ thành công")
@@ -232,21 +264,21 @@ export function SharingHistory() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="relative flex-1 max-w-md">
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 md:gap-4">
+        <div className="relative flex-1 w-full sm:max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Tìm kiếm lịch sử..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-muted/50 border-border"
+            className="pl-10 bg-white border-border"
           />
         </div>
         
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-full sm:w-40 bg-white">
               <SelectValue placeholder="Trạng thái" />
             </SelectTrigger>
             <SelectContent>
@@ -257,7 +289,7 @@ export function SharingHistory() {
           </Select>
           
           <Select value={projectFilter} onValueChange={handleProjectChange}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-full sm:w-40 bg-white">
               <SelectValue placeholder="Dự án" />
             </SelectTrigger>
             <SelectContent>
@@ -272,7 +304,7 @@ export function SharingHistory() {
           </Select>
           
           <Select value={moduleFilter} onValueChange={setModuleFilter}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-full sm:w-40 bg-white">
               <SelectValue placeholder={
                 projectFilter === "all" 
                   ? "Module" 
@@ -305,7 +337,7 @@ export function SharingHistory() {
           </Select>
           
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-full sm:w-40 bg-white">
               <SelectValue placeholder="Sắp xếp theo" />
             </SelectTrigger>
             <SelectContent>
@@ -321,13 +353,14 @@ export function SharingHistory() {
             variant="outline"
             size="sm"
             onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+            className="w-full sm:w-auto"
           >
             {sortOrder === "asc" ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Hôm nay</CardTitle>
@@ -391,247 +424,41 @@ export function SharingHistory() {
 
       <Card className="bg-card border-border">
         <CardHeader>
-          <CardTitle className="text-foreground">Lịch sử Chia sẻ</CardTitle>
+          <CardTitle className="text-foreground text-lg sm:text-xl">Lịch sử Chia sẻ</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border">
-                <TableHead className="text-muted-foreground">Loại</TableHead>
-                <TableHead className="text-muted-foreground">Tài liệu</TableHead>
-                <TableHead className="text-muted-foreground">Vị trí</TableHead>
-                <TableHead className="text-muted-foreground">Người chia sẻ</TableHead>
-                <TableHead className="text-muted-foreground">Chia sẻ với</TableHead>
-                <TableHead className="text-muted-foreground">Quyền</TableHead>
-                <TableHead className="text-muted-foreground">Số lượng</TableHead>
-                <TableHead className="text-muted-foreground">Thời gian</TableHead>
-                <TableHead className="text-muted-foreground">Trạng thái</TableHead>
-                <TableHead className="text-muted-foreground">Hành động</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow className="border-border">
-                  <TableCell colSpan={10} className="text-center text-muted-foreground">Đang tải...</TableCell>
-                </TableRow>
-              ) : filtered.map((item: any) => (
-                <TableRow key={`${item.contentId}-${item.sharedWithId}-${item.createdAt}`} className="border-border">
-                  <TableCell>{getTypeBadge(item?.batch?.scope)}</TableCell>
-                  <TableCell className="font-medium text-foreground">{item.content?.title || '-'}</TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1">
-                        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
-                          📁 {item.content?.project?.name || 'Không xác định'}
-                        </Badge>
-                      </div>
-                      {item.content?.module?.name && (
-                        <div className="flex items-center gap-1">
-                          <Badge variant="secondary" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                            📂 {item.content?.module?.name}
-                          </Badge>
-                        </div>
-                      )}
-                      {!item.content?.module?.name && item.content?.project?.name && (
-                        <div className="text-xs text-muted-foreground italic">
-                          Không có module
-                        </div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-6 w-6">
-                        <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                          {(item.sharedBy?.name || item.sharedBy?.email || '').charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-muted-foreground">{item.sharedBy?.name || item.sharedBy?.email}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{item.sharedWith?.name || item.sharedWith?.email}</TableCell>
-                  <TableCell>{getPermissionBadges(item)}</TableCell>
-                  <TableCell className="text-muted-foreground">{item?.batch?.itemsCount || 1}</TableCell>
-                  <TableCell className="text-muted-foreground">{new Date(item.createdAt).toLocaleString('vi-VN')}</TableCell>
-                  <TableCell>
-                    <Badge variant={item.status.toLowerCase() === 'active' ? 'default' : 'secondary'}>
-                      {item.status.toLowerCase() === 'active' ? 'Đang hoạt động' : 'Đã thu hồi'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-popover border-border">
-                        <DropdownMenuItem
-                          onClick={() => handleEditPermission(item)}
-                          className="cursor-pointer"
-                          disabled={item.status === "revoked"}
-                        >
-                          <Edit className="mr-2 h-4 w-4" />
-                          Chỉnh sửa quyền
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleReshare(item)} className="cursor-pointer">
-                          <Share2 className="mr-2 h-4 w-4" />
-                          Chia sẻ lại
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator className="bg-border" />
-                        <DropdownMenuItem
-                          onClick={() => handleRevoke(item)}
-                          className="cursor-pointer text-red-400 focus:text-red-400"
-                          disabled={item.status === "revoked"}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Thu hồi chia sẻ
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <CardContent className="w-[calc(100vw-2rem)] md:w-full">
+          <SharingHistoryTable
+            shares={filtered as any}
+            isLoading={isLoading}
+            onReshare={handleReshare}
+            onEdit={handleEditPermission}
+            onRevoke={handleRevoke}
+          />
         </CardContent>
       </Card>
 
-      {/* Dialog xác nhận thu hồi */}
-      <Dialog open={showRevokeDialog} onOpenChange={setShowRevokeDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Xác nhận thu hồi chia sẻ</DialogTitle>
-            <DialogDescription>
-              Bạn có chắc chắn muốn thu hồi chia sẻ này không? Hành động này không thể hoàn tác.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRevokeDialog(false)}>
-              Hủy
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleRevokeConfirm}
-              disabled={revokeShareMut.isPending}
-            >
-              {revokeShareMut.isPending ? "Đang thu hồi..." : "Thu hồi"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <RevokeShareDialog
+        open={showRevokeDialog}
+        onOpenChange={setShowRevokeDialog}
+        onConfirm={handleRevokeConfirm}
+        isPending={revokeShareMut.isPending}
+      />
 
-      {/* Dialog xác nhận chia sẻ lại */}
-      <Dialog open={showReshareDialog} onOpenChange={setShowReshareDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Xác nhận chia sẻ lại</DialogTitle>
-            <DialogDescription>
-              Bạn có chắc chắn muốn chia sẻ lại nội dung này không? Người dùng sẽ có thể truy cập lại nội dung.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowReshareDialog(false)}>
-              Hủy
-            </Button>
-            <Button
-              onClick={handleReshareConfirm}
-              disabled={shareContentMut.isPending}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              {shareContentMut.isPending ? "Đang chia sẻ..." : "Chia sẻ lại"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ReshareDialog
+        open={showReshareDialog}
+        onOpenChange={setShowReshareDialog}
+        onConfirm={handleReshareConfirm}
+        isPending={shareContentMut.isPending}
+      />
 
-      {/* Dialog chỉnh sửa quyền */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              Chỉnh sửa quyền chia sẻ
-            </DialogTitle>
-            <DialogDescription>
-              Thay đổi quyền truy cập cho người dùng này
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="canView"
-                  checked={permissions.canView}
-                  onCheckedChange={(checked) => 
-                    setPermissions(prev => ({ ...prev, canView: !!checked }))
-                  }
-                />
-                <Label htmlFor="canView" className="flex items-center gap-2">
-                  <Eye className="h-4 w-4" />
-                  Xem nội dung
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="canDownload"
-                  checked={permissions.canDownload}
-                  onCheckedChange={(checked) => 
-                    setPermissions(prev => ({ ...prev, canDownload: !!checked }))
-                  }
-                />
-                <Label htmlFor="canDownload" className="flex items-center gap-2">
-                  <Download className="h-4 w-4" />
-                  Tải xuống nội dung
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="canEdit"
-                  checked={permissions.canEdit}
-                  onCheckedChange={(checked) => 
-                    setPermissions(prev => ({ ...prev, canEdit: !!checked }))
-                  }
-                />
-                <Label htmlFor="canEdit" className="flex items-center gap-2">
-                  <Edit3 className="h-4 w-4" />
-                  Chỉnh sửa nội dung
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="canDelete"
-                  checked={permissions.canDelete}
-                  onCheckedChange={(checked) => 
-                    setPermissions(prev => ({ ...prev, canDelete: !!checked }))
-                  }
-                />
-                <Label htmlFor="canDelete" className="flex items-center gap-2">
-                  <Trash2 className="h-4 w-4" />
-                  Xóa nội dung
-                </Label>
-              </div>
-            </div>
-            <div className="bg-muted/50 p-3 rounded-lg">
-              <p className="text-sm text-muted-foreground">
-                <strong>Lưu ý:</strong> Quyền "Xem" là bắt buộc. Quyền "Tải xuống" cho phép người dùng tải file về máy. Nếu bỏ chọn "Xem", người dùng sẽ không thể truy cập nội dung.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
-              Hủy
-            </Button>
-            <Button
-              onClick={handleEditPermissions}
-              disabled={updateShareMut.isPending || !permissions.canView}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {updateShareMut.isPending ? "Đang cập nhật..." : "Cập nhật quyền"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <EditPermissionsDialog
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+        permissions={permissions}
+        onPermissionsChange={setPermissions}
+        onConfirm={handleEditPermissions}
+        isPending={updateShareMut.isPending}
+      />
     </div>
   )
 }

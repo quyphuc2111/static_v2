@@ -83,13 +83,13 @@ export function ResetPasswordDialog({ open, onOpenChange, user }: ResetPasswordD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[450px] bg-card border-border">
+      <DialogContent className="max-w-[95vw] sm:max-w-[450px] max-h-[90vh] overflow-y-auto bg-card border-border">
         <DialogHeader>
-          <DialogTitle className="text-foreground flex items-center gap-2">
-            <Lock className="h-5 w-5 text-primary" />
+          <DialogTitle className="text-foreground flex items-center gap-2 text-lg sm:text-xl">
+            <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
             Đặt lại Mật khẩu
           </DialogTitle>
-          <DialogDescription className="text-muted-foreground">
+          <DialogDescription className="text-muted-foreground text-sm">
             Đặt mật khẩu mới cho <span className="font-medium text-foreground">{user.username}</span>
           </DialogDescription>
         </DialogHeader>
@@ -185,18 +185,19 @@ export function ResetPasswordDialog({ open, onOpenChange, user }: ResetPasswordD
             </p>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button 
               type="button" 
               variant="outline" 
               onClick={() => onOpenChange(false)}
               disabled={resetPassword.isPending}
+              className="w-full sm:w-auto"
             >
               Hủy
             </Button>
             <Button 
               type="submit" 
-              className="bg-primary hover:bg-primary/90"
+              className="bg-primary hover:bg-primary/90 w-full sm:w-auto"
               disabled={resetPassword.isPending || !isPasswordValid || !passwordsMatch}
             >
               {resetPassword.isPending ? (

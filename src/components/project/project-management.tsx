@@ -30,21 +30,21 @@ export function ProjectManagement() {
   const totalModules = filteredProjects.reduce((sum, p) => sum + (p.modules?.length || 0), 0)
 
   return (
-    <div className="flex flex-col gap-6 p-6 ">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-4 md:gap-6 max-w-full overflow-x-hidden">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Quản lý Dự án</h1>
-          <p className="text-muted-foreground mt-1">Quản lý các dự án và module trong hệ thống</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Quản lý Dự án</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">Quản lý các dự án và module trong hệ thống</p>
         </div>
        <PermissionGuard permission={Permissions.Project.CREATE}>
-       <Button onClick={() => setIsCreateDialogOpen(true)} className="gap-2" data-testid="project-create-button">
+       <Button onClick={() => setIsCreateDialogOpen(true)} className="gap-2 w-full md:w-auto" data-testid="project-create-button">
           <Plus className="h-4 w-4" />
           Tạo Dự án Mới
         </Button>
        </PermissionGuard>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-4 md:gap-6 md:grid-cols-3 max-w-full">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
@@ -87,26 +87,26 @@ export function ProjectManagement() {
         </Card>
       </div>
 
-      <Card>
+      <Card className="overflow-hidden max-w-full">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <CardTitle>Danh sách Dự án</CardTitle>
-              <CardDescription>Quản lý tất cả các dự án và module</CardDescription>
+              <CardTitle className="text-lg sm:text-xl">Danh sách Dự án</CardTitle>
+              <CardDescription className="text-sm">Quản lý tất cả các dự án và module</CardDescription>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <PermissionGuard permission={Permissions.Project.VIEW_DELETED}>
-                <Tabs value={showDeleted ? "deleted" : "active"} onValueChange={(v) => setShowDeleted(v === "deleted")} data-testid="project-tabs">
-                  <TabsList>
-                    <TabsTrigger value="active" data-testid="tab-active">Đang hoạt động</TabsTrigger>
-                    <TabsTrigger value="deleted" data-testid="tab-deleted">
+                <Tabs value={showDeleted ? "deleted" : "active"} onValueChange={(v) => setShowDeleted(v === "deleted")} data-testid="project-tabs" className="w-full sm:w-auto">
+                  <TabsList className="w-full sm:w-auto grid grid-cols-2">
+                    <TabsTrigger value="active" data-testid="tab-active" className="text-xs sm:text-sm">Đang hoạt động</TabsTrigger>
+                    <TabsTrigger value="deleted" data-testid="tab-deleted" className="text-xs sm:text-sm">
                       <Trash2 className="h-3 w-3 mr-1" />
                       Đã xóa
                     </TabsTrigger>
                   </TabsList>
                 </Tabs>
               </PermissionGuard>
-              <div className="relative w-64" data-testid="project-search-wrapper">
+              <div className="relative w-full sm:w-64" data-testid="project-search-wrapper">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Tìm kiếm dự án..."
@@ -119,7 +119,7 @@ export function ProjectManagement() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <ProjectList searchQuery={searchQuery} showDeleted={showDeleted} />
         </CardContent>
       </Card>

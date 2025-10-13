@@ -15,7 +15,8 @@ export async function GET(req: NextRequest, { params }: Params) {
 
     // Check if user has permission to view content or is viewing their own content
     const { userId } = await params
-    const isOwnContent = session.user.id === userId
+    const numericUserId = Number(userId)
+    const isOwnContent = Number(session.user.id) === numericUserId
     const hasViewPermission = await hasPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id)
 
     if (!isOwnContent && !hasViewPermission) {
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     // Get all content owned by this user
     const content = await prisma.contentData.findMany({
       where: {
-        ownerId: userId,
+        ownerId: numericUserId as any,
         isDeleted: false,
         status: "COMPLETED"
       },

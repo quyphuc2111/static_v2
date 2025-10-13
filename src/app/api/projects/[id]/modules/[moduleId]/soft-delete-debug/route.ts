@@ -44,7 +44,7 @@ export async function POST(
       
       // Get detailed permission info
       const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
+        where: { id: Number(session.user.id) as any },
         include: {
           roles: {
             include: {
@@ -84,7 +84,7 @@ export async function POST(
 
     // Check if module exists and not already deleted
     const module = await prisma.module.findUnique({
-      where: { id: moduleId },
+      where: { id: Number(moduleId) as any },
     })
 
     console.log('Module found:', !!module)
@@ -105,7 +105,7 @@ export async function POST(
 
     // Soft delete the module
     const updatedModule = await prisma.module.update({
-      where: { id: moduleId },
+      where: { id: Number(moduleId) as any },
       data: {
         isDeleted: true,
         deletedAt: new Date(),

@@ -7,6 +7,7 @@ import { ContentItem } from "./columns"
 import { useUserPermissions } from "@/modules/rbac/hooks"
 import { PermissionName } from "@prisma/client"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import { calculateContentPermissions } from "./permissions"
 
 interface ContentContextMenuProps {
   children: React.ReactNode
@@ -55,33 +56,11 @@ export function ContentContextMenu({
   hasSCORMInfo,
   currentUserId
 }: ContentContextMenuProps) {
-  const { hasPermission, hasAnyPermission, isAdmin } = useUserPermissions()
+  const userPermissions = useUserPermissions()
   
-  // Determine permissions
-  const isOwner = content.owner?.id === currentUserId
-  const sharePerms = content.sharePermissions
-  const isDeleted = content.isDeleted
-  const hasFile = content.contentUrl && content.contentUrl.trim() !== ""
-  
-  // System permissions
-  const canViewSystem = hasPermission(PermissionName.VIEW_CONTENT) || isAdmin
-  const canEditSystem = hasAnyPermission([PermissionName.EDIT_CONTENT, PermissionName.MANAGE_OWN_CONTENT]) || isAdmin
-  const canDownloadSystem = hasAnyPermission([PermissionName.DOWNLOAD_CONTENT, PermissionName.MANAGE_OWN_CONTENT]) || isAdmin
-  const canDeleteSystem = hasAnyPermission([PermissionName.SOFT_DELETE_CONTENT, PermissionName.MANAGE_OWN_CONTENT]) || isAdmin
-  const canRestoreSystem = hasAnyPermission([PermissionName.RESTORE_CONTENT, PermissionName.MANAGE_OWN_CONTENT]) || isAdmin
-  const canSoftDeleteSystem = hasAnyPermission([PermissionName.SOFT_DELETE_CONTENT, PermissionName.MANAGE_OWN_CONTENT]) || isAdmin
-  const canHardDeleteSystem = hasAnyPermission([PermissionName.HARD_DELETE_CONTENT, PermissionName.MANAGE_ALL_CONTENT]) || isAdmin
-
-  // Combined permissions: system permissions + ownership/share permissions
-  const canView = canViewSystem && (isOwner || sharePerms?.canView || false)
-  const canEdit = canEditSystem && (isOwner || sharePerms?.canEdit || false)
-  const canDownload = canDownloadSystem && (isOwner || sharePerms?.canDownload || false)
-  const canDelete = canDeleteSystem && (isOwner || sharePerms?.canDelete || false)
-  const canRestore = canRestoreSystem && isOwner
-  const canUpload = isOwner && !hasFile && !isDeleted && canEditSystem
-  const canUpdate = isOwner && hasFile && !isDeleted && canEditSystem
-  const canSoftDelete = canSoftDeleteSystem && (isOwner || sharePerms?.canDelete || false) && !isDeleted
-  const canHardDelete = canHardDeleteSystem && isOwner && !isDeleted
+  // Calculate permissions using shared utility
+  const perms = calculateContentPermissions(content, currentUserId, userPermissions)
+  const { isDeleted } = perms
   
   // If content is deleted, show restore action
   if (isDeleted) {
@@ -91,17 +70,19 @@ export function ContentContextMenu({
           {children}
         </ContextMenuTrigger>
         <ContextMenuContent className="w-48">
-          <ContextMenuItem 
-            onClick={() => onRestore(content)}
-            disabled={isRestoring}
-            className="text-green-400 focus:text-green-400"
-          >
-            <RotateCcw className="mr-2 h-4 w-4" />
-            {isRestoring ? "Đang khôi phục..." : "Khôi phục"}
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          {
-            canHardDeleteSystem && onHardDelete && (
+          {perms.canRestore && (
+            <ContextMenuItem 
+              onClick={() => onRestore(content)}
+              disabled={isRestoring}
+              className="text-green-400 focus:text-green-400"
+            >
+              <RotateCcw className="mr-2 h-4 w-4" />
+              {isRestoring ? "Đang khôi phục..." : "Khôi phục"}
+            </ContextMenuItem>
+          )}
+          {perms.canHardDelete && onHardDelete && (
+            <>
+              <ContextMenuSeparator />
               <ContextMenuItem 
                 onClick={() => onHardDelete(content)}
                 disabled={isHardDeleting}
@@ -110,8 +91,9 @@ export function ContentContextMenu({
                 <Trash2 className="mr-2 h-4 w-4" />
                 {isHardDeleting ? "Đang xóa cứng..." : "Xóa vĩnh viễn"}
               </ContextMenuItem>
-            )
-          }
+            </>
+          )}
+          <ContextMenuSeparator />
           <ContextMenuItem onClick={() => onView(content)}>
             <Eye className="mr-2 h-4 w-4" />
             Xem chi tiết
@@ -127,25 +109,27 @@ export function ContentContextMenu({
         {children}
       </ContextMenuTrigger>
       <ContextMenuContent className="w-48">
-        {canView && (
+        {perms.canView && (
           <>
             <ContextMenuItem onClick={() => onView(content)}>
               <Eye className="mr-2 h-4 w-4" />
               Xem
             </ContextMenuItem>
-            <ContextMenuItem onClick={() => onCopyUrl(content)}>
-              {copiedUrl === content.id ? (
-                <>
-                  <Check className="mr-2 h-4 w-4 text-green-400" />
-                  <span className="text-green-400">Đã copy!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy URL
-                </>
-              )}
-            </ContextMenuItem>
+            {perms.canCopyUrl && (
+              <ContextMenuItem onClick={() => onCopyUrl(content)}>
+                {copiedUrl === content.id ? (
+                  <>
+                    <Check className="mr-2 h-4 w-4 text-green-400" />
+                    <span className="text-green-400">Đã copy!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy URL
+                  </>
+                )}
+              </ContextMenuItem>
+            )}
             {hasSCORMInfo && (
               <ContextMenuItem onClick={() => onShowSCORMInfo(content)}>
                 <BookOpen className="mr-2 h-4 w-4" />
@@ -154,7 +138,7 @@ export function ContentContextMenu({
             )}
           </>
         )}
-        {canEdit && (
+        {perms.canEdit && (
           <>
             <ContextMenuSeparator />
             <ContextMenuItem onClick={() => onEdit(content)}>
@@ -163,7 +147,7 @@ export function ContentContextMenu({
             </ContextMenuItem>
           </>
         )}
-        {canDownload && (
+        {perms.canDownload && (
           <ContextMenuItem 
             onClick={() => onDownload(content)}
             disabled={isDownloading}
@@ -172,7 +156,7 @@ export function ContentContextMenu({
             {isDownloading ? "Đang tải..." : "Tải xuống"}
           </ContextMenuItem>
         )}
-        {canUpdate && onUpdateFile && (
+        {perms.canUpdate && onUpdateFile && (
           <ContextMenuItem 
             onClick={() => onUpdateFile(content)}
             disabled={isUpdating}
@@ -181,7 +165,7 @@ export function ContentContextMenu({
             {isUpdating ? "Đang cập nhật..." : "Cập nhật File"}
           </ContextMenuItem>
         )}
-        {canSoftDelete && onSoftDelete && (
+        {perms.canSoftDelete && onSoftDelete && (
           <ContextMenuItem 
             onClick={() => onSoftDelete(content)}
             disabled={isSoftDeleting}
@@ -191,7 +175,7 @@ export function ContentContextMenu({
             {isSoftDeleting ? "Đang xóa mềm..." : "Xóa mềm"}
           </ContextMenuItem>
         )}
-        {canHardDelete && onHardDelete && (
+        {perms.canHardDelete && onHardDelete && (
           <ContextMenuItem 
             onClick={() => onHardDelete(content)}
             disabled={isHardDeleting}

@@ -24,9 +24,18 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Get redirect URL from query params
+  const getRedirectUrl = () => {
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search)
+      return searchParams.get('redirect') || '/project'
+    }
+    return '/dashboard'
+  }
+
   useEffect(() => {
     if (isAuthenticated) {
-      router.push("/")
+      router.push(getRedirectUrl())
     }
   }, [isAuthenticated, router])
 
@@ -36,7 +45,7 @@ export default function LoginPage() {
     setIsLoading(true)
     try {
       await login({ login: loginInput, password })
-      router.push("/")
+      router.push(getRedirectUrl())
     } catch (err: any) {
       setError(err?.response?.data?.message ?? "Đăng nhập thất bại")
     } finally {
@@ -117,7 +126,7 @@ export default function LoginPage() {
               </div>
 
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
+                {/* <div className="flex items-center space-x-2">
                   <Checkbox
                     id="remember"
                     checked={rememberMe}
@@ -126,10 +135,10 @@ export default function LoginPage() {
                   <Label htmlFor="remember" className="text-sm">
                     Ghi nhớ đăng nhập
                   </Label>
-                </div>
-                <Link href="/forgot-password" className="text-sm text-primary hover:underline">
+                </div> */}
+                {/* <Link href="/forgot-password" className="text-sm text-primary hover:underline">
                   Quên mật khẩu?
-                </Link>
+                </Link> */}
               </div>
 
               <Button type="submit" className="w-full" disabled={isLoading}>
@@ -178,12 +187,12 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div className="mt-6 text-center text-sm text-muted-foreground">
+            {/* <div className="mt-6 text-center text-sm text-muted-foreground">
               Chưa có tài khoản?{" "}
               <Link href="/register" className="text-primary hover:underline">
                 Đăng ký ngay
               </Link>
-            </div>
+            </div> */}
           </CardContent>
         </Card>
 

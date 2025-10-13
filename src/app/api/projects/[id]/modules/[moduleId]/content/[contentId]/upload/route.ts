@@ -112,7 +112,7 @@ export async function POST(
 
     // Verify project and module exist
     const project = await prisma.project.findUnique({
-      where: { id: projectId }
+      where: { id: Number(projectId) as any }
     })
 
     if (!project) {
@@ -120,7 +120,7 @@ export async function POST(
     }
 
     const module = await prisma.module.findUnique({
-      where: { id: moduleId }
+      where: { id: Number(moduleId) as any }
     })
 
     if (!module) {
@@ -129,7 +129,7 @@ export async function POST(
 
     // Find the content to update
     const content = await prisma.contentData.findUnique({
-      where: { id: contentId },
+      where: { id: Number(contentId) as any },
       include: {
         owner: { select: { id: true, name: true, email: true } }
       }
@@ -142,7 +142,7 @@ export async function POST(
     // Permission check for updating content
     const isAdmin = (session.user.roles || []).includes("ADMINISTRATOR")
     const canManageAll = isAdmin || await checkPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id)
-    const isOwner = content.ownerId === session.user.id
+    const isOwner = content.ownerId === Number(session.user.id) as any
 
     if (!canManageAll && !isOwner) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
@@ -221,7 +221,7 @@ export async function POST(
     
     // Update content with new file info
     await prisma.contentData.update({
-      where: { id: contentId },
+      where: { id: Number(contentId) as any },
       data: {
         contentType,
         contentUrl: relativePath,
@@ -236,7 +236,7 @@ export async function POST(
       try {
         // Update progress: Starting extraction (10%)
         await prisma.contentData.update({
-          where: { id: contentId },
+          where: { id: Number(contentId) as any },
           data: { progress: 10 } as any
         })
 
@@ -248,7 +248,7 @@ export async function POST(
         
         // Update progress: Finding files (20%)
         await tx.contentData.update({
-          where: { id: contentId },
+          where: { id: Number(contentId) as any },
           data: { progress: 20 } as any
         })
         
@@ -291,7 +291,7 @@ export async function POST(
         
         // Update progress: Files found (30%)
         await tx.contentData.update({
-          where: { id: contentId },
+          where: { id: Number(contentId) as any },
           data: { progress: 30 } as any
         })
         
@@ -304,7 +304,7 @@ export async function POST(
           
           // Update progress: Validating SCORM (40%)
           await tx.contentData.update({
-            where: { id: contentId },
+            where: { id: Number(contentId) as any },
             data: { progress: 40 } as any
           })
           
@@ -333,7 +333,7 @@ export async function POST(
               
               // Update progress: SCORM processed (60%)
               await tx.contentData.update({
-                where: { id: contentId },
+                where: { id: Number(contentId) as any },
                 data: { progress: 60 } as any
               })
               
@@ -356,7 +356,7 @@ export async function POST(
           // Process HTML package
           // Update progress: Processing HTML (50%)
           await tx.contentData.update({
-            where: { id: contentId },
+            where: { id: Number(contentId) as any },
             data: { progress: 50 } as any
           })
           
@@ -368,7 +368,7 @@ export async function POST(
         if (launchFile) {
           // Update progress: Saving content (80%)
           await tx.contentData.update({
-            where: { id: contentId },
+            where: { id: Number(contentId) as any },
             data: { progress: 80 } as any
           })
           
@@ -376,7 +376,7 @@ export async function POST(
           const relativeDirPath = uploadDir.replace(process.cwd() + '/public', '')
           
           await tx.contentData.update({
-            where: { id: contentId },
+            where: { id: Number(contentId) as any },
             data: {
               status: "COMPLETED" as any,
               progress: 100,
@@ -433,7 +433,7 @@ export async function POST(
         } else {
           // No index file found, mark as failed
           await tx.contentData.update({
-            where: { id: contentId },
+            where: { id: Number(contentId) as any },
             data: {
               status: "FAILED" as any,
               progress: 0
@@ -446,7 +446,7 @@ export async function POST(
         // If transaction fails, update status outside transaction
         try {
           await prisma.contentData.update({
-            where: { id: contentId },
+            where: { id: Number(contentId) as any },
             data: {
               status: "FAILED" as any,
               progress: 0

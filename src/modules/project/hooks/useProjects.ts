@@ -2,11 +2,13 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { createProject, deleteProject, listProjects, updateProject } from "../project.service"
+import cachedKeys from "@/constants/cachedKeys"
+import { CreateProjectPayload, UpdateProjectPayload, ListProjectsParams } from "../project.interface"
 
-export function useProjects(params?: { includeDeleted?: boolean; onlyDeleted?: boolean }) {
+export function useProjects(params?: ListProjectsParams) {
   const qc = useQueryClient()
   
-  const queryKey = ["projects", "list", params]
+  const queryKey = cachedKeys.project.list(params)
 
   const listQuery = useQuery({ 
     queryKey, 
@@ -15,18 +17,18 @@ export function useProjects(params?: { includeDeleted?: boolean; onlyDeleted?: b
 
   const createMut = useMutation({
     mutationFn: createProject,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["projects", "list"] }),
   })
 
   const updateMut = useMutation({
-    mutationFn: ({ id, ...payload }: { id: string; name: string; description?: string; status?: "ACTIVE" | "INACTIVE" | "ARCHIVED" }) => 
+    mutationFn: ({ id, ...payload }: { id: string } & UpdateProjectPayload) => 
       updateProject(id, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["projects", "list"] }),
   })
 
   const deleteMut = useMutation({
     mutationFn: deleteProject,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["projects", "list"] }),
   })
 
   return {
@@ -34,7 +36,7 @@ export function useProjects(params?: { includeDeleted?: boolean; onlyDeleted?: b
     isLoading: listQuery.isLoading,
     refetch: listQuery.refetch,
     createProject: createMut.mutateAsync,
-    updateProject: (id: string, payload: { name: string; description?: string; status?: "ACTIVE" | "INACTIVE" | "ARCHIVED" }) => 
+    updateProject: (id: string, payload: UpdateProjectPayload) => 
       updateMut.mutateAsync({ id, ...payload }),
     deleteProject: deleteMut.mutateAsync,
   }

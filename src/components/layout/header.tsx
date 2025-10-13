@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, Search, Settings, User, HelpCircle, LogOut, Moon, Sun } from "lucide-react"
+import { Bell, Search, Settings, User, HelpCircle, LogOut, Moon, Sun, Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useTheme } from "next-themes"
@@ -16,49 +16,67 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/modules/auth/hooks/useAuth"
 
-export function Header() {
+interface HeaderProps {
+  onMenuClick?: () => void
+}
+
+export function Header({ onMenuClick }: HeaderProps) {
   const { theme, setTheme, resolvedTheme } = useTheme()
   const isDark = (resolvedTheme ?? theme) === "dark"
   const { user: me, isLoading, logout } = useAuth()
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-16 items-center justify-between px-6">
-        <div className="flex items-center gap-6">
+      <div className="flex h-16 items-center justify-between px-4 md:px-6">
+        <div className="flex items-center gap-3 md:gap-6">
+          {/* Mobile Menu Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden hover:bg-accent"
+            onClick={onMenuClick}
+            aria-label="Menu"
+          >
+            <Menu className="h-6 w-6" />
+          </Button>
+          
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-sm">DM</span>
             </div>
-            <h1 className="text-xl font-semibold text-foreground">DocManager</h1>
+            <h1 className="text-lg md:text-xl font-semibold text-foreground">DocManager</h1>
           </div>
 
-          <nav className="hidden md:flex items-center text-sm text-muted-foreground">
+          <nav className="hidden lg:flex items-center text-sm text-muted-foreground">
             <span className="hover:text-foreground cursor-pointer">Trang chủ</span>
             <span className="mx-2">/</span>
             <span className="text-foreground">Dashboard</span>
           </nav>
         </div>
 
-        <div className="flex items-center gap-4">
-
-          <Button variant="ghost" size="icon" className="sm:hidden">
-            <Search className="h-5 w-5" />
-          </Button>
-
+        <div className="flex items-center gap-2 md:gap-4">
+          {/* Theme Toggle */}
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Toggle theme"
+            aria-label="Chuyển đổi giao diện"
             onClick={() => setTheme(isDark ? "light" : "dark")}
+            className="hover:bg-accent"
           >
             {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </Button>
 
-          <Button variant="ghost" size="icon" className="relative">
+          {/* Notifications */}
+          {/* <Button 
+            variant="ghost" 
+            size="icon" 
+            className="relative hover:bg-accent hidden sm:flex"
+            aria-label="Thông báo"
+          >
             <Bell className="h-5 w-5" />
             <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs bg-primary">
               3
             </Badge>
-          </Button>
+          </Button> */}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

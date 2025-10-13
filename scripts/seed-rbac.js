@@ -1,3 +1,6 @@
+// Load environment variables from .env file
+require('dotenv').config()
+
 const { PrismaClient } = require('@prisma/client')
 
 const prisma = new PrismaClient()
@@ -129,17 +132,12 @@ async function seedRBAC() {
           in: [
             // Content permissions
             'VIEW_CONTENT', 'CREATE_CONTENT', 'EDIT_CONTENT', 'DOWNLOAD_CONTENT', 
-            'SOFT_DELETE_CONTENT', 'VIEW_DELETED_OWN_CONTENT', 'RESTORE_CONTENT',
-            'MANAGE_OWN_CONTENT', 'VIEW_OWN_CONTENT_ONLY',
-            'SHARE_CONTENT_ACCESS', 'VIEW_SHARED_CONTENT',
+            'SOFT_DELETE_CONTENT', 'VIEW_DELETED_OWN_CONTENT', 'RESTORE_CONTENT', 'VIEW_OWN_CONTENT_ONLY',
+            'VIEW_SHARED_CONTENT',
             // Project permissions
-            'VIEW_PROJECTS', 'CREATE_PROJECTS', 'EDIT_PROJECTS',
-            'SOFT_DELETE_PROJECTS', 'VIEW_DELETED_PROJECTS', 'RESTORE_PROJECTS',
+            'VIEW_PROJECTS',
             // Module permissions
-            'VIEW_MODULES', 'CREATE_MODULES', 'EDIT_MODULES',
-            'SOFT_DELETE_MODULES', 'VIEW_DELETED_MODULES', 'RESTORE_MODULES',
-            // Other
-            'VIEW_USERS', 'VIEW_DASHBOARD_STATS'
+            'VIEW_MODULES'
           ]
         }
       }

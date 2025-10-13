@@ -57,7 +57,7 @@ export function ShareContentDialog({ open, onOpenChange }: ShareContentDialogPro
     }
   }, [open])
 
-  const filteredUsers = users?.filter(user => 
+  const filteredUsers = users?.data?.filter((user: any) => 
     user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -85,7 +85,7 @@ export function ShareContentDialog({ open, onOpenChange }: ShareContentDialogPro
       }
 
       const payload: any = {
-        sharedWithId: selectedUserId,
+        sharedWithId: Number(selectedUserId) as any,
         canView,
         canEdit,
         canDelete,
@@ -116,8 +116,8 @@ export function ShareContentDialog({ open, onOpenChange }: ShareContentDialogPro
 
     shareContentMut.mutate(
       {
-        contentId: selectedContentId,
-        sharedWithId: selectedUserId,
+        contentId: Number(selectedContentId) as any,
+        sharedWithId: Number(selectedUserId) as any,
         canView,
         canEdit,
         canDelete,
@@ -260,7 +260,7 @@ export function ShareContentDialog({ open, onOpenChange }: ShareContentDialogPro
                   {usersLoading ? (
                     <SelectItem value="loading" disabled>Đang tải...</SelectItem>
                   ) : filteredUsers.length > 0 ? (
-                    filteredUsers.map((user) => (
+                    filteredUsers.map((user: any) => (
                       <SelectItem key={user.id} value={user.id}>
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4" />
@@ -289,7 +289,7 @@ export function ShareContentDialog({ open, onOpenChange }: ShareContentDialogPro
                     {usersLoading ? (
                       <SelectItem value="loading" disabled>Đang tải...</SelectItem>
                     ) : filteredUsers.length > 0 ? (
-                      filteredUsers.map((user) => (
+                      filteredUsers.map((user: any) => (
                         <SelectItem key={user.id} value={user.id}>
                           <div className="flex items-center gap-2">
                             <User className="h-4 w-4" />

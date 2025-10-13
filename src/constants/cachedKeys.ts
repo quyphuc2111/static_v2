@@ -13,6 +13,12 @@ const cachedKeys = {
         list: (projectId: string, moduleId: string) => ["content", projectId, moduleId],
         stats: (projectId?: string) => projectId ? ["content", "stats", projectId] : ["content", "stats"],
     },
+    project: {
+        list: (params?: any) => ["projects", "list", params],
+        detail: (projectId: string) => ["projects", projectId],
+        modules: (projectId: string) => ["projects", projectId, "modules"],
+        moduleContentCount: (moduleId: string) => ["module-content-count", moduleId],
+    },
 }
 
 export default cachedKeys

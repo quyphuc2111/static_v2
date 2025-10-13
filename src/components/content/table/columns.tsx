@@ -15,6 +15,7 @@ import {
 import { useState } from "react"
 import { useUserPermissions } from "@/modules/rbac/hooks"
 import { PermissionName } from "@prisma/client"
+import { calculateContentPermissions, ContentPermissions } from "./permissions"
 
 // Types
 export interface ContentItem {
@@ -178,32 +179,11 @@ function ContentActions({
   isHardDeleting,
   currentUserId
 }: ContentActionsProps) {
-  const { hasPermission, hasAnyPermission, isAdmin } = useUserPermissions()
+  const userPermissions = useUserPermissions()
   
-  // Determine permissions
-  const isOwner = content.owner?.id === currentUserId
-  const sharePerms = content.sharePermissions
-  console.log("sharePerms", sharePerms)
-  const isDeleted = content.isDeleted
-  const hasFile = content.contentUrl && content.contentUrl.trim() !== ""
-  
-  // System permissions
-  const canViewSystem = hasPermission(PermissionName.VIEW_CONTENT) || isAdmin
-  const canEditSystem = hasAnyPermission([PermissionName.EDIT_CONTENT]) || isAdmin
-  const canDownloadSystem = hasAnyPermission([PermissionName.DOWNLOAD_CONTENT]) || isAdmin
-  const canRestoreSystem = hasAnyPermission([PermissionName.RESTORE_CONTENT]) || isAdmin
-  const canSoftDeleteSystem = hasAnyPermission([PermissionName.SOFT_DELETE_CONTENT]) || isAdmin
-  const canHardDeleteSystem = hasAnyPermission([PermissionName.HARD_DELETE_CONTENT, PermissionName.MANAGE_ALL_CONTENT]) || isAdmin
-  
-  // Combined permissions: system permissions + ownership/share permissions
-  const canView = canViewSystem || ( sharePerms?.canView || false)
-  const canDownload = canDownloadSystem || ( sharePerms?.canDownload || false)
-  const canEdit = canEditSystem || ( sharePerms?.canEdit || false)
-  const canRestore = canRestoreSystem 
-  const canUpload =  !hasFile && !isDeleted && canEditSystem
-  const canUpdate =  hasFile && !isDeleted && canEditSystem
-  const canSoftDelete = canSoftDeleteSystem && (( sharePerms?.canDelete || false) && !isDeleted)
-  const canHardDelete = canHardDeleteSystem &&  !isDeleted
+  // Calculate permissions using shared utility
+  const perms = calculateContentPermissions(content, currentUserId, userPermissions)
+  const { isDeleted } = perms
 
   // If content is deleted, show restore action instead
   if (isDeleted) {
@@ -215,17 +195,19 @@ function ContentActions({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem 
-            onClick={() => onRestore(content)}
-            disabled={isRestoring}
-            className="text-green-400"
-          >
-            <RotateCcw className="mr-2 h-4 w-4" />
-            {isRestoring ? "Đang khôi phục..." : "Khôi phục"}
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          {
-            canHardDeleteSystem && onHardDelete && (
+          {perms.canRestore && (
+            <DropdownMenuItem 
+              onClick={() => onRestore(content)}
+              disabled={isRestoring}
+              className="text-green-400"
+            >
+              <RotateCcw className="mr-2 h-4 w-4" />
+              {isRestoring ? "Đang khôi phục..." : "Khôi phục"}
+            </DropdownMenuItem>
+          )}
+          {perms.canHardDelete && onHardDelete && (
+            <>
+              <DropdownMenuSeparator />
               <DropdownMenuItem 
                 onClick={() => onHardDelete(content)}
                 disabled={isHardDeleting}
@@ -234,8 +216,9 @@ function ContentActions({
                 <Trash2 className="mr-2 h-4 w-4" />
                 {isHardDeleting ? "Đang xóa cứng..." : "Xóa vĩnh viễn"}
               </DropdownMenuItem>
-            )
-          }
+            </>
+          )}
+          <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => onView(content)}>
             <Eye className="mr-2 h-4 w-4" />
             Xem chi tiết
@@ -253,25 +236,27 @@ function ContentActions({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {canView && (
+        {perms.canView && (
           <>
             <DropdownMenuItem onClick={() => onView(content)}>
               <Eye className="mr-2 h-4 w-4" />
               Xem
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onCopyUrl(content)}>
-              {copiedUrl === content.id ? (
-                <>
-                  <Check className="mr-2 h-4 w-4 text-green-400" />
-                  <span className="text-green-400">Đã copy!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy URL
-                </>
-              )}
-            </DropdownMenuItem>
+            {perms.canCopyUrl && (
+              <DropdownMenuItem onClick={() => onCopyUrl(content)}>
+                {copiedUrl === content.id ? (
+                  <>
+                    <Check className="mr-2 h-4 w-4 text-green-400" />
+                    <span className="text-green-400">Đã copy!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy URL
+                  </>
+                )}
+              </DropdownMenuItem>
+            )}
             {getSCORMInfo(content) && (
               <DropdownMenuItem onClick={() => onShowSCORMInfo(content)}>
                 <BookOpen className="mr-2 h-4 w-4" />
@@ -280,7 +265,7 @@ function ContentActions({
             )}
           </>
         )}
-        {canDownload && (
+        {perms.canDownload && (
           <DropdownMenuItem 
             onClick={() => onDownload(content)}
             disabled={isDownloading}
@@ -289,14 +274,14 @@ function ContentActions({
             {isDownloading ? "Đang tải..." : "Tải xuống"}
           </DropdownMenuItem>
         )}
-        {canEdit && (
+        {perms.canEdit && (
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onEdit(content)}>
               <Edit className="mr-2 h-4 w-4" />
               Chỉnh sửa
             </DropdownMenuItem>
-            {canUpdate && onUpdateFile && (
+            {perms.canUpdate && onUpdateFile && (
               <DropdownMenuItem 
                 onClick={() => onUpdateFile(content)}
                 disabled={isUpdating}
@@ -307,7 +292,7 @@ function ContentActions({
             )}
           </>
         )}
-        {canSoftDelete && onSoftDelete && (
+        {perms.canSoftDelete && onSoftDelete && (
           <DropdownMenuItem 
             onClick={() => onSoftDelete(content)}
             disabled={isSoftDeleting}
@@ -317,7 +302,7 @@ function ContentActions({
             {isSoftDeleting ? "Đang xóa mềm..." : "Xóa mềm"}
           </DropdownMenuItem>
         )}
-        {canHardDelete && onHardDelete && (
+        {perms.canHardDelete && onHardDelete && (
           <DropdownMenuItem 
             onClick={() => onHardDelete(content)}
             disabled={isHardDeleting}
@@ -492,17 +477,15 @@ export const createContentColumns = (
   {
     accessorKey: "contentUrl",
     header: "Đường dẫn",
-    cell: ({ row }) => {
+    cell: ({ row, table }) => {
       const contentUrl = row.getValue("contentUrl") as string
       const hasFile = contentUrl && contentUrl.trim() !== ""
       const content = row.original
-      const isOwner = content.owner?.id === options?.currentUserId
-      const canUpload = isOwner && !hasFile && !content.isDeleted
       
       if (!hasFile) {
         return (
           <div className="flex items-center">
-            {canUpload && actions.onUploadFile ? (
+            {actions.onUploadFile ? (
               <Button
                 size="sm"
                 variant="outline"

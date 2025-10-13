@@ -26,12 +26,13 @@ export async function PATCH(req: Request, { params }: Params) {
 
     try {
       const { moduleId } = await params
+      const mId = Number(moduleId)
       const updateData: any = { name }
       if (description !== undefined) updateData.description = description || null
       if (status !== undefined) updateData.status = status
       
       const updated = await prisma.module.update({
-        where: { id: moduleId },
+        where: { id: mId as any },
         data: updateData,
       })
       return NextResponse.json({ data: updated })
@@ -58,7 +59,7 @@ export async function DELETE(_req: Request, { params }: Params) {
     }
 
     const { moduleId } = await params
-    await prisma.module.delete({ where: { id: moduleId } })
+    await prisma.module.delete({ where: { id: Number(moduleId) as any } })
     return NextResponse.json({ success: true })
   } catch (e) {
     return NextResponse.json({ message: "Server error" }, { status: 500 })

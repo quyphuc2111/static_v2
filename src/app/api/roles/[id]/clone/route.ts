@@ -19,10 +19,11 @@ export async function POST(
     }
 
     const { id: roleId } = await params
+    const numericRoleId = Number(roleId)
 
     // Get source role with permissions
     const sourceRole = await prisma.role.findUnique({
-      where: { id: roleId },
+      where: { id: numericRoleId as any },
       include: {
         permissions: true
       }

@@ -18,7 +18,7 @@ export async function hasPermission(permission: string | PermissionName, userId?
 
     // Get user with roles and permissions
     const user = await prisma.user.findUnique({
-      where: { id: targetUserId },
+      where: { id: targetUserId as any },
       include: {
         roles: {
           include: {

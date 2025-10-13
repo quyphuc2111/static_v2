@@ -31,7 +31,7 @@ export function AssignRoleDialog({ open, onOpenChange, user }: AssignRoleDialogP
     assignRoleMut.mutate(
       {
         userId: user.id,
-        roleId: selectedRoleId,
+        roleId: Number(selectedRoleId) as any,
       },
       {
         onSuccess: () => {
@@ -52,7 +52,7 @@ export function AssignRoleDialog({ open, onOpenChange, user }: AssignRoleDialogP
       removeRoleMut.mutate(
         {
           userId: user.id,
-          roleId,
+          roleId: Number(roleId) as any,
         },
         {
           onSuccess: () => {
@@ -98,7 +98,7 @@ export function AssignRoleDialog({ open, onOpenChange, user }: AssignRoleDialogP
               </div>
             ) : userRoles && userRoles.length > 0 ? (
               <div className="space-y-2">
-                {userRoles.map((userRole) => (
+                {userRoles.map((userRole: any) => (
                   <div key={userRole.roleId} className="flex items-center justify-between p-3 border rounded-lg">
                     <div className="flex items-center gap-3">
                       <Shield className="h-4 w-4 text-muted-foreground" />
@@ -142,15 +142,15 @@ export function AssignRoleDialog({ open, onOpenChange, user }: AssignRoleDialogP
             ) : availableRoles.length > 0 ? (
               <div className="space-y-2">
                 <div className="grid grid-cols-1 gap-2">
-                  {availableRoles.map((role) => (
+                  {availableRoles.map((role: any) => (
                     <div 
                       key={role.id} 
                       className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
-                        selectedRoleId === role.id 
+                        selectedRoleId === role.id.toString() 
                           ? "border-primary bg-primary/5" 
                           : "hover:bg-muted/50"
                       }`}
-                      onClick={() => setSelectedRoleId(role.id)}
+                      onClick={() => setSelectedRoleId(role.id.toString())}
                     >
                       <div className="flex items-center gap-3">
                         <Shield className="h-4 w-4 text-muted-foreground" />
