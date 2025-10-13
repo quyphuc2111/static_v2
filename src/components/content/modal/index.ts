@@ -2,6 +2,8 @@
 export { CreateContentDialog } from "./create-content-dialog"
 export { EditContentDialog } from "./edit-content-dialog"
 export { DeleteContentDialog } from "./delete-content-dialog"
+export { SoftDeleteDialog } from "./soft-delete-dialog"
+export { HardDeleteDialog } from "./hard-delete-dialog"
 export { SCORMInfo } from "./scorm-info"
 export { SCORMInfoDialog } from "./scorm-info-dialog"
 export { DescriptionDialog } from "./description-dialog"

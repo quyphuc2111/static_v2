@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission as checkPermission } from "@/lib/permissions"
 import { PermissionName } from "@prisma/client"
+import { logModuleAction } from "@/lib/audit"
 
 type Params = { params: Promise<{ id: string; moduleId: string }> }
 
@@ -73,6 +74,17 @@ export async function POST(
 
       return module
     })
+    
+    // Log audit
+    await logModuleAction(
+      session.user.id,
+      'soft_deleted',
+      String(mId),
+      {
+        moduleName: updatedModule.name,
+        description: updatedModule.description
+      }
+    )
 
     return NextResponse.json({
       message: "Module soft deleted successfully",

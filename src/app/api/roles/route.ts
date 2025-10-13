@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission } from "@/lib/permissions"
+import { createAuditLog } from "@/lib/audit"
 
 export async function GET(req: NextRequest) {
   try {
@@ -87,6 +88,19 @@ export async function POST(req: NextRequest) {
       }
 
       return newRole
+    })
+    
+    // Log audit
+    await createAuditLog({
+      actorId: session.user.id,
+      action: 'created',
+      entityType: 'Role',
+      entityId: String(role.id),
+      metadata: {
+        roleName: role.name,
+        description: role.description,
+        permissions: permissionIds
+      }
     })
 
     return NextResponse.json({ data: role }, { status: 201 })

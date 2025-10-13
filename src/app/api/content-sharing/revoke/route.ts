@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission } from "@/lib/permissions"
 import { PermissionName, ShareStatus } from "@prisma/client"
+import { createAuditLog } from "@/lib/audit"
 
 export async function PATCH(req: NextRequest) {
   try {
@@ -51,7 +52,7 @@ export async function PATCH(req: NextRequest) {
       })
 
       // Update all shares in the batch
-      await prisma.contentShare.updateMany({
+      const revokedShares = await prisma.contentShare.updateMany({
         where: { batchId: Number(batchId) as any },
         data: {
           status: ShareStatus.REVOKED,
@@ -61,6 +62,20 @@ export async function PATCH(req: NextRequest) {
           canDownload: false,
           revokedAt: new Date(),
           updatedAt: new Date()
+        }
+      })
+      
+      // Log audit for batch revoke
+      await createAuditLog({
+        actorId: session.user.id,
+        action: 'batch_revoked',
+        entityType: 'ShareBatch',
+        entityId: String(batchId),
+        metadata: {
+          scope: batch.scope,
+          sharedWithId: batch.sharedWithId,
+          itemsCount: batch.itemsCount,
+          revokedCount: revokedShares.count
         }
       })
 
@@ -86,7 +101,7 @@ export async function PATCH(req: NextRequest) {
       }
 
       // Update share status
-      await prisma.contentShare.update({
+      const revokedShare = await prisma.contentShare.update({
         where: { id: Number(shareId) as any },
         data: {
           status: ShareStatus.REVOKED,
@@ -96,6 +111,28 @@ export async function PATCH(req: NextRequest) {
           canDownload: false,
           revokedAt: new Date(),
           updatedAt: new Date()
+        },
+        include: {
+          content: {
+            select: { id: true, title: true }
+          },
+          sharedWith: {
+            select: { id: true, email: true }
+          }
+        }
+      })
+      
+      // Log audit for individual revoke
+      await createAuditLog({
+        actorId: session.user.id,
+        action: 'revoked',
+        entityType: 'ContentShare',
+        entityId: String(shareId),
+        metadata: {
+          contentId: revokedShare.contentId,
+          contentTitle: revokedShare.content?.title,
+          sharedWithId: revokedShare.sharedWithId,
+          sharedWithEmail: revokedShare.sharedWith?.email
         }
       })
 

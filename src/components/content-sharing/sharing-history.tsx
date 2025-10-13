@@ -50,6 +50,8 @@ export function SharingHistory() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [projectFilter, setProjectFilter] = useState<string>("all")
   const [moduleFilter, setModuleFilter] = useState<string>("all")
+  const [sharedByFilter, setSharedByFilter] = useState<string>("all")
+  const [sharedWithFilter, setSharedWithFilter] = useState<string>("all")
   const [sortBy, setSortBy] = useState<string>("createdAt")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
   const [showRevokeDialog, setShowRevokeDialog] = useState(false)
@@ -127,6 +129,16 @@ export function SharingHistory() {
       list = list.filter((s: any) => s.content?.module?.id === moduleFilter)
     }
     
+    // Filter by shared by (người chia sẻ)
+    if (sharedByFilter !== "all") {
+      list = list.filter((s: any) => String(s.sharedById) === sharedByFilter)
+    }
+    
+    // Filter by shared with (người nhận)
+    if (sharedWithFilter !== "all") {
+      list = list.filter((s: any) => String(s.sharedWithId) === sharedWithFilter)
+    }
+    
     // Sort
     list.sort((a: any, b: any) => {
       let aVal, bVal
@@ -160,7 +172,7 @@ export function SharingHistory() {
     })
     
     return list
-  }, [shares, searchTerm, statusFilter, projectFilter, moduleFilter, sortBy, sortOrder])
+  }, [shares, searchTerm, statusFilter, projectFilter, moduleFilter, sharedByFilter, sharedWithFilter, sortBy, sortOrder])
 
   const handleRevokeConfirm = () => {
     if (!revokeShareId) return
@@ -263,13 +275,24 @@ export function SharingHistory() {
     setShowRevokeDialog(true)
   }
 
+  const handleClearFilters = () => {
+    setSearchTerm("")
+    setStatusFilter("all")
+    setProjectFilter("all")
+    setModuleFilter("all")
+    setSharedByFilter("all")
+    setSharedWithFilter("all")
+    setSortBy("createdAt")
+    setSortOrder("desc")
+  }
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 md:gap-4">
         <div className="relative flex-1 w-full sm:max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Tìm kiếm lịch sử..."
+            placeholder="Tìm theo tài liệu, người chia sẻ, người nhận..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 bg-white border-border"
@@ -277,6 +300,48 @@ export function SharingHistory() {
         </div>
         
         <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+          <Select value={sharedByFilter} onValueChange={setSharedByFilter}>
+            <SelectTrigger className="w-full sm:w-48 bg-white">
+              <SelectValue placeholder="Người chia sẻ" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tất cả người chia sẻ</SelectItem>
+              {shares && Array.from(new Map(shares
+                .filter((s: any) => s.sharedBy?.id)
+                .map((s: any) => [s.sharedBy.id, { 
+                  id: s.sharedBy.id, 
+                  name: s.sharedBy.name || s.sharedBy.username,
+                  email: s.sharedBy.email 
+                }])
+              ).values()).map((user: any) => (
+                <SelectItem key={user.id} value={String(user.id)}>
+                  {user.name || user.email}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={sharedWithFilter} onValueChange={setSharedWithFilter}>
+            <SelectTrigger className="w-full sm:w-48 bg-white">
+              <SelectValue placeholder="Người nhận" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tất cả người nhận</SelectItem>
+              {shares && Array.from(new Map(shares
+                .filter((s: any) => s.sharedWith?.id)
+                .map((s: any) => [s.sharedWith.id, { 
+                  id: s.sharedWith.id, 
+                  name: s.sharedWith.name || s.sharedWith.username,
+                  email: s.sharedWith.email 
+                }])
+              ).values()).map((user: any) => (
+                <SelectItem key={user.id} value={String(user.id)}>
+                  {user.name || user.email}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-40 bg-white">
               <SelectValue placeholder="Trạng thái" />
@@ -357,6 +422,18 @@ export function SharingHistory() {
           >
             {sortOrder === "asc" ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
           </Button>
+          
+          {(searchTerm || statusFilter !== "all" || projectFilter !== "all" || moduleFilter !== "all" || sharedByFilter !== "all" || sharedWithFilter !== "all" || sortBy !== "createdAt" || sortOrder !== "desc") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearFilters}
+              className="w-full sm:w-auto text-xs"
+            >
+              <Filter className="h-3 w-3 mr-1" />
+              Xóa bộ lọc
+            </Button>
+          )}
         </div>
       </div>
 

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission } from "@/lib/permissions"
 import { PermissionName } from "@prisma/client"
+import { logUserAction } from "@/lib/audit"
 import bcrypt from "bcryptjs"
 
 type Params = { params: Promise<{ userId: string }> }
@@ -43,6 +44,17 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         updatedAt: true,
       },
     })
+    
+    // Log audit
+    await logUserAction(
+      session.user.id,
+      'password_reset',
+      userId,
+      {
+        userName: updated.name,
+        resetBy: session.user.id
+      }
+    )
 
     return NextResponse.json({ 
       data: updated,

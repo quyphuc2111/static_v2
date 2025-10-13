@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission } from "@/lib/permissions"
 import { PermissionName } from "@prisma/client"
+import { createAuditLog } from "@/lib/audit"
 
 export async function PATCH(
   req: NextRequest,
@@ -90,6 +91,21 @@ export async function PATCH(
             email: true
           }
         }
+      }
+    })
+    
+    // Log audit
+    await createAuditLog({
+      actorId: session.user.id,
+      action: 'permissions_updated',
+      entityType: 'ContentShare',
+      entityId: shareId,
+      metadata: {
+        contentId: updatedShare.contentId,
+        contentTitle: updatedShare.content?.title,
+        sharedWithId: updatedShare.sharedWithId,
+        sharedWithEmail: updatedShare.sharedWith?.email,
+        permissions: { canView, canEdit, canDelete, canDownload }
       }
     })
 

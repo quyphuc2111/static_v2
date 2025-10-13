@@ -23,12 +23,11 @@ export async function GET(req: NextRequest, { params }: Params) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403 })
     }
 
-    // Get all content owned by this user
+    // Get all content owned by this user (all status except deleted)
     const content = await prisma.contentData.findMany({
       where: {
         ownerId: numericUserId as any,
-        isDeleted: false,
-        status: "COMPLETED"
+        isDeleted: false
       },
       select: {
         id: true,

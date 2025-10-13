@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission } from "@/lib/permissions"
+import { logUserAction } from "@/lib/audit"
 
 interface Params {
   params: Promise<{
@@ -103,6 +104,24 @@ export async function POST(req: NextRequest, { params }: Params) {
         }
       }
     })
+    
+    // Get user info for audit
+    const user = await prisma.user.findUnique({
+      where: { id: numericUserId as any },
+      select: { name: true }
+    })
+    
+    // Log audit
+    await logUserAction(
+      session.user.id,
+      'role_assigned',
+      userId,
+      {
+        userName: user?.name,
+        roleId: roleId,
+        roleName: userRole.role?.name
+      }
+    )
 
     return NextResponse.json({ data: userRole }, { status: 201 })
   } catch (error) {
@@ -135,6 +154,12 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     if (!roleId) {
       return NextResponse.json({ message: "Role ID is required" }, { status: 400 })
     }
+    
+    // Get user info for audit
+    const user = await prisma.user.findUnique({
+      where: { id: numericUserId as any },
+      select: { name: true }
+    })
 
     await prisma.userRole.delete({
       where: {
@@ -144,6 +169,17 @@ export async function DELETE(req: NextRequest, { params }: Params) {
         }
       }
     })
+    
+    // Log audit
+    await logUserAction(
+      session.user.id,
+      'role_removed',
+      userId,
+      {
+        userName: user?.name,
+        roleId: roleId
+      }
+    )
 
     return NextResponse.json({ message: "Role removed successfully" })
   } catch (error) {

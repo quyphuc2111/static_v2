@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission } from "@/lib/permissions"
 import { PermissionName, ShareScope } from "@prisma/client"
+import { createAuditLog } from "@/lib/audit"
 
 export async function GET(req: NextRequest) {
   try {
@@ -221,6 +222,24 @@ export async function POST(req: NextRequest) {
         })
         results.push(share)
       }
+      
+      // Log audit for bulk share
+      await createAuditLog({
+        actorId: session.user.id,
+        action: 'bulk_shared',
+        entityType: 'ContentShare',
+        entityId: String(batch.id),
+        metadata: {
+          scope: scope,
+          sharedWithId: numeric.sharedWithId,
+          projectId: numeric.projectId,
+          moduleId: numeric.moduleId,
+          ownerId: numeric.ownerId,
+          contentCount: results.length,
+          permissions: { canView, canEdit, canDelete, canDownload }
+        }
+      })
+      
       return NextResponse.json({ data: { count: results.length, batchId: batch.id } }, { status: 201 })
     }
 
@@ -331,6 +350,21 @@ export async function POST(req: NextRequest) {
           }
         }
       })
+      
+      // Log audit for share update
+      await createAuditLog({
+        actorId: session.user.id,
+        action: 'updated',
+        entityType: 'ContentShare',
+        entityId: String(updatedShare.id),
+        metadata: {
+          contentId: numeric.contentId,
+          contentTitle: updatedShare.content?.title,
+          sharedWithId: numeric.sharedWithId,
+          sharedWithEmail: updatedShare.sharedWith?.email,
+          permissions: { canView, canEdit, canDelete, canDownload }
+        }
+      })
 
       return NextResponse.json({ data: updatedShare })
     } else {
@@ -381,6 +415,21 @@ export async function POST(req: NextRequest) {
               email: true
             }
           }
+        }
+      })
+      
+      // Log audit for new share
+      await createAuditLog({
+        actorId: session.user.id,
+        action: 'created',
+        entityType: 'ContentShare',
+        entityId: String(newShare.id),
+        metadata: {
+          contentId: numeric.contentId,
+          contentTitle: newShare.content?.title,
+          sharedWithId: numeric.sharedWithId,
+          sharedWithEmail: newShare.sharedWith?.email,
+          permissions: { canView, canEdit, canDelete, canDownload }
         }
       })
 

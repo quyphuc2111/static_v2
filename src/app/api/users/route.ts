@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission } from "@/lib/permissions"
 import { PermissionName, UserStatus } from "@prisma/client"
+import { logUserAction } from "@/lib/audit"
 import bcrypt from "bcryptjs"
 
 export async function GET(req: NextRequest) {
@@ -157,6 +158,19 @@ export async function POST(req: NextRequest) {
 
       return { user: fullUser!, temporaryPassword: plainPassword }
     })
+    
+    // Log audit
+    await logUserAction(
+      session.user.id,
+      'created',
+      String(created.user.id),
+      {
+        userName: created.user.name,
+        email: created.user.email,
+        username: created.user.username,
+        roleId: roleId
+      }
+    )
 
     return NextResponse.json({ data: created.user, temporaryPassword: created.temporaryPassword }, { status: 201 })
   } catch (error: any) {

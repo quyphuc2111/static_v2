@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission } from "@/lib/permissions"
+import { createAuditLog } from "@/lib/audit"
 
 export async function POST(
   req: NextRequest,
@@ -63,6 +64,20 @@ export async function POST(
       }
 
       return newRole
+    })
+    
+    // Log audit
+    await createAuditLog({
+      actorId: session.user.id,
+      action: 'cloned',
+      entityType: 'Role',
+      entityId: String(clonedRole.id),
+      metadata: {
+        roleName: clonedRole.name,
+        sourceRoleId: roleId,
+        sourceRoleName: sourceRole.name,
+        permissionCount: sourceRole.permissions.length
+      }
     })
 
     return NextResponse.json({ data: clonedRole }, { status: 201 })

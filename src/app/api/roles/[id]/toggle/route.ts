@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { hasPermission } from "@/lib/permissions"
+import { createAuditLog } from "@/lib/audit"
 
 export async function POST(
   req: NextRequest,
@@ -42,6 +43,18 @@ export async function POST(
       where: { id: numericRoleId as any },
       data: {
         isActive: !currentRole.isActive
+      }
+    })
+    
+    // Log audit
+    await createAuditLog({
+      actorId: session.user.id,
+      action: 'status_toggled',
+      entityType: 'Role',
+      entityId: roleId,
+      metadata: {
+        roleName: updatedRole.name,
+        newStatus: updatedRole.isActive
       }
     })
 

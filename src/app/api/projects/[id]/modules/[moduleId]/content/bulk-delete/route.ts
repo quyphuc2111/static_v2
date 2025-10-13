@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { PermissionName } from "@prisma/client"
 import { hasAnyPermission } from "@/lib/permissions"
+import { logContentAction } from "@/lib/audit"
 
 interface Params {
   params: Promise<{
@@ -120,6 +121,21 @@ export async function POST(req: NextRequest, { params }: Params) {
         return { count: updateResult.count }
       }
     })
+    
+    // Log audit for each deleted content
+    const action = canHardDelete ? 'bulk_hard_deleted' : 'bulk_soft_deleted'
+    for (const content of existingContent) {
+      await logContentAction(
+        session.user.id,
+        action,
+        String(content.id),
+        {
+          contentTitle: content.title,
+          action: 'bulk_delete',
+          count: result.count
+        }
+      )
+    }
 
     return NextResponse.json({
       message: `Successfully ${isAdmin ? 'deleted' : 'soft-deleted'} ${result.count} content items`,

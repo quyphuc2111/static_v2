@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { PermissionName, ShareStatus } from "@prisma/client"
 import { hasPermission as checkPermission, hasAnyPermission } from "@/lib/permissions"
+import { logContentAction } from "@/lib/audit"
 import { Prisma } from "@prisma/client"
 import { writeFile, mkdir } from "fs/promises"
 import { join, dirname } from "path"
@@ -596,6 +597,20 @@ export async function POST(
         }
       }
     }, 2000)
+    
+    // Log audit
+    await logContentAction(
+      session.user.id,
+      'created',
+      String(content.id),
+      {
+        contentTitle: content.title,
+        contentType: content.contentType,
+        projectId: pId,
+        moduleId: mId,
+        fileSize: file.size
+      }
+    )
 
     return NextResponse.json({ data: content })
   } catch (error) {
