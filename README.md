@@ -40,7 +40,8 @@ Cập nhật các biến môi trường trong `.env`:
 DATABASE_URL="mysql://user:password@host:port/database"
 NEXT_PUBLIC_API_BASE_URL="http://localhost:3000"
 NEXT_PUBLIC_BASE_URL="http://localhost:3000"
-SESSION_SECRET="your-secret-key-here"
+SESSION_COOKIE_NAME="bkt_session"
+SESSION_PASSWORD=dev-secret-change-me-dev-secret-change-me
 ```
 
 ### 4. Prisma Setup
