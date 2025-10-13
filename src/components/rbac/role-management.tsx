@@ -30,8 +30,8 @@ import { Separator } from "../ui/separator"
 import { Plus, MoreHorizontal, Edit, Trash2, Copy, Shield, Users, Lock, Unlock, AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useRoles, useDeleteRole, usePermissions, useUpdateRole, useCreateRole, useCloneRole, useToggleRoleStatus } from "@/modules/rbac/hooks"
-import { CreateRoleDialog } from "./create-role-dialog"
-import { EditRoleDialog } from "./edit-role-dialog"
+import { CreateRoleDialog } from "./modal/create-role-dialog"
+import { EditRoleDialog } from "./modal/edit-role-dialog"
 import { PermissionGuard } from "./permission-guard"
 import { PermissionName } from "@prisma/client"
 
@@ -93,7 +93,7 @@ export function RoleManagement() {
 
   const handleDeleteRole = (roleId: string) => {
     if (confirm("Bạn có chắc chắn muốn xóa vai trò này?")) {
-      deleteRoleMut.mutate(roleId)
+      deleteRoleMut.mutate(Number(roleId) as any)
     }
   }
 
@@ -107,12 +107,12 @@ export function RoleManagement() {
 
   const handleCloneRole = (roleId: string) => {
     if (confirm("Bạn có muốn nhân bản vai trò này?")) {
-      cloneRoleMut.mutate(roleId)
+      cloneRoleMut.mutate(Number(roleId) as any)
     }
   }
 
   const handleToggleStatus = (roleId: string) => {
-    toggleStatusMut.mutate(roleId)
+    toggleStatusMut.mutate(Number(roleId) as any)
   }
 
   if (isLoading) {
@@ -123,17 +123,17 @@ export function RoleManagement() {
     )
   }
 
-  const permissionCategories = buildPermissionCategories(permissions || [])
+  const permissionCategories = buildPermissionCategories(permissions || [] as any)
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 md:gap-4 w-full md:w-auto">
           <Input
             placeholder="Tìm kiếm vai trò..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-80"
+            className="w-full sm:w-80"
           />
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Users className="h-4 w-4" />
@@ -158,12 +158,13 @@ export function RoleManagement() {
                 setRoleName("")
                 setRoleDescription("")
                 setIsCreateDialogOpen(true)
-              }}>
+              }} className="w-full md:w-auto">
                 <Plus className="h-4 w-4 mr-2" />
-                Tạo vai trò mới
+                <span className="hidden sm:inline">Tạo vai trò mới</span>
+                <span className="sm:hidden">Tạo mới</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="!max-w-4xl max-h-[90vh]">
+            <DialogContent className="max-w-[95vw] sm:max-w-[90vw] md:!max-w-4xl max-h-[90vh]">
               <DialogHeader>
                 <DialogTitle>
                   {selectedRole ? "Chỉnh sửa vai trò" : "Tạo vai trò mới"}
@@ -259,14 +260,14 @@ export function RoleManagement() {
                       payload: {
                         name: roleName,
                         description: roleDescription,
-                        permissionIds: selectedPermissions,
+                        permissionIds: selectedPermissions.map(id => Number(id) as any),
                       }
                     })
                   } else {
                     createRoleMut.mutate({
                       name: roleName,
                       description: roleDescription,
-                      permissionIds: selectedPermissions,
+                      permissionIds: selectedPermissions.map(id => Number(id) as any),
                     })
                   }
                   setIsCreateDialogOpen(false)
@@ -329,12 +330,12 @@ export function RoleManagement() {
                           <Edit className="h-4 w-4 mr-2" />
                           Chỉnh sửa
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleCloneRole(role.id)}>
+                        <DropdownMenuItem onClick={() => handleCloneRole(role.id.toString())}>
                           <Copy className="h-4 w-4 mr-2" />
                           Nhân bản
                         </DropdownMenuItem>
                         <DropdownMenuItem 
-                          onClick={() => handleToggleStatus(role.id)}
+                          onClick={() => handleToggleStatus(role.id.toString())}
                           disabled={isSystem}
                         >
                           {role.isActive ? (
@@ -353,7 +354,7 @@ export function RoleManagement() {
                         <DropdownMenuItem 
                           className="text-red-600" 
                           disabled={isSystem}
-                          onClick={() => handleDeleteRole(role.id)}
+                          onClick={() => handleDeleteRole(role.id.toString())}
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
                           Xóa vai trò

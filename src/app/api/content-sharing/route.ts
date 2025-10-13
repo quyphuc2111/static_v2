@@ -18,11 +18,11 @@ export async function GET(req: NextRequest) {
     let whereClause: any = {}
 
     if (userId) {
-      whereClause.sharedWithId = userId
+      whereClause.sharedWithId = Number(userId) as any
     }
 
     if (contentId) {
-      whereClause.contentId = contentId
+      whereClause.contentId = Number(contentId) as any
     }
 
     const shares = await prisma.contentShare.findMany({
@@ -117,30 +117,39 @@ export async function POST(req: NextRequest) {
       contentIds
     } = body
 
+    const numeric = {
+      contentId: contentId != null ? Number(contentId) : undefined,
+      sharedWithId: sharedWithId != null ? Number(sharedWithId) : undefined,
+      projectId: projectId != null ? Number(projectId) : undefined,
+      moduleId: moduleId != null ? Number(moduleId) : undefined,
+      ownerId: ownerId != null ? Number(ownerId) : undefined,
+      contentIds: Array.isArray(contentIds) ? contentIds.map((v: any) => Number(v)) : undefined,
+    }
+
     const isAdmin = Array.isArray(session.user?.roles) && (session.user!.roles as any[]).includes("ADMINISTRATOR")
     const canManageAll = await hasPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id)
 
     // BULK SHARE: project/module/owner/contentIds (requires SHARE_CONTENT_ACCESS permission)
-    if (sharedWithId && (projectId || moduleId || ownerId || (Array.isArray(contentIds) && contentIds.length > 0))) {
+    if (numeric.sharedWithId && (numeric.projectId || numeric.moduleId || numeric.ownerId || (Array.isArray(numeric.contentIds) && numeric.contentIds.length > 0))) {
       // Check permissions for different bulk share types
-      if (projectId && !isAdmin && !canManageAll) {
+      if (numeric.projectId && !isAdmin && !canManageAll) {
         return NextResponse.json({ message: "Forbidden: Project sharing requires admin privileges" }, { status: 403 })
       }
       
-      if (moduleId && !isAdmin && !canManageAll) {
+      if (numeric.moduleId && !isAdmin && !canManageAll) {
         return NextResponse.json({ message: "Forbidden: Module sharing requires admin privileges" }, { status: 403 })
       }
       
-      if (ownerId && !isAdmin && !canManageAll && ownerId !== session.user.id) {
+      if (numeric.ownerId && !isAdmin && !canManageAll && numeric.ownerId !== Number(session.user.id)) {
         return NextResponse.json({ message: "Forbidden: Can only share your own content" }, { status: 403 })
       }
       
       // Collect content IDs by filters
       const whereClause: any = { isDeleted: false }
-      if (projectId) whereClause.projectId = projectId
-      if (moduleId) whereClause.moduleId = moduleId
-      if (ownerId) whereClause.ownerId = ownerId
-      if (Array.isArray(contentIds) && contentIds.length > 0) whereClause.id = { in: contentIds }
+      if (numeric.projectId) whereClause.projectId = numeric.projectId as any
+      if (numeric.moduleId) whereClause.moduleId = numeric.moduleId as any
+      if (numeric.ownerId) whereClause.ownerId = numeric.ownerId as any
+      if (Array.isArray(numeric.contentIds) && numeric.contentIds.length > 0) whereClause.id = { in: numeric.contentIds as any }
 
       const contents = await prisma.contentData.findMany({ where: whereClause, select: { id: true } })
       if (contents.length === 0) {
@@ -148,28 +157,28 @@ export async function POST(req: NextRequest) {
       }
 
       // Ensure target user exists
-      const user = await prisma.user.findUnique({ where: { id: sharedWithId } })
+      const user = await prisma.user.findUnique({ where: { id: numeric.sharedWithId! as any } })
       if (!user) {
         return NextResponse.json({ message: "User not found" }, { status: 404 })
       }
 
       // Create batch record
-      const scope: ShareScope = projectId
+      const scope: ShareScope = numeric.projectId
         ? ShareScope.PROJECT
-        : moduleId
+        : numeric.moduleId
         ? ShareScope.MODULE
-        : ownerId
+        : numeric.ownerId
         ? ShareScope.OWNER
         : ShareScope.LIST
 
       const batch = await prisma.shareBatch.create({
         data: {
           scope,
-          sharedById: session.user!.id,
-          sharedWithId,
-          projectId: projectId || null,
-          moduleId: moduleId || null,
-          ownerId: ownerId || null,
+          sharedById: Number(session.user!.id) as any,
+          sharedWithId: numeric.sharedWithId! as any,
+          projectId: (numeric.projectId || null) as any,
+          moduleId: (numeric.moduleId || null) as any,
+          ownerId: (numeric.ownerId || null) as any,
           canView,
           canEdit,
           canDelete,
@@ -178,70 +187,53 @@ export async function POST(req: NextRequest) {
         },
       })
 
-      // Smart sharing: Create new or update existing based on scope
+      // Smart sharing: Create new or update existing based on contentId + sharedWithId (unique constraint)
       const results = []
       for (const c of contents) {
-        // Check if there's an active share with same scope and sharedBy
-        const existingShare = await prisma.contentShare.findFirst({
+        // Use upsert to handle existing shares (avoid unique constraint violation)
+        const share = await prisma.contentShare.upsert({
           where: {
-            contentId: c.id,
-            sharedWithId,
-            status: 'ACTIVE',
-            batch: {
-              scope: scope,
-              sharedById: session.user!.id
+            contentId_sharedWithId: {
+              contentId: c.id as any,
+              sharedWithId: numeric.sharedWithId! as any
             }
           },
-          orderBy: {
-            createdAt: 'desc'
+          update: {
+            canView,
+            canEdit,
+            canDelete,
+            canDownload,
+            batchId: batch.id as any,
+            status: 'ACTIVE',
+            updatedAt: new Date()
+          },
+          create: {
+            contentId: c.id as any,
+            sharedById: Number(session.user!.id) as any,
+            sharedWithId: numeric.sharedWithId! as any,
+            canView,
+            canEdit,
+            canDelete,
+            canDownload,
+            batchId: batch.id as any,
+            status: 'ACTIVE'
           }
         })
-
-        if (existingShare) {
-          // Update existing share with same scope
-          const updated = await prisma.contentShare.update({
-            where: { id: existingShare.id },
-            data: {
-              canView,
-              canEdit,
-              canDelete,
-              canDownload,
-              batchId: batch.id,
-              updatedAt: new Date()
-            }
-          })
-          results.push(updated)
-        } else {
-          // Create new share for different scope or first time
-          const created = await prisma.contentShare.create({
-            data: { 
-              contentId: c.id, 
-              sharedById: session.user!.id, 
-              sharedWithId, 
-              canView, 
-              canEdit, 
-              canDelete, 
-              canDownload, 
-              batchId: batch.id,
-              status: 'ACTIVE'
-            }
-          })
-          results.push(created)
-        }
+        results.push(share)
       }
       return NextResponse.json({ data: { count: results.length, batchId: batch.id } }, { status: 201 })
     }
 
     // STANDARD SHARE: owner can share their own content
-    if (!contentId || !sharedWithId) {
+    if (!numeric.contentId || !numeric.sharedWithId) {
       return NextResponse.json({ message: "Content ID and shared with user ID are required" }, { status: 400 })
     }
 
     // Check if content exists and user has permission to share it
     const content = await prisma.contentData.findFirst({
       where: isAdmin
-        ? { id: contentId }
-        : { id: contentId, ownerId: session.user.id }
+        ? { id: numeric.contentId as any }
+        : { id: numeric.contentId as any, ownerId: Number(session.user.id) as any }
     })
 
     if (!content) {
@@ -250,7 +242,7 @@ export async function POST(req: NextRequest) {
 
     // Check if user exists
     const user = await prisma.user.findUnique({
-      where: { id: sharedWithId }
+      where: { id: numeric.sharedWithId! as any }
     })
 
     if (!user) {
@@ -261,9 +253,9 @@ export async function POST(req: NextRequest) {
     const batch = await prisma.shareBatch.create({
       data: {
         scope: ShareScope.OWNER,
-        sharedById: session.user.id,
-        sharedWithId,
-        ownerId: session.user.id,
+        sharedById: Number(session.user.id) as any,
+        sharedWithId: numeric.sharedWithId! as any,
+        ownerId: Number(session.user.id) as any,
         canView,
         canEdit,
         canDelete,
@@ -275,12 +267,12 @@ export async function POST(req: NextRequest) {
     // Check if there's an active share with same scope (OWNER scope for standard share)
     const existingShare = await prisma.contentShare.findFirst({
       where: {
-        contentId,
-        sharedWithId,
+        contentId: numeric.contentId! as any,
+        sharedWithId: numeric.sharedWithId! as any,
         status: 'ACTIVE',
         batch: {
           scope: ShareScope.OWNER,
-          sharedById: session.user.id
+          sharedById: Number(session.user.id) as any
         }
       },
       orderBy: {
@@ -299,7 +291,7 @@ export async function POST(req: NextRequest) {
           canEdit,
           canDelete,
           canDownload,
-          batchId: batch.id,
+          batchId: batch.id as any,
           updatedAt: new Date()
         },
         include: {
@@ -345,14 +337,14 @@ export async function POST(req: NextRequest) {
       // Create new share
       const newShare = await prisma.contentShare.create({
         data: {
-          contentId,
-          sharedById: session.user.id,
-          sharedWithId,
+          contentId: numeric.contentId! as any,
+          sharedById: Number(session.user.id) as any,
+          sharedWithId: numeric.sharedWithId! as any,
           canView,
           canEdit,
           canDelete,
           canDownload,
-          batchId: batch.id
+          batchId: batch.id as any
         },
         include: {
           content: {
@@ -421,11 +413,11 @@ export async function DELETE(req: NextRequest) {
     // Check if user has permission to remove the share
     const share = await prisma.contentShare.findFirst({
       where: {
-        contentId,
-        sharedWithId,
+        contentId: Number(contentId) as any,
+        sharedWithId: Number(sharedWithId) as any,
         OR: [
-          { sharedById: session.user.id },
-          { sharedWithId: session.user.id }
+          { sharedById: Number(session.user.id) as any },
+          { sharedWithId: Number(session.user.id) as any }
         ]
       }
     })

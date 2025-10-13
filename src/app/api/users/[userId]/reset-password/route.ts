@@ -19,6 +19,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
 
     const { userId } = await params
+    const numericUserId = Number(userId)
     const body = await req.json().catch(() => ({}))
     const { newPassword } = body as { newPassword?: string }
 
@@ -30,7 +31,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const passwordHash = await bcrypt.hash(newPassword, 10)
 
     const updated = await prisma.user.update({
-      where: { id: userId },
+      where: { id: numericUserId as any },
       data: { passwordHash },
       select: {
         id: true,

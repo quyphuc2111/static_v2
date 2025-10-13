@@ -27,11 +27,11 @@ export async function POST(
       return NextResponse.json({ message: "Bạn không có quyền xóa dự án" }, { status: 403 })
     }
 
-    const projectId = params.id
+    const projectId = Number(params.id)
 
     // Check if project exists and not already deleted
     const project = await prisma.project.findUnique({
-      where: { id: projectId },
+      where: { id: projectId as any },
     })
 
     if (!project) {
@@ -49,7 +49,7 @@ export async function POST(
     const updatedProject = await prisma.$transaction(async (tx) => {
       // Soft delete the project
       const project = await tx.project.update({
-        where: { id: projectId },
+        where: { id: projectId as any },
         data: {
           isDeleted: true,
           deletedAt: new Date(),
@@ -61,7 +61,7 @@ export async function POST(
       // Soft delete all modules in this project
       await tx.module.updateMany({
         where: { 
-          projectId: projectId,
+          projectId: projectId as any,
           isDeleted: false 
         },
         data: {
@@ -75,7 +75,7 @@ export async function POST(
       // Soft delete all content in this project
       await tx.contentData.updateMany({
         where: { 
-          projectId: projectId,
+          projectId: projectId as any,
           isDeleted: false 
         },
         data: {
@@ -89,10 +89,10 @@ export async function POST(
     })
 
     // Log audit action
-    await logProjectAction(session.user.id, 'soft_deleted', projectId, {
+    await logProjectAction(session.user.id, 'soft_deleted', projectId as any, {
       projectName: updatedProject.name,
-      modulesCount: await prisma.module.count({ where: { projectId, isDeleted: true } }),
-      contentCount: await prisma.contentData.count({ where: { projectId, isDeleted: true } })
+      modulesCount: await prisma.module.count({ where: { projectId: projectId as any, isDeleted: true } }),
+      contentCount: await prisma.contentData.count({ where: { projectId: projectId as any, isDeleted: true } })
     })
 
     return NextResponse.json({

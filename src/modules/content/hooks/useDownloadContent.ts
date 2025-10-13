@@ -5,7 +5,7 @@ import { toast } from "react-toastify"
 export function useDownloadContent(projectId: string, moduleId: string) {
   return useMutation({
     mutationFn: (contentId: string) => downloadContent(projectId, moduleId, contentId),
-    onSuccess: (result, contentId) => {
+    onSuccess: (result: any, contentId: string) => {
       try {
         const { blob, filename } = result
         

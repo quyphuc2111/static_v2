@@ -26,11 +26,11 @@ export async function DELETE(
       return NextResponse.json({ message: "Bạn không có quyền xóa dự án" }, { status: 403 })
     }
 
-    const projectId = params.id
+    const projectId = Number(params.id)
 
     // Check if project exists
     const project = await prisma.project.findUnique({
-      where: { id: projectId },
+      where: { id: projectId as any },
       include: {
         modules: true,
         contentData: true,
@@ -43,7 +43,7 @@ export async function DELETE(
 
     // Hard delete the project (cascade will delete modules and content)
     await prisma.project.delete({
-      where: { id: projectId },
+      where: { id: projectId as any },
     })
 
     return NextResponse.json({

@@ -1,5 +1,5 @@
 export interface Role {
-  id: string
+  id: number
   name: string
   description?: string
   createdAt: string
@@ -9,7 +9,7 @@ export interface Role {
 }
 
 export interface Permission {
-  id: string
+  id: number
   name: string
   nameVi?: string
   description?: string
@@ -18,17 +18,17 @@ export interface Permission {
 }
 
 export interface RolePermission {
-  roleId: string
-  permissionId: string
+  roleId: number
+  permissionId: number
   role?: Role
   permission?: Permission
 }
 
 export interface UserRole {
-  userId: string
-  roleId: string
+  userId: number
+  roleId: number
   user?: {
-    id: string
+    id: number
     name?: string
     email: string
   }
@@ -36,28 +36,28 @@ export interface UserRole {
 }
 
 export interface ContentShare {
-  id: string
-  contentId: string
-  sharedById: string
-  sharedWithId: string
+  id: number
+  contentId: number
+  sharedById: number
+  sharedWithId: number
   canView: boolean
   canEdit: boolean
   canDelete: boolean
   createdAt: string
   updatedAt: string
   content?: {
-    id: string
+    id: number
     title: string
     contentType: string
     status: string
   }
   sharedBy?: {
-    id: string
+    id: number
     name?: string
     email: string
   }
   sharedWith?: {
-    id: string
+    id: number
     name?: string
     email: string
   }
@@ -66,17 +66,17 @@ export interface ContentShare {
 export interface CreateRolePayload {
   name: string
   description?: string
-  permissionIds: string[]
+  permissionIds: number[]
 }
 
 export interface AssignRolePayload {
-  userId: string
-  roleId: string
+  userId: number
+  roleId: number
 }
 
 export interface ShareContentPayload {
-  contentId: string
-  sharedWithId: string
+  contentId: number
+  sharedWithId: number
   canView?: boolean
   canDownload?: boolean
   canEdit?: boolean
@@ -84,18 +84,19 @@ export interface ShareContentPayload {
 }
 
 export interface BulkSharePayload {
-  sharedWithId: string
+  sharedWithId: number
   canView?: boolean
   canEdit?: boolean
   canDelete?: boolean
-  projectId?: string
-  moduleId?: string
-  ownerId?: string
-  contentIds?: string[]
+  canDownload?: boolean
+  projectId?: number
+  moduleId?: number
+  ownerId?: number
+  contentIds?: number[]
 }
 
 export interface UserWithRoles {
-  id: string
+  id: number
   username: string
   name?: string
   email?: string
@@ -110,7 +111,7 @@ export interface CreateUserPayload {
   name?: string
   email?: string
   status?: string
-  roleId?: string
+  roleId?: number
   password?: string
 }
 
@@ -120,7 +121,7 @@ export interface UpdateUserPayload {
   email?: string
   status?: string
   password?: string
-  roleId?: string
+  roleId?: number
 }
 
 export interface RoleWithPermissions extends Role {

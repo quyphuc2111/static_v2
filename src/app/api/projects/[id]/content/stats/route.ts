@@ -10,6 +10,7 @@ export async function GET(
 ) {
   try {
     const { id: projectId } = await params
+    const pId = Number(projectId)
 
     // Auth and permission check
     const session = await getSession()
@@ -19,7 +20,7 @@ export async function GET(
 
     // Verify project exists
     const project = await prisma.project.findUnique({
-      where: { id: projectId }
+      where: { id: pId as any }
     })
 
     if (!project) {
@@ -34,12 +35,12 @@ export async function GET(
     const stats = await prisma.contentData.groupBy({
       by: ['status'],
       where: {
-        projectId,
+        projectId: pId as any,
         isDeleted: false,
         ...(canViewAll ? {} : {
           OR: [
-            { ownerId: session.user.id },
-            { shares: { some: { sharedWithId: session.user.id, canView: true, status: ShareStatus.ACTIVE } } }
+            { ownerId: Number(session.user.id) as any },
+            { shares: { some: { sharedWithId: Number(session.user.id) as any, canView: true, status: ShareStatus.ACTIVE } } }
           ]
         })
       },

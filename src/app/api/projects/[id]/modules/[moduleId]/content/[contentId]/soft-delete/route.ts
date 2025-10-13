@@ -15,13 +15,16 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     const { id: projectId, moduleId, contentId } = await params
+    const pId = Number(projectId)
+    const mId = Number(moduleId)
+    const cId = Number(contentId)
 
     // Check if content exists and not already deleted
     const content = await prisma.contentData.findFirst({
       where: {
-        id: contentId,
-        projectId,
-        moduleId,
+        id: cId as any,
+        projectId: pId as any,
+        moduleId: mId as any,
         isDeleted: false
       }
     })
@@ -41,10 +44,10 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     // Check ownership for non-admin users
     if (!isAdmin && !canManageAll) {
-      const isOwner = content.ownerId === session.user.id
+      const isOwner = Number(content.ownerId) === Number(session.user.id)
       if (!isOwner) {
         const share = await prisma.contentShare.findFirst({
-          where: { contentId: content.id, sharedWithId: session.user.id, canDelete: true }
+          where: { contentId: content.id as any, sharedWithId: Number(session.user.id) as any, canDelete: true }
         })
         if (!share) {
           return NextResponse.json({ error: "Bạn không có quyền xóa nội dung này" }, { status: 403 })
@@ -54,7 +57,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     // Soft delete the content
     const updatedContent = await prisma.contentData.update({
-      where: { id: contentId },
+      where: { id: cId as any },
       data: {
         isDeleted: true,
         deletedAt: new Date(),
@@ -63,7 +66,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     })
 
     // Log audit action
-    await logContentAction(session.user.id, 'soft_deleted', contentId, {
+    await logContentAction(session.user.id, 'soft_deleted', cId as any, {
       contentTitle: content.title,
       contentType: content.contentType,
       projectId: content.projectId,

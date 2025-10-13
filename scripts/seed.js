@@ -1,5 +1,8 @@
 /* eslint-disable no-console */
-const { PrismaClient, RoleName, PermissionName, UserStatus } = require("@prisma/client")
+// Load environment variables
+require('dotenv').config()
+
+const { PrismaClient, PermissionName, UserStatus } = require("@prisma/client")
 const bcrypt = require("bcryptjs")
 
 const prisma = new PrismaClient()
@@ -19,19 +22,19 @@ async function main() {
 
   // 2) Ensure ADMINISTRATOR, DEV, TESTER roles exist
   const adminRole = await prisma.role.upsert({
-    where: { name: RoleName.ADMINISTRATOR },
+    where: { name: 'ADMINISTRATOR' },
     update: {},
-    create: { name: RoleName.ADMINISTRATOR },
+    create: { name: 'ADMINISTRATOR' },
   })
   const devRole = await prisma.role.upsert({
-    where: { name: RoleName.DEV },
+    where: { name: 'DEV' },
     update: {},
-    create: { name: RoleName.DEV },
+    create: { name: 'DEV' },
   })
   const testerRole = await prisma.role.upsert({
-    where: { name: RoleName.TESTER },
+    where: { name: 'TESTER' },
     update: {},
-    create: { name: RoleName.TESTER },
+    create: { name: 'TESTER' },
   })
 
   // 3) Grant all permissions to ADMINISTRATOR
@@ -52,11 +55,12 @@ async function main() {
   const passwordHash = await bcrypt.hash(password, 10)
 
   const adminUser = await prisma.user.upsert({
-    where: { email },
+    where: { username: "admin" },
     update: {},
     create: {
       email,
       name: "Administrator",
+      username: "admin",
       passwordHash,
       status: UserStatus.ACTIVE,
     },

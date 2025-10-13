@@ -156,6 +156,9 @@ export async function POST(
 ) {
   try {
     const { id: projectId, moduleId, contentId } = await params
+    const pId = Number(projectId)
+    const mId = Number(moduleId)
+    const cId = Number(contentId)
 
     const session = await getSession()
     if (!session.user) {
@@ -165,9 +168,9 @@ export async function POST(
     // Check if content exists and user has permission
     const content = await prisma.contentData.findFirst({
       where: {
-        id: contentId,
-        projectId,
-        moduleId,
+        id: cId as any,
+        projectId: pId as any,
+        moduleId: mId as any,
         isDeleted: false
       },
       include: {
@@ -180,7 +183,7 @@ export async function POST(
     }
 
     // Check permissions
-    const isOwner = content.owner?.id === session.user.id
+    const isOwner = Number(content.owner?.id ?? NaN) === Number(session.user.id)
     const hasManageOwnContent = await checkPermission(session.user.id, PermissionName.MANAGE_OWN_CONTENT)
     const hasManageAllContent = await checkPermission(session.user.id, PermissionName.MANAGE_ALL_CONTENT)
 
@@ -223,11 +226,12 @@ export async function POST(
     // Update content status to PROCESSING and reset progress to 0 using transaction
     await prisma.$transaction(async (tx) => {
       await tx.contentData.update({
-        where: { id: contentId },
+        where: { id: cId as any },
         data: { 
           status: "PROCESSING",
           progress: 0,
-          contentType: contentType as "FILE_ZIP_HTML" | "FILE_ZIP_SCORM"
+          contentType: contentType as "FILE_ZIP_HTML" | "FILE_ZIP_SCORM",
+          fileSize: file.size // Update file size
         }
       })
     })
@@ -304,7 +308,7 @@ export async function POST(
           
           await prisma.$transaction(async (tx) => {
             await tx.contentData.update({
-              where: { id: contentId },
+              where: { id: cId as any },
               data: { 
                 status: "FAILED",
                 description: {
@@ -317,7 +321,7 @@ export async function POST(
             })
           })
           
-          console.log(`ZIP validation failed for content ${contentId}:`, {
+          console.log(`ZIP validation failed for content ${cId}:`, {
             expectedHtmlFile,
             launchDir,
             foundFiles: zipValidationResult.foundFiles,
@@ -521,7 +525,7 @@ export async function POST(
         // Update content with new description and status using transaction
         await prisma.$transaction(async (tx) => {
           await tx.contentData.update({
-            where: { id: contentId },
+            where: { id: content.id as any },
             data: {
               description: description as Prisma.InputJsonValue,
               status: "COMPLETED",
@@ -530,16 +534,16 @@ export async function POST(
           })
         })
 
-        console.log(`Successfully updated content ${contentId} with new file`)
+        console.log(`Successfully updated content ${cId} with new file`)
 
       } catch (error) {
-        console.error("Error processing file for content:", contentId, error)
+        console.error("Error processing file for content:", cId, error)
         
         // Update content status to FAILED using transaction
         try {
           await prisma.$transaction(async (tx) => {
             await tx.contentData.update({
-              where: { id: contentId },
+              where: { id: content.id as any },
               data: { status: "FAILED" }
             })
           })
@@ -551,7 +555,7 @@ export async function POST(
 
     return NextResponse.json({ 
       message: "File update started successfully",
-      contentId: contentId 
+      contentId: cId 
     })
   } catch (error) {
     console.error("Error updating file:", error)

@@ -222,17 +222,11 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
       onOpenChange(open)
     }}>
       <DialogContent 
-        className="bg-card border-border overflow-hidden flex flex-col !w-[99vw] !sm:w-[98vw] !md:w-[95vw] !lg:w-[92vw] !xl:w-[90vw] !2xl:w-[88vw] max-w-none h-[95vh] sm:h-[90vh] md:h-[85vh] lg:h-[80vh] xl:h-[75vh] 2xl:h-[70vh]"
-        style={{ 
-          width: '60vw', 
-          maxWidth: '60vw', 
-          height: '80vh',
-          maxHeight: '80vh'
-        }}
+        className="bg-card border-border overflow-hidden flex flex-col w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[80vw] xl:w-[75vw] max-w-6xl h-[90vh] sm:h-[85vh] md:h-[80vh] p-4 sm:p-6"
       >
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="text-foreground">Tạo Nội dung Mới</DialogTitle>
-          <DialogDescription className="text-muted-foreground">
+        <DialogHeader className="flex-shrink-0 pb-4">
+          <DialogTitle className="text-foreground text-lg sm:text-xl">Tạo Nội dung mới</DialogTitle>
+          <DialogDescription className="text-muted-foreground text-sm">
             Upload file ZIP (HTML hoặc SCORM) để tạo nội dung học tập
           </DialogDescription>
         </DialogHeader>
@@ -241,9 +235,9 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
           <ScrollArea className="flex-1 pr-2 min-h-0">
             <div className="space-y-4 sm:space-y-6 pr-2">
             {/* Content Type Selection */}
-            <div className="space-y-4">
-              <Label className="text-foreground font-medium">Chọn loại nội dung</Label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-3">
+              <Label className="text-foreground font-medium text-sm sm:text-base">Chọn loại nội dung <span className="text-red-400">*</span></Label>
+              <div className="grid grid-cols-1 gap-3">
                 {contentTypes.map((type) => (
                   <Card
                     key={type.id}
@@ -262,13 +256,13 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
                       }
                     }}
                   >
-                    <CardContent className="p-4">
+                    <CardContent className="p-3 sm:p-4">
                       <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${type.bgColor}`}>
-                          <type.icon className={`h-6 w-6 ${type.color}`} />
+                        <div className={`p-2 rounded-lg ${type.bgColor} flex-shrink-0`}>
+                          <type.icon className={`h-5 w-5 sm:h-6 sm:w-6 ${type.color}`} />
                         </div>
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-foreground">{type.name}</h3>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-foreground text-sm sm:text-base">{type.name}</h3>
                           <p className="text-xs text-muted-foreground">{type.description}</p>
                         </div>
                       </div>
@@ -279,35 +273,33 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
             </div>
 
             {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-              {/* Left Column - Basic Info */}
-              <div className="space-y-4 sm:space-y-6">
-                {/* Title */}
-                <div className="space-y-2">
-                  <Label htmlFor="title" className="text-foreground font-medium">
-                    Tiêu đề <span className="text-red-400">*</span>
-                  </Label>
-                  <Input
-                    id="title"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Nhập tiêu đề nội dung"
-                    className="bg-background border-border hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary/20"
-                    required
-                  />
-                </div>
+            <div className="space-y-4 sm:space-y-6">
+              {/* Title */}
+              <div className="space-y-2">
+                <Label htmlFor="title" className="text-foreground font-medium text-sm sm:text-base">
+                  Tiêu đề <span className="text-red-400">*</span>
+                </Label>
+                <Input
+                  id="title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Nhập tiêu đề nội dung"
+                  className="bg-background border-border hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary/20 text-sm sm:text-base"
+                  required
+                />
+              </div>
 
-                {/* Description Key-Value */}
-                <div className="space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
-                    <Label className="text-foreground font-medium">
-                      Mô tả chi tiết 
-                      {descriptionItems.length > 3 && (
-                        <span className="text-xs text-muted-foreground ml-2">
-                          (có thể scroll để xem thêm)
-                        </span>
-                      )}
-                    </Label>
+              {/* Description Key-Value */}
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <Label className="text-foreground font-medium text-sm sm:text-base">
+                    Mô tả chi tiết 
+                    {descriptionItems.length > 3 && (
+                      <span className="text-xs text-muted-foreground ml-2">
+                        (có thể scroll để xem thêm)
+                      </span>
+                    )}
+                  </Label>
                     <Button
                       type="button"
                       variant="outline"
@@ -361,11 +353,10 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
                 </div>
               </div>
 
-              {/* Right Column - File Upload */}
-              <div className="space-y-4 sm:space-y-6">
-                {/* File Upload */}
+              {/* File Upload */}
+              {selectedType ? (
                 <div className="space-y-4">
-                  <Label className="text-foreground font-medium">
+                  <Label className="text-foreground font-medium text-sm sm:text-base">
                     Upload File ZIP <span className="text-red-400">*</span>
                   </Label>
                   <div className="border-2 border-dashed border-border rounded-lg p-3 sm:p-4 text-center hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 bg-background/30 backdrop-blur-sm">
@@ -445,20 +436,72 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
                       </div>
                     )}
                   </div>
-                </div>
 
-                {/* Requirements Info */}
-                <div className="bg-background/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 border border-border">
-                  <h4 className="font-medium text-foreground mb-2 text-sm sm:text-base">Yêu cầu file:</h4>
-                  <ul className="text-xs sm:text-sm text-muted-foreground space-y-1">
-                    <li>• File phải có định dạng .zip</li>
-                    <li>• HTML Package: Chứa file HTML, CSS, JS</li>
-                    <li>• SCORM Package: Tuân thủ chuẩn SCORM 1.2 hoặc 2004</li>
-                    <li>• Kích thước tối đa: ∞</li>
-                  </ul>
+                  {/* Requirements Info */}
+                  <div className="bg-background/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 border border-border">
+                    <h4 className="font-medium text-foreground mb-2 text-sm sm:text-base">Yêu cầu file:</h4>
+                    <ul className="text-xs sm:text-sm text-muted-foreground space-y-1">
+                      <li>• File phải có định dạng .zip</li>
+                      <li>• HTML Package: Chứa file HTML, CSS, JS</li>
+                      <li>• SCORM Package: Tuân thủ chuẩn SCORM 1.2 hoặc 2004</li>
+                      <li>• Kích thước tối đa: ∞</li>
+                    </ul>
+                  </div>
                 </div>
-              </div>
-            </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Placeholder khi chưa chọn loại nội dung */}
+                  <div className="border-2 border-dashed border-border rounded-lg p-6 sm:p-8 text-center bg-muted/20">
+                    <div className="flex flex-col items-center gap-3 sm:gap-4">
+                      <div className="p-3 sm:p-4 rounded-full bg-muted/50 border border-border">
+                        <Archive className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground" />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-base sm:text-lg font-medium text-foreground">
+                          Chọn loại nội dung trước
+                        </h3>
+                        <p className="text-xs sm:text-sm text-muted-foreground max-w-sm">
+                          Vui lòng chọn loại nội dung (HTML Package hoặc SCORM Package) ở trên để có thể upload file ZIP
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 px-3 py-1.5 rounded-full">
+                        <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                        <span>Đang chờ lựa chọn</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Requirements Info */}
+                  <div className="bg-background/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 border border-border">
+                    <h4 className="font-medium text-foreground mb-2 sm:mb-3 text-sm sm:text-base flex items-center gap-2">
+                      <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                      Yêu cầu file:
+                    </h4>
+                    <ul className="text-xs sm:text-sm text-muted-foreground space-y-1.5 sm:space-y-2">
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-400 mt-0.5">•</span>
+                        <span>File phải có định dạng .zip</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-400 mt-0.5">•</span>
+                        <span>HTML Package: Chứa file HTML, CSS, JS</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-green-400 mt-0.5">•</span>
+                        <span>HTML Package: Chứa file index.html</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-purple-400 mt-0.5">•</span>
+                        <span>SCORM Package: Tuân thủ chuẩn SCORM 1.2 hoặc 2004</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-orange-400 mt-0.5">•</span>
+                        <span>Kích thước tối đa: Không giới hạn</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              )}
             </div>
           </ScrollArea>
 

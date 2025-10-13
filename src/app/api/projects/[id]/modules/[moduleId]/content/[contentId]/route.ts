@@ -17,14 +17,17 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     const { id: projectId, moduleId, contentId } = await params
+    const pId = Number(projectId)
+    const mId = Number(moduleId)
+    const cId = Number(contentId)
     const { title, description } = await request.json()
 
     // Get content to check ownership and existence
     const content = await prisma.contentData.findFirst({
       where: {
-        id: contentId,
-        projectId,
-        moduleId,
+        id: cId as any,
+        projectId: pId as any,
+        moduleId: mId as any,
         isDeleted: false
       }
     })
@@ -39,14 +42,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     
     // Check permissions
     if (!isAdmin && !canEditAll) {
-      const isOwner = content.ownerId === session.user.id
+      const isOwner = Number(content.ownerId) === Number(session.user.id)
       
       if (!isOwner) {
         // Check if shared with edit permission
         const share = await prisma.contentShare.findFirst({
           where: {
-            contentId: content.id,
-            sharedWithId: session.user.id,
+            contentId: content.id as any,
+            sharedWithId: Number(session.user.id) as any,
             canEdit: true
           }
         })
@@ -67,9 +70,30 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       }
     }
 
+    // Check if updating title and if new title already exists for this owner
+    if (title && title !== content.title) {
+      const existingContent = await prisma.contentData.findFirst({
+        where: {
+          projectId: pId as any,
+          moduleId: mId as any,
+          ownerId: content.ownerId as any,
+          title: title as any,
+          isDeleted: false,
+          id: { not: cId as any }
+        } as any
+      })
+
+      if (existingContent) {
+        return NextResponse.json(
+          { error: "Bạn đã có nội dung với tiêu đề này trong module này" },
+          { status: 409 }
+        )
+      }
+    }
+
     // Update content
     const updatedContent = await prisma.contentData.update({
-      where: { id: contentId },
+      where: { id: cId as any },
       data: {
         ...(title && { title }),
         ...(description !== undefined && { description })
@@ -98,13 +122,16 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     }
 
     const { id: projectId, moduleId, contentId } = await params
+    const pId = Number(projectId)
+    const mId = Number(moduleId)
+    const cId = Number(contentId)
 
     // Verify content exists and base constraints
     const content = await prisma.contentData.findFirst({
       where: {
-        id: contentId,
-        projectId,
-        moduleId,
+        id: cId as any,
+        projectId: pId as any,
+        moduleId: mId as any,
         isDeleted: false
       }
     })
@@ -124,10 +151,10 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
     // Permission: owner or shared canDelete (for non-admin)
     if (!isAdmin && !canHardDelete) {
-      const isOwner = content.ownerId === session.user.id
+      const isOwner = Number(content.ownerId) === Number(session.user.id)
       if (!isOwner) {
         const share = await prisma.contentShare.findFirst({
-          where: { contentId: content.id, sharedWithId: session.user.id, canDelete: true }
+          where: { contentId: content.id as any, sharedWithId: Number(session.user.id) as any, canDelete: true }
         })
         if (!share) {
           return NextResponse.json({ error: "Forbidden: Not owner or shared" }, { status: 403 })
@@ -140,7 +167,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       if (canHardDelete) {
         // Hard delete: Remove from database completely
         await tx.contentData.delete({
-          where: { id: contentId }
+          where: { id: cId as any }
         })
 
         // Also remove physical files
@@ -155,7 +182,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       } else {
         // Soft delete: Mark as deleted but keep data and files
         await tx.contentData.update({
-          where: { id: contentId },
+          where: { id: cId as any },
           data: { 
             isDeleted: true,
             deletedAt: new Date(),
@@ -166,7 +193,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     })
 
     // Log audit action
-    await logContentAction(session.user.id, canHardDelete ? 'hard_deleted' : 'soft_deleted', contentId, {
+    await logContentAction(session.user.id, canHardDelete ? 'hard_deleted' : 'soft_deleted', cId as any, {
       contentTitle: content.title,
       contentType: content.contentType,
       projectId: content.projectId,

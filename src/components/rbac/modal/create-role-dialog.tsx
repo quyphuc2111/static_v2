@@ -1,36 +1,27 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { useUpdateRole, usePermissions } from "@/modules/rbac/hooks"
+import { useCreateRole, usePermissions } from "@/modules/rbac/hooks"
 import { toast } from "react-toastify"
 
-interface EditRoleDialogProps {
+interface CreateRoleDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  role: any
 }
 
-export function EditRoleDialog({ open, onOpenChange, role }: EditRoleDialogProps) {
+export function CreateRoleDialog({ open, onOpenChange }: CreateRoleDialogProps) {
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
 
   const { data: permissions, isLoading: permissionsLoading } = usePermissions()
-  const updateRoleMut = useUpdateRole()
-
-  useEffect(() => {
-    if (role) {
-      setName(role.name || "")
-      setDescription(role.description || "")
-      setSelectedPermissions(role.permissions?.map((rp: any) => rp.permissionId) || [])
-    }
-  }, [role])
+  const createRoleMut = useCreateRole()
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,22 +36,22 @@ export function EditRoleDialog({ open, onOpenChange, role }: EditRoleDialogProps
       return
     }
 
-    updateRoleMut.mutate(
+    createRoleMut.mutate(
       {
-        roleId: role.id,
-        payload: {
-          name: name.trim(),
-          description: description.trim() || undefined,
-          permissionIds: selectedPermissions,
-        },
+        name: name.trim(),
+        description: description.trim() || undefined,
+        permissionIds: selectedPermissions.map(id => Number(id) as any),
       },
       {
         onSuccess: () => {
-          toast.success("Cập nhật vai trò thành công")
+          toast.success("Tạo vai trò thành công")
           onOpenChange(false)
+          setName("")
+          setDescription("")
+          setSelectedPermissions([])
         },
         onError: (error: any) => {
-          toast.error(error.message || "Cập nhật vai trò thất bại")
+          toast.error(error.message || "Tạo vai trò thất bại")
         },
       }
     )
@@ -83,16 +74,14 @@ export function EditRoleDialog({ open, onOpenChange, role }: EditRoleDialogProps
     return acc
   }, {} as Record<string, any[]>)
 
-  if (!role) return null
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] sm:max-w-[90vw] md:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>Chỉnh sửa Vai trò</DialogTitle>
+          <DialogTitle className="text-lg sm:text-xl">Tạo Vai trò Mới</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6 overflow-y-auto flex-1 px-1">
           <div className="space-y-2">
             <Label htmlFor="name">Tên vai trò *</Label>
             <Input
@@ -115,37 +104,43 @@ export function EditRoleDialog({ open, onOpenChange, role }: EditRoleDialogProps
             />
           </div>
 
-          <div className="space-y-4">
-            <Label>Quyền hạn *</Label>
+          <div className="space-y-3 md:space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Quyền hạn *</Label>
+              <span className="text-xs text-muted-foreground">
+                {selectedPermissions.length} quyền đã chọn
+              </span>
+            </div>
             {permissionsLoading ? (
-              <div className="text-center py-4 text-muted-foreground">
+              <div className="text-center py-4 text-muted-foreground text-sm">
                 Đang tải danh sách quyền hạn...
               </div>
             ) : (
-              <div className="space-y-4 max-h-60 overflow-y-auto border rounded-lg p-4">
+              <div className="space-y-3 md:space-y-4 max-h-[40vh] md:max-h-60 overflow-y-auto border rounded-lg p-3 md:p-4 bg-muted/30">
                 {groupedPermissions && Object.entries(groupedPermissions).map(([category, perms]) => (
                   <div key={category} className="space-y-2">
-                    <h4 className="font-medium text-sm text-muted-foreground uppercase">
+                    <h4 className="font-semibold text-xs sm:text-sm text-foreground uppercase tracking-wide sticky top-0 bg-muted/50 backdrop-blur-sm py-1 -mx-1 px-1 rounded">
                       {category}
                     </h4>
                     <div className="grid grid-cols-1 gap-2">
                       {perms.map((permission) => (
-                        <div key={permission.id} className="flex items-center space-x-2">
+                        <div key={permission.id} className="flex items-start space-x-2 p-2 rounded hover:bg-accent/50 transition-colors">
                           <Checkbox
                             id={permission.id}
                             checked={selectedPermissions.includes(permission.id)}
                             onCheckedChange={(checked) => 
                               handlePermissionChange(permission.id, checked as boolean)
                             }
+                            className="mt-0.5"
                           />
                           <Label 
                             htmlFor={permission.id}
-                            className="text-sm font-normal cursor-pointer"
+                            className="text-xs sm:text-sm font-normal cursor-pointer flex-1 leading-relaxed"
                           >
-                            {permission.name}
+                            <span className="font-medium">{permission.name}</span>
                             {permission.description && (
-                              <span className="text-muted-foreground ml-2">
-                                - {permission.description}
+                              <span className="block text-muted-foreground text-xs mt-0.5">
+                                {permission.description}
                               </span>
                             )}
                           </Label>
@@ -158,15 +153,21 @@ export function EditRoleDialog({ open, onOpenChange, role }: EditRoleDialogProps
             )}
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0 pt-4 border-t mt-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => onOpenChange(false)}
+              className="w-full sm:w-auto"
+            >
               Hủy
             </Button>
             <Button 
               type="submit" 
-              disabled={updateRoleMut.isPending || !name.trim() || selectedPermissions.length === 0}
+              disabled={createRoleMut.isPending || !name.trim() || selectedPermissions.length === 0}
+              className="w-full sm:w-auto"
             >
-              {updateRoleMut.isPending ? "Đang cập nhật..." : "Cập nhật vai trò"}
+              {createRoleMut.isPending ? "Đang tạo..." : `Tạo vai trò (${selectedPermissions.length})`}
             </Button>
           </DialogFooter>
         </form>

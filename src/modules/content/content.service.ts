@@ -46,18 +46,6 @@ export async function restoreContent(projectId: string, moduleId: string, conten
   })
 }
 
-export async function softDeleteContent(projectId: string, moduleId: string, contentId: string) {
-  return httpService.post<{ message: string; data: ContentData }>({ 
-    url: CONTENT_API_URL.SOFT_DELETE(projectId, moduleId, contentId)
-  })
-}
-
-export async function hardDeleteContent(projectId: string, moduleId: string, contentId: string) {
-  return httpService.delete<{ message: string }>({ 
-    url: CONTENT_API_URL.HARD_DELETE(projectId, moduleId, contentId)
-  })
-}
-
 export async function bulkDeleteContent(projectId: string, moduleId: string, contentIds: string[]) {
   return httpService.post<{ message: string; deletedCount: number }>({ 
     url: CONTENT_API_URL.BULK_DELETE(projectId, moduleId),
@@ -87,24 +75,7 @@ export async function downloadContent(projectId: string, moduleId: string, conte
       throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
     }
     
-    const blob = await response.blob()
-    
-    // Extract filename from Content-Disposition header
-    const contentDisposition = response.headers.get('Content-Disposition')
-    let filename = `content-${contentId}.zip` // fallback
-    
-    if (contentDisposition) {
-      console.log('Content-Disposition header:', contentDisposition)
-      // Try to extract filename from Content-Disposition header
-      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
-      if (filenameMatch && filenameMatch[1]) {
-        filename = filenameMatch[1].replace(/['"]/g, '')
-        console.log('Extracted filename:', filename)
-      }
-    }
-    
-    // Return both blob and filename
-    return { blob, filename }
+    return response.blob()
   } catch (error) {
     console.error('Download error:', error)
     throw error
@@ -118,10 +89,21 @@ export async function getContentStats(projectId?: string) {
   return res.data
 }
 
+export async function softDeleteContent(projectId: string, moduleId: string, contentId: string) {
+  return httpService.post<{ message: string }>({ 
+    url: CONTENT_API_URL.SOFT_DELETE(projectId, moduleId, contentId)
+  })
+}
+
+export async function hardDeleteContent(projectId: string, moduleId: string, contentId: string) {
+  return httpService.post<{ message: string }>({ 
+    url: CONTENT_API_URL.HARD_DELETE(projectId, moduleId, contentId)
+  })
+}
+
 export async function importContentBulk(projectId: string, moduleId: string, items: Array<{ title: string; description?: any; contentType?: 'FILE_ZIP_HTML' | 'FILE_ZIP_SCORM' }>) {
-  const res = await httpService.post<{ data: ContentData[] }>({
+  return httpService.post<{ message: string; importedCount: number }>({ 
     url: CONTENT_API_URL.IMPORT(projectId, moduleId),
     data: { items }
   })
-  return res.data
 }

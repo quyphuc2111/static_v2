@@ -40,15 +40,15 @@ export function DeleteUserDialog({ open, onOpenChange, user }: DeleteUserDialogP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px] bg-card border-border">
+      <DialogContent className="max-w-[95vw] sm:max-w-[400px] bg-card border-border">
         <DialogHeader>
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/20">
-              <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
+            <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/20">
+              <AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6 text-red-600 dark:text-red-400" />
             </div>
             <div>
-              <DialogTitle className="text-foreground">Xóa Người dùng</DialogTitle>
-              <DialogDescription className="text-muted-foreground">
+              <DialogTitle className="text-foreground text-base sm:text-lg">Xóa Người dùng</DialogTitle>
+              <DialogDescription className="text-muted-foreground text-xs sm:text-sm">
                 Hành động này không thể hoàn tác
               </DialogDescription>
             </div>
@@ -81,8 +81,8 @@ export function DeleteUserDialog({ open, onOpenChange, user }: DeleteUserDialogP
           </div>
         </div>
 
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
             Hủy
           </Button>
           <Button 
@@ -90,7 +90,7 @@ export function DeleteUserDialog({ open, onOpenChange, user }: DeleteUserDialogP
             variant="destructive" 
             onClick={handleDelete}
             disabled={remove.isPending}
-            className="bg-red-600 hover:bg-red-700"
+            className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
           >
             {remove.isPending ? (
               <>

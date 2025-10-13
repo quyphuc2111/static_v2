@@ -18,7 +18,8 @@ export async function GET(_req: Request, { params }: Params) {
     }
 
     const { id } = await params
-    const modules = await prisma.module.findMany({ where: { projectId: id }, orderBy: { createdAt: "desc" } })
+    const pId = Number(id)
+    const modules = await prisma.module.findMany({ where: { projectId: pId as any }, orderBy: { createdAt: "desc" } })
     return NextResponse.json({ data: modules })
   } catch (e) {
     return NextResponse.json({ message: "Server error" }, { status: 500 })
@@ -44,13 +45,14 @@ export async function POST(req: Request, { params }: Params) {
     if (!name) return NextResponse.json({ message: "Tên module là bắt buộc" }, { status: 400 })
 
     const { id } = await params
+    const pId = Number(id)
     try {
       const created = await prisma.module.create({ 
         data: { 
           name, 
           description: description || null,
           status,
-          projectId: id 
+          projectId: pId as any 
         } 
       })
       return NextResponse.json({ data: created }, { status: 201 })

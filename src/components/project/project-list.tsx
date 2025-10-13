@@ -47,7 +47,7 @@ export function ProjectList({ searchQuery, showDeleted = false }: ProjectListPro
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-8">
+      <div className="flex items-center justify-center py-8 px-6">
         <p className="text-muted-foreground">Đang tải...</p>
       </div>
     )
@@ -55,7 +55,7 @@ export function ProjectList({ searchQuery, showDeleted = false }: ProjectListPro
 
   if (filteredProjects.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
+      <div className="flex flex-col items-center justify-center py-12 px-6 text-center ">
         <div className="rounded-full bg-muted p-4 mb-4">
           <FolderOpen className="h-8 w-8 text-muted-foreground" />
         </div>
@@ -75,9 +75,17 @@ export function ProjectList({ searchQuery, showDeleted = false }: ProjectListPro
   }
 
   return (
-    <DataTable 
-      data={filteredProjects as Project[]} 
-      onDelete={handleDeleteProject}
-    />
+    <div className="w-[calc(100vw-40px)] md:w-full">
+      <div className="flex md:hidden items-center justify-center text-xs text-muted-foreground py-2 bg-muted/30 border-b">
+        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+        </svg>
+        Vuốt sang để xem thêm
+      </div>
+      <DataTable 
+        data={filteredProjects as Project[]} 
+        onDelete={handleDeleteProject}
+      />
+    </div>
   )
 }

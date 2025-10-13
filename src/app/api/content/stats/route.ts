@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     let whereClause: any = { isDeleted: false }
 
     if (projectId) {
-      whereClause.projectId = projectId
+      whereClause.projectId = Number(projectId) as any
     }
 
     const isAdmin = (session.user.roles || []).includes("ADMINISTRATOR")
@@ -28,31 +28,31 @@ export async function GET(request: NextRequest) {
     const [total, completed, processing, failed] = await Promise.all([
       prisma.contentData.count({ where: { ...whereClause, ...(canViewAll ? {} : {
         OR: [
-          { ownerId: session.user.id },
-          { shares: { some: { sharedWithId: session.user.id, canView: true, status: ShareStatus.ACTIVE } } }
+          { ownerId: Number(session.user.id) as any },
+          { shares: { some: { sharedWithId: Number(session.user.id) as any, canView: true, status: ShareStatus.ACTIVE } } }
         ]
       }) } }),
       prisma.contentData.count({ 
         where: { ...whereClause, status: ContentStatus.COMPLETED, ...(canViewAll ? {} : {
           OR: [
-            { ownerId: session.user.id },
-            { shares: { some: { sharedWithId: session.user.id, canView: true, status: ShareStatus.ACTIVE } } }
+            { ownerId: Number(session.user.id) as any },
+            { shares: { some: { sharedWithId: Number(session.user.id) as any, canView: true, status: ShareStatus.ACTIVE } } }
           ]
         }) } 
       }),
       prisma.contentData.count({ 
         where: { ...whereClause, status: ContentStatus.PROCESSING, ...(canViewAll ? {} : {
           OR: [
-            { ownerId: session.user.id },
-            { shares: { some: { sharedWithId: session.user.id, canView: true, status: ShareStatus.ACTIVE } } }
+            { ownerId: Number(session.user.id) as any },
+            { shares: { some: { sharedWithId: Number(session.user.id) as any, canView: true, status: ShareStatus.ACTIVE } } }
           ]
         }) } 
       }),
       prisma.contentData.count({ 
         where: { ...whereClause, status: ContentStatus.FAILED, ...(canViewAll ? {} : {
           OR: [
-            { ownerId: session.user.id },
-            { shares: { some: { sharedWithId: session.user.id, canView: true, status: ShareStatus.ACTIVE } } }
+            { ownerId: Number(session.user.id) as any },
+            { shares: { some: { sharedWithId: Number(session.user.id) as any, canView: true, status: ShareStatus.ACTIVE } } }
           ]
         }) } 
       })

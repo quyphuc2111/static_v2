@@ -5,7 +5,10 @@ import { ShareContentPayload, BulkSharePayload } from "../rbac.interface"
 export function useContentShares(userId?: string, contentId?: string) {
   return useQuery({
     queryKey: ["rbac", "content-shares", userId, contentId],
-    queryFn: () => getContentShares(userId, contentId),
+    queryFn: () => getContentShares(
+      userId ? parseInt(userId) : undefined, 
+      contentId ? parseInt(contentId) : undefined
+    ),
   })
 }
 
@@ -16,7 +19,6 @@ export function useShareContent() {
     mutationFn: (payload: ShareContentPayload) => shareContent(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rbac", "content-shares"] })
-      queryClient.invalidateQueries({ queryKey: ["content"] })
     },
   })
 }
@@ -26,10 +28,9 @@ export function useRemoveContentShare() {
 
   return useMutation({
     mutationFn: ({ contentId, sharedWithId }: { contentId: string; sharedWithId: string }) => 
-      removeContentShare(contentId, sharedWithId),
+      removeContentShare(parseInt(contentId), parseInt(sharedWithId)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rbac", "content-shares"] })
-      queryClient.invalidateQueries({ queryKey: ["content"] })
     },
   })
 }
@@ -41,7 +42,6 @@ export function useBulkShareContent() {
     mutationFn: (payload: BulkSharePayload) => bulkShareContent(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rbac", "content-shares"] })
-      queryClient.invalidateQueries({ queryKey: ["content"] })
     },
   })
 }
@@ -50,11 +50,10 @@ export function useRevokeContentShare() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ shareId, batchId }: { shareId?: string; batchId?: string }) => 
+    mutationFn: ({ shareId, batchId }: { shareId?: number; batchId?: number }) => 
       revokeContentShare(shareId, batchId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rbac", "content-shares"] })
-      queryClient.invalidateQueries({ queryKey: ["content"] })
     },
   })
 }
@@ -64,16 +63,14 @@ export function useUpdateContentShare() {
 
   return useMutation({
     mutationFn: ({ shareId, canView, canDownload, canEdit, canDelete }: { 
-      shareId: string; 
+      shareId: number; 
       canView: boolean; 
-      canDownload: boolean;
+      canDownload: boolean; 
       canEdit: boolean; 
-      canDelete: boolean; 
-    }) => 
-      updateContentShare(shareId, canView, canDownload, canEdit, canDelete),
+      canDelete: boolean 
+    }) => updateContentShare(shareId, canView, canDownload, canEdit, canDelete),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rbac", "content-shares"] })
-      queryClient.invalidateQueries({ queryKey: ["content"] })
     },
   })
 }

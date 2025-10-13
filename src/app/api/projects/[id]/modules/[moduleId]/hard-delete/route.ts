@@ -27,10 +27,11 @@ export async function DELETE(
     }
 
     const { moduleId } = params
+    const mId = Number(moduleId)
 
     // Check if module exists
     const module = await prisma.module.findUnique({
-      where: { id: moduleId },
+      where: { id: mId as any },
       include: {
         contentData: true,
       },
@@ -42,7 +43,7 @@ export async function DELETE(
 
     // Hard delete the module (cascade will delete content)
     await prisma.module.delete({
-      where: { id: moduleId },
+      where: { id: mId as any },
     })
 
     return NextResponse.json({

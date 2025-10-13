@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       // Add permissions to role
       if (permissionIds.length > 0) {
         await tx.rolePermission.createMany({
-          data: permissionIds.map((permissionId: string) => ({
+          data: permissionIds.map((permissionId: number) => ({
             roleId: newRole.id,
             permissionId
           }))

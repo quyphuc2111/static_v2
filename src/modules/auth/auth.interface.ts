@@ -1,12 +1,12 @@
 import { PermissionName, UserStatus } from "@prisma/client"
+import { BaseEntity, StatusEntity, NamedEntity, ApiResponse } from "@/types/common"
 
 export type LoginPayload = {
   login: string // username or email
   password: string
 }
 
-export type AuthUser = {
-  id: string
+export interface AuthUser extends BaseEntity, StatusEntity {
   username: string
   email?: string | null
   name?: string | null
@@ -24,7 +24,7 @@ export type AuthUser = {
   token?: string
 }
 
-export type LoginResponse = {
+export interface LoginResponse extends ApiResponse<AuthUser> {
   user: AuthUser
 }
 

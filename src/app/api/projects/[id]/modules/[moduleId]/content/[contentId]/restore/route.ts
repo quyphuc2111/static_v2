@@ -14,13 +14,16 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     const { id: projectId, moduleId, contentId } = await params
+    const pId = Number(projectId)
+    const mId = Number(moduleId)
+    const cId = Number(contentId)
 
     // Get soft-deleted content
     const content = await prisma.contentData.findFirst({
       where: {
-        id: contentId,
-        projectId,
-        moduleId,
+        id: cId as any,
+        projectId: pId as any,
+        moduleId: mId as any,
         isDeleted: true  // Only restore soft-deleted content
       }
     })
@@ -39,7 +42,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Permission check: must have RESTORE_CONTENT or be admin/manager
     if (!isAdmin && !canManageAll && !canRestore) {
       // If no restore permission, check if owner with MANAGE_OWN_CONTENT
-      const isOwner = content.ownerId === session.user.id
+      const isOwner = Number(content.ownerId) === Number(session.user.id)
       
       if (!isOwner || !canManageOwn) {
         return NextResponse.json({ 
@@ -50,7 +53,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     // Restore content
     const restoredContent = await prisma.contentData.update({
-      where: { id: contentId },
+      where: { id: cId as any },
       data: { 
         isDeleted: false,
         deletedAt: null,
