@@ -201,7 +201,7 @@ export function DataTable<TData, TValue>({
       </div>
 
       {/* Bulk Actions */}
-      {showSelection && bulkActions && selectedItems.length > 0 && (
+      {/* {showSelection && bulkActions && selectedItems.length > 0 && (
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-muted/50 p-3 rounded-lg border mx-4 sm:mx-6">
           <div className="flex items-center space-x-2">
             <span className="text-sm font-medium">
@@ -229,7 +229,7 @@ export function DataTable<TData, TValue>({
             </Button>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Table */}
       <div className="w-full overflow-x-auto">

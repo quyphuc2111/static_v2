@@ -15,10 +15,17 @@ export async function hasPermission(permission: string | PermissionName, userId?
     }
 
     const targetUserId = userId || session.user.id
+    
+    // Convert to number for Int schema
+    const numericUserId = Number(targetUserId)
+    if (isNaN(numericUserId)) {
+      console.error("Invalid userId provided to hasPermission:", targetUserId)
+      return false
+    }
 
     // Get user with roles and permissions
     const user = await prisma.user.findUnique({
-      where: { id: targetUserId as any },
+      where: { id: numericUserId as any },
       include: {
         roles: {
           include: {
