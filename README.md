@@ -1,4 +1,4 @@
-# Static Content Server
+# Static Content Server - Node Version 22
 
 ## 📝 Mô tả
 
@@ -10,7 +10,6 @@ Hệ thống quản lý và phân phối nội dung HTML/SCORM tĩnh với các 
 4. **Role-Based Access Control**: Phân quyền chi tiết theo vai trò
 5. **Content Sharing**: Chia sẻ nội dung giữa các user với quyền tùy chỉnh
 6. **Testing**: Tester có thể test trực tiếp các module
-7. ** NODE VERSION: 22
 
 ## 🚀 Cài đặt
 
