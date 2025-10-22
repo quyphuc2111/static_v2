@@ -11,6 +11,9 @@ import { existsSync, createWriteStream } from "fs"
 import yauzl from "yauzl"
 import { SCORMService } from "@/services/scormService"
 
+export const maxDuration = 300 // 5 minutes
+export const dynamic = 'force-dynamic'
+
 // Helper function to remove Vietnamese diacritics and sanitize for file paths
 function sanitizeVietnameseString(str: string): string {
   return str
