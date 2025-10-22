@@ -161,11 +161,13 @@ class HttpService {
     const path = (url as string) || "";
     const sanitizedPath = path.startsWith("/") ? path : `/${path}`;
 
+    const requestTimeout = config.timeout || 100000;
+
     return axiosInstance.request({
       baseURL: sanitizedBase,
       url: sanitizedPath,
       ...config,
-      timeout: 10000,
+      timeout: requestTimeout,
       headers: {
         "Content-Type": "application/json",
         "application-name": "bkt",
