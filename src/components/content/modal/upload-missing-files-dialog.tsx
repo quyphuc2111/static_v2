@@ -64,7 +64,7 @@ export function UploadMissingFilesDialog({ open, onOpenChange, projectId, module
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [detectedLaunchFiles, setDetectedLaunchFiles] = useState<Record<string, string | null>>({})
   const [isAnalyzing, setIsAnalyzing] = useState<Record<string, boolean>>({})
-  const [draggingContentId, setDraggingContentId] = useState<string | null>(null))
+  const [draggingContentId, setDraggingContentId] = useState<string | null>(null)
 
   const contentQuery = useContent(projectId, moduleId, !!projectId && !!moduleId)
   const updateContentMut = useUpdateContent(projectId, moduleId)
