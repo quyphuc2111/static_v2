@@ -23,7 +23,7 @@ export default function RootLayout({
   return (
     <html lang="vi" suppressHydrationWarning>
       <body
-        className={`font-sans ${GeistSans.variable} ${GeistMono.variable} antialiased`}
+        className={`font-sans ${GeistSans.variable} ${GeistMono.variable} antialiased h-screen overflow-hidden`}
       >
         <ToastContainer
           position="top-right"

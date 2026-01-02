@@ -430,9 +430,9 @@ export const createContentColumns = (
     id: "index",
     header: "#",
     cell: ({ row, table }) => {
-      const pageIndex = table.getState().pagination.pageIndex
-      const pageSize = table.getState().pagination.pageSize
-      const index = pageIndex * pageSize + row.index + 1
+      const { pageIndex, pageSize } = table?.getState().pagination
+      const rowIndex = table?.getRowModel()?.rows.findIndex(r => r.id === row.id)
+      const index = pageIndex * pageSize + rowIndex + 1
       return (
         <div className="text-xs text-muted-foreground font-medium w-8">
           {index}

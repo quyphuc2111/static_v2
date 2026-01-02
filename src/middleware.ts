@@ -11,6 +11,7 @@ const PUBLIC_PATHS = [
   '/about',
   '/api/auth/login',
   '/api/auth/logout',
+  '/uploads',
 ]
 
 // Kiểm tra xem path có phải là public không
@@ -21,17 +22,14 @@ function isPublicPath(pathname: string): boolean {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Handle CORS cho API routes
-  if (pathname.startsWith('/api/')) {
+  // Cho phép /uploads với CORS headers để nhúng vào trang khác
+  if (pathname.startsWith('/uploads')) {
     const response = NextResponse.next()
     response.headers.set('Access-Control-Allow-Origin', '*')
-    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
-    response.headers.set('Access-Control-Allow-Credentials', 'true')
-
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 200, headers: response.headers })
-    }
+    response.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS')
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type')
+    response.headers.set('X-Frame-Options', 'ALLOWALL')
+    response.headers.delete('X-Frame-Options')
     return response
   }
 

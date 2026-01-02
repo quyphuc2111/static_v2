@@ -14,9 +14,9 @@ export default function ManagerPage({children}: {children: React.ReactNode}) {
   return (
     <div className="h-screen flex flex-col">
       <Header onMenuClick={() => setMobileMenuOpen(true)} />
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Desktop Sidebar */}
-        <div className="hidden md:flex flex-shrink-0">
+        <div className="hidden md:flex flex-shrink-0 h-full">
           <Sidebar 
             collapsed={sidebarCollapsed} 
             onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -31,11 +31,9 @@ export default function ManagerPage({children}: {children: React.ReactNode}) {
           </SheetContent>
         </Sheet>
 
-        <ScrollArea className="flex-1 overflow-x-hidden">
-          <main className="p-4 md:p-6 max-w-full overflow-x-hidden">
-            {children}
-          </main>
-        </ScrollArea>
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6">
+          {children}
+        </main>
       </div>
     </div>
   )
