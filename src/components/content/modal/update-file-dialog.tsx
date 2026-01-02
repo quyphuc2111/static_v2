@@ -3,6 +3,7 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { RefreshCw, Archive, Code, BookOpen, CheckCircle, AlertCircle, Info } from "lucide-react"
+import { toast } from "react-toastify"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -54,6 +55,7 @@ export function UpdateFileDialog({ open, onOpenChange, content, projectId, modul
   const [file, setFile] = useState<File | null>(null)
   const [detectedLaunchFile, setDetectedLaunchFile] = useState<string | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
 
   const updateContentFileMut = useUpdateContentFile(projectId, moduleId)
 
@@ -144,6 +146,34 @@ export function UpdateFileDialog({ open, onOpenChange, content, projectId, modul
       analyzeZipFile(selectedFile)
     } else {
       setDetectedLaunchFile(null)
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    const droppedFile = e.dataTransfer.files?.[0]
+    if (droppedFile && droppedFile.name.endsWith('.zip')) {
+      setFile(droppedFile)
+      if (selectedType === "FILE_ZIP_HTML") {
+        analyzeZipFile(droppedFile)
+      }
+    } else {
+      toast.error("Vui lòng chọn file ZIP")
     }
   }
 
@@ -244,10 +274,19 @@ export function UpdateFileDialog({ open, onOpenChange, content, projectId, modul
               </Label>
               
               {!file ? (
-                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 hover:bg-primary/5 transition-all bg-background/30">
-                  <Archive className="mx-auto h-10 w-10 text-muted-foreground mb-2" />
-                  <p className="text-sm font-medium text-foreground mb-1">
-                    Chọn file ZIP mới
+                <div 
+                  className={`border-2 border-dashed rounded-lg p-6 text-center transition-all bg-background/30 ${
+                    isDragging 
+                      ? "border-primary bg-primary/10 scale-[1.02]" 
+                      : "border-border hover:border-primary/50 hover:bg-primary/5"
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  <Archive className={`mx-auto h-10 w-10 mb-2 transition-colors ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
+                  <p className={`text-sm font-medium mb-1 ${isDragging ? "text-primary" : "text-foreground"}`}>
+                    {isDragging ? "Thả file vào đây" : "Chọn file ZIP mới"}
                   </p>
                   <p className="text-xs text-muted-foreground mb-3">
                     Kéo thả hoặc click để chọn

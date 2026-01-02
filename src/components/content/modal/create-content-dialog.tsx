@@ -68,6 +68,7 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [detectedLaunchFile, setDetectedLaunchFile] = useState<string | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
 
   const createContentMut = useCreateContent(projectId, moduleId)
 
@@ -194,6 +195,34 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
       analyzeZipFile(selectedFile)
     } else {
       setDetectedLaunchFile(null)
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    const droppedFile = e.dataTransfer.files?.[0]
+    if (droppedFile && droppedFile.name.endsWith('.zip')) {
+      setFile(droppedFile)
+      if (selectedType === "FILE_ZIP_HTML") {
+        analyzeZipFile(droppedFile)
+      }
+    } else {
+      toast.error("Vui lòng chọn file ZIP")
     }
   }
 
@@ -359,12 +388,21 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
                   <Label className="text-foreground font-medium text-sm sm:text-base">
                     Upload File ZIP <span className="text-red-400">*</span>
                   </Label>
-                  <div className="border-2 border-dashed border-border rounded-lg p-3 sm:p-4 text-center hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 bg-background/30 backdrop-blur-sm">
-                    <Archive className="mx-auto h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground mb-2 sm:mb-3" />
+                  <div 
+                    className={`border-2 border-dashed rounded-lg p-3 sm:p-4 text-center transition-all duration-200 bg-background/30 backdrop-blur-sm ${
+                      isDragging 
+                        ? "border-primary bg-primary/10 scale-[1.02]" 
+                        : "border-border hover:border-primary/50 hover:bg-primary/5"
+                    }`}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                  >
+                    <Archive className={`mx-auto h-8 w-8 sm:h-12 sm:w-12 mb-2 sm:mb-3 transition-colors ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
                     <div className="space-y-2 sm:space-y-3">
                       <div>
-                        <p className="font-medium text-foreground mb-1 text-sm sm:text-base">
-                          Kéo thả file ZIP vào đây
+                        <p className={`font-medium mb-1 text-sm sm:text-base ${isDragging ? "text-primary" : "text-foreground"}`}>
+                          {isDragging ? "Thả file vào đây" : "Kéo thả file ZIP vào đây"}
                         </p>
                         <p className="text-xs sm:text-sm text-muted-foreground">
                           Hoặc click để chọn file từ máy tính
