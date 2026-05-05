@@ -1,121 +1,80 @@
 "use client"
 
-import { Bell, Search, Settings, User, HelpCircle, LogOut, Moon, Sun, Menu } from "lucide-react"
+import { Moon, Sun, Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { useTheme } from "next-themes"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { usePathname } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/modules/auth/hooks/useAuth"
+import { navigation } from "@/constants/navigation"
 
 interface HeaderProps {
   onMenuClick?: () => void
 }
 
+function useCurrentPageName() {
+  const pathname = usePathname()
+  const matched = navigation.find(
+    (item) =>
+      pathname === item.href ||
+      pathname.startsWith(item.href + "/") ||
+      (item.href === "/project" && pathname.startsWith("/projects"))
+  )
+  return matched?.name || "Dashboard"
+}
+
 export function Header({ onMenuClick }: HeaderProps) {
   const { theme, setTheme, resolvedTheme } = useTheme()
   const isDark = (resolvedTheme ?? theme) === "dark"
-  const { user: me, isLoading, logout } = useAuth()
+  const { user: me } = useAuth()
+  const pageName = useCurrentPageName()
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-16 items-center justify-between px-4 md:px-6">
-        <div className="flex items-center gap-3 md:gap-6">
-          {/* Mobile Menu Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden hover:bg-accent"
-            onClick={onMenuClick}
-            aria-label="Menu"
-          >
-            <Menu className="h-6 w-6" />
-          </Button>
-          
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">DM</span>
+    <header className="flex h-16 items-center border-b bg-white px-4 md:px-8 dark:bg-slate-900 border-slate-200 dark:border-slate-800 shrink-0 justify-between">
+      <div className="flex items-center gap-4 text-sm">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden hover:bg-accent"
+          onClick={onMenuClick}
+          aria-label="Menu"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+        <nav className="hidden lg:flex items-center gap-4 text-sm">
+          <span className="text-slate-400">Home</span>
+          <span className="text-slate-300">/</span>
+          <span className="font-medium text-slate-900 dark:text-slate-100">{pageName}</span>
+        </nav>
+      </div>
+      <div className="flex items-center gap-2 md:gap-4">
+       
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Chuyển đổi giao diện"
+          onClick={() => setTheme(isDark ? "light" : "dark")}
+          className="hover:bg-accent"
+        >
+          {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+        </Button>
+        {/* <Button variant="ghost" size="icon" className="relative">
+          <Bell className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+          <span className="absolute top-2 right-2.5 h-2 w-2 rounded-full bg-red-500 border-2 border-white dark:border-slate-900" />
+        </Button> */}
+        <div className="flex items-center gap-3 border-l pl-4 border-slate-200 dark:border-slate-800">
+          <div className="text-sm text-right hidden sm:block">
+            <div className="font-medium text-slate-900 dark:text-slate-100">
+              {me?.name || me?.email || "User"}
             </div>
-            <h1 className="text-lg md:text-xl font-semibold text-foreground">DocManager</h1>
+            <div className="text-xs text-slate-500 dark:text-slate-400 uppercase">
+              {me?.roles?.[0]?.name || "USER"}
+            </div>
           </div>
-
-          <nav className="hidden lg:flex items-center text-sm text-muted-foreground">
-            <span className="hover:text-foreground cursor-pointer">Trang chủ</span>
-            <span className="mx-2">/</span>
-            <span className="text-foreground">Dashboard</span>
-          </nav>
-        </div>
-
-        <div className="flex items-center gap-2 md:gap-4">
-          {/* Theme Toggle */}
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Chuyển đổi giao diện"
-            onClick={() => setTheme(isDark ? "light" : "dark")}
-            className="hover:bg-accent"
-          >
-            {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-          </Button>
-
-          {/* Notifications */}
-          {/* <Button 
-            variant="ghost" 
-            size="icon" 
-            className="relative hover:bg-accent hidden sm:flex"
-            aria-label="Thông báo"
-          >
-            <Bell className="h-5 w-5" />
-            <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs bg-primary">
-              3
-            </Badge>
-          </Button> */}
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-9 w-9 rounded-full">
-                <Avatar className="h-9 w-9">
-                  <AvatarImage src="/admin-avatar.png" alt={me?.name || me?.email || "User"} />
-                  <AvatarFallback>{(me?.name || me?.email || "U").slice(0,2).toUpperCase()}</AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" forceMount>
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{me?.name || me?.email || ""}</p>
-                  {me?.email && (
-                    <p className="text-xs leading-none text-muted-foreground">{me.email}</p>
-                  )}
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <User className="mr-2 h-4 w-4" />
-                <span>Hồ sơ cá nhân</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Cài đặt hệ thống</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <HelpCircle className="mr-2 h-4 w-4" />
-                <span>Trợ giúp</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-400" onClick={() => logout()}>
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Đăng xuất</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Avatar className="h-9 w-9 border border-slate-200">
+            <AvatarImage src={`https://api.dicebear.com/7.x/notionists/svg?seed=${me?.name || me?.email || "User"}`} />
+            <AvatarFallback>{(me?.name || me?.email || "U").slice(0, 2).toUpperCase()}</AvatarFallback>
+          </Avatar>
         </div>
       </div>
     </header>

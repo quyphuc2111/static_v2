@@ -34,12 +34,12 @@ export const navigation: NavigationItem[] = [
       PermissionName.HARD_DELETE_PROJECTS
     ]
   }, 
-  {
-    name: "Quản lý Nội dung",
-    href: "/content",
-    icon: FileText,
-    permissions: [PermissionName.VIEW_CONTENT, PermissionName.VIEW_OWN_CONTENT_ONLY]
-  },
+  // {
+  //   name: "Quản lý Nội dung",
+  //   href: "/content",
+  //   icon: FileText,
+  //   permissions: [PermissionName.VIEW_CONTENT, PermissionName.VIEW_OWN_CONTENT_ONLY]
+  // },
   {
     name: "Quản lý Người dùng",
     href: "/users",
@@ -58,11 +58,11 @@ export const navigation: NavigationItem[] = [
     icon: Shield,
     permissions: [PermissionName.MANAGE_USER_PERMISSIONS]
   },
-  {
-    name: "Chia sẻ Nội dung",
-    href: "/content-sharing",
-    icon: Share2,
-    permissions: [PermissionName.SHARE_CONTENT_ACCESS]
-  }
+  // {
+  //   name: "Chia sẻ Nội dung",
+  //   href: "/content-sharing",
+  //   icon: Share2,
+  //   permissions: [PermissionName.SHARE_CONTENT_ACCESS]
+  // }
 ]
 

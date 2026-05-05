@@ -4,6 +4,7 @@ import { getSession } from "@/lib/session"
 import { hasPermission } from "@/lib/permissions"
 import { PermissionName, UserStatus } from "@prisma/client"
 import { logUserAction } from "@/lib/audit"
+import { userEventBus } from "@/lib/user-events"
 
 type Params = { params: Promise<{ userId: string }> }
 
@@ -62,6 +63,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         newStatus: updated.status
       }
     )
+
+    // Emit SSE event để force logout user bị disable
+    if (newStatus === UserStatus.DISABLED) {
+      userEventBus.emitUserDisabled(numericUserId)
+    } else {
+      userEventBus.emitUserEnabled(numericUserId)
+    }
 
     return NextResponse.json({ data: updated })
   } catch (error) {

@@ -1,67 +1,41 @@
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useRecentActivity } from "@/modules/dashboard/hooks"
 import { ActivityItem } from "@/modules/dashboard/dashboard.service"
 import { formatDistanceToNow } from "date-fns"
 import { vi } from "date-fns/locale"
 
-const getActionBadge = (action: string, type: string) => {
-  const actionMap: Record<string, { label: string; variant: string; className: string }> = {
-    'created': { label: 'Tạo mới', variant: 'default', className: 'bg-green-500/20 text-green-400 border-green-500/30' },
-    'updated': { label: 'Cập nhật', variant: 'default', className: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-    'deleted': { label: 'Xóa', variant: 'default', className: 'bg-red-500/20 text-red-400 border-red-500/30' },
-    'shared': { label: 'Chia sẻ', variant: 'default', className: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
-    'uploaded': { label: 'Tải lên', variant: 'default', className: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
-    'restored': { label: 'Khôi phục', variant: 'default', className: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
-  }
-
-  const config = actionMap[action.toLowerCase()] || { label: action, variant: 'secondary', className: '' }
-  
-  return (
-    <Badge variant={config.variant as any} className={config.className}>
-      {config.label}
-    </Badge>
-  )
+const dotColorMap: Record<string, string> = {
+  created: "bg-blue-600",
+  updated: "bg-blue-400",
+  uploaded: "bg-blue-500",
+  shared: "bg-purple-400",
+  deleted: "bg-red-400",
+  restored: "bg-green-400",
 }
 
 const getActivityDescription = (activity: ActivityItem) => {
   const { action, entityType, metadata } = activity
-  
   switch (entityType) {
-    case 'ContentData':
+    case "ContentData":
       return {
-        action: action === 'created' ? 'đã tạo tài liệu' : 
-                action === 'updated' ? 'đã cập nhật tài liệu' :
-                action === 'deleted' ? 'đã xóa tài liệu' : 'đã thực hiện hành động',
-        target: metadata?.title || 'Tài liệu',
-        context: metadata?.projectName ? `trong dự án ${metadata.projectName}` : ''
+        title: action === "created" ? "Tài liệu được tạo" : action === "updated" ? "Tài liệu cập nhật" : action === "deleted" ? "Tài liệu bị xóa" : action === "uploaded" ? "Tài liệu tải lên" : "Hành động tài liệu",
+        desc: `${metadata?.title || "Tài liệu"}${metadata?.projectName ? ` trong ${metadata.projectName}` : ""}`,
       }
-    case 'Project':
+    case "Project":
       return {
-        action: action === 'created' ? 'đã tạo dự án' :
-                action === 'updated' ? 'đã cập nhật dự án' :
-                action === 'deleted' ? 'đã xóa dự án' : 'đã thực hiện hành động',
-        target: metadata?.name || 'Dự án',
-        context: ''
+        title: action === "created" ? "Dự án được tạo" : action === "updated" ? "Dự án cập nhật" : action === "deleted" ? "Dự án bị xóa" : "Hành động dự án",
+        desc: metadata?.name || "Dự án",
       }
-    case 'User':
+    case "User":
       return {
-        action: action === 'created' ? 'đã tạo người dùng' :
-                action === 'updated' ? 'đã cập nhật người dùng' :
-                action === 'deleted' ? 'đã xóa người dùng' : 'đã thực hiện hành động',
-        target: metadata?.name || metadata?.email || 'Người dùng',
-        context: ''
+        title: action === "created" ? "Người dùng được tạo" : action === "updated" ? "Người dùng cập nhật" : "Hành động người dùng",
+        desc: metadata?.name || metadata?.email || "Người dùng",
       }
     default:
-      return {
-        action: `đã ${action}`,
-        target: entityType,
-        context: ''
-      }
+      return { title: `${action} ${entityType}`, desc: "" }
   }
 }
 
@@ -70,82 +44,59 @@ export function RecentActivity() {
 
   if (isLoading) {
     return (
-      <Card className="bg-card border-border">
-        <CardHeader>
-          <CardTitle className="text-foreground">Hoạt động Gần đây</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-4">
-                <Skeleton className="h-9 w-9 rounded-full" />
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-5 w-16" />
-                  </div>
-                  <Skeleton className="h-4 w-48" />
-                  <Skeleton className="h-3 w-20" />
-                </div>
-              </div>
-            ))}
+      <div className="p-5 space-y-6">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="relative pl-6">
+            <Skeleton className="absolute left-[3px] top-1.5 w-1.5 h-1.5 rounded-full" />
+            <Skeleton className="h-3 w-32 mb-1" />
+            <Skeleton className="h-3 w-48 mb-1" />
+            <Skeleton className="h-2 w-16" />
           </div>
-        </CardContent>
-      </Card>
+        ))}
+      </div>
     )
   }
 
   if (!activity || activity.length === 0) {
     return (
-      <Card className="bg-card border-border">
-        <CardHeader>
-          <CardTitle className="text-foreground">Hoạt động Gần đây</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-center py-8">Không có hoạt động nào gần đây</p>
-        </CardContent>
-      </Card>
+      <div className="p-5 text-center py-10">
+        <p className="text-sm text-slate-500">Không có hoạt động nào gần đây</p>
+      </div>
     )
   }
 
   return (
-    <Card className="bg-card border-border">
-      <CardHeader>
-        <CardTitle className="text-foreground">Hoạt động Gần đây</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {activity.slice(0, 10).map((activityItem: ActivityItem) => {
-            const description = getActivityDescription(activityItem)
-            const actorName = activityItem.actor?.name || activityItem.actor?.email || 'Hệ thống'
-            const actorInitial = actorName.charAt(0).toUpperCase()
-            
-            return (
-              <div key={activityItem.id} className="flex items-center gap-4">
-                <Avatar className="h-9 w-9">
-                  <AvatarFallback>{actorInitial}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-foreground">{actorName}</p>
-                    {getActionBadge(activityItem.action, activityItem.type)}
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {description.action} <span className="font-medium">{description.target}</span>
-                    {description.context && <span className="text-muted-foreground"> {description.context}</span>}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(activityItem.createdAt), { 
-                      addSuffix: true, 
-                      locale: vi 
-                    })}
-                  </p>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </CardContent>
-    </Card>
+    <>
+      <div className="overflow-y-auto p-5 space-y-6">
+        {activity.slice(0, 10).map((item: ActivityItem, idx: number) => {
+          const { title, desc } = getActivityDescription(item)
+          const actorName = item.actor?.name || item.actor?.email || "Hệ thống"
+          const dotColor = dotColorMap[item.action?.toLowerCase()] || "bg-slate-300 dark:bg-slate-600"
+          const isLast = idx === Math.min(activity.length, 10) - 1
+
+          return (
+            <div key={item.id} className="relative pl-6">
+              <div className={`absolute left-[3px] top-1.5 w-1.5 h-1.5 rounded-full ${dotColor}`} />
+              {!isLast && (
+                <div className="absolute left-[6px] top-3 bottom-0 w-px bg-slate-100 dark:bg-slate-800" />
+              )}
+              <p className="text-xs font-bold text-slate-900 dark:text-white mb-1">{title}</p>
+              <p className="text-[11px] text-slate-500 leading-normal mb-1">
+                <span className="font-semibold text-slate-700 dark:text-slate-300">{actorName}</span>
+                {desc ? ` — ${desc}` : ""}
+              </p>
+              <p className="text-[10px] text-slate-400">
+                {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true, locale: vi })}
+              </p>
+            </div>
+          )
+        })}
+      </div>
+      <div className="p-3 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 text-center mt-auto">
+        <Button variant="link" className="text-[11px] font-bold text-slate-500 hover:text-blue-600 p-0 h-auto">
+          Xem toàn bộ lịch sử
+        </Button>
+      </div>
+    </>
   )
 }

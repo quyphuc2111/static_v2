@@ -193,14 +193,14 @@ export function UserRoleManagement() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
+                    <DropdownMenu modal={false}>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleChangeRole(user)}>
+                        <DropdownMenuItem onSelect={() => setTimeout(() => handleChangeRole(user), 0)}>
                           <UserCog className="h-4 w-4 mr-2" />
                           Đổi vai trò
                         </DropdownMenuItem>

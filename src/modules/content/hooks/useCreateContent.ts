@@ -2,90 +2,81 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { createContent } from "../content.service"
 import { CreateContentPayload } from "../content.interface"
 import { toast } from "react-toastify"
-import { useEffect, useRef } from "react"
+import { useRef } from "react"
 
 export function useCreateContent(projectId: string, moduleId: string) {
   const queryClient = useQueryClient()
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Cleanup polling on unmount
-  useEffect(() => {
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
-      }
-    }
-  }, [])
+  const optimisticIdRef = useRef<string>("")
 
-  const stopPolling = () => {
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current)
-      pollingIntervalRef.current = null
-    }
-  }
-
-  const startPolling = () => {
-    // Clear any existing interval
-    stopPolling()
-
-    let pollCount = 0
-    const maxPolls = 60 // 2 minutes (60 * 2 seconds)
-
-    // Poll every 2 seconds to check for processing status updates
-    pollingIntervalRef.current = setInterval(() => {
-      // Check if interval should still be running
-      if (!pollingIntervalRef.current) {
-        return
-      }
-
-      pollCount++
-      
-      // Fetch fresh data and check status
-      const queryKey = ["content", projectId, moduleId]
-      queryClient.refetchQueries({ queryKey }).then(() => {
-        // Double check if interval is still running before processing
-        if (!pollingIntervalRef.current) {
-          return
-        }
-
-        // Get the latest data from cache after refetch
-        const data = queryClient.getQueryData(queryKey) as any
-        
-        // Data is either an array directly OR { data: array }
-        const contentArray = Array.isArray(data) ? data : data?.data
-        
-        if (contentArray && Array.isArray(contentArray)) {
-          const processingItems = contentArray.filter((item: any) => item.status === "PROCESSING")
-          const hasProcessing = processingItems.length > 0
-          
-          // Stop polling if no content is processing
-          if (!hasProcessing) {
-            toast.success("Xử lý nội dung hoàn tất!")
-            stopPolling()
-            return
-          }
-        }
-        
-        // Safety: stop after max polls (2 minutes)
-        if (pollCount >= maxPolls) {
-          stopPolling()
-        }
-      })
-    }, 2000)
+  const updateOptimisticProgress = (progress: number) => {
+    const queryKey = ["content", projectId, moduleId]
+    queryClient.setQueryData(queryKey, (old: any) => {
+      if (!old) return old
+      const updateItem = (items: any[]) =>
+        items.map((item: any) =>
+          item.id === optimisticIdRef.current
+            ? { ...item, progress, ...(progress >= 100 ? { status: "PROCESSING", progress: undefined } : {}) }
+            : item
+        )
+      if (Array.isArray(old)) return updateItem(old)
+      return { ...old, data: updateItem(old.data || []) }
+    })
   }
 
   return useMutation({
-    mutationFn: (payload: CreateContentPayload) => createContent(projectId, moduleId, payload),
-    onSuccess: (data) => {
+    mutationFn: (payload: CreateContentPayload) =>
+      createContent(projectId, moduleId, payload, (progress) => {
+        updateOptimisticProgress(progress)
+      }),
+    onMutate: async (payload) => {
+      const queryKey = ["content", projectId, moduleId]
+      await queryClient.cancelQueries({ queryKey })
+
+      const previousData = queryClient.getQueryData(queryKey)
+
+      const tempId = `temp-${Date.now()}`
+      optimisticIdRef.current = tempId
+
+      const optimisticItem = {
+        id: tempId,
+        title: payload.title,
+        contentType: payload.contentType,
+        description: payload.description || null,
+        contentUrl: "",
+        status: "UPLOADING" as const,
+        progress: 0,
+        fileSize: payload.file?.size || 0,
+        isDeleted: false,
+        deletedAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        projectId,
+        moduleId,
+      }
+
+      queryClient.setQueryData(queryKey, (old: any) => {
+        if (!old) return { data: [optimisticItem] }
+        if (Array.isArray(old)) return [optimisticItem, ...old]
+        return { ...old, data: [optimisticItem, ...(old.data || [])] }
+      })
+
+      return { previousData }
+    },
+    onSuccess: () => {
+      optimisticIdRef.current = ""
       toast.success("Đang xử lý nội dung...")
-      // Immediately refresh to show the new content with PROCESSING status
       queryClient.invalidateQueries({ queryKey: ["content", projectId, moduleId] })
       queryClient.invalidateQueries({ queryKey: ["content", "stats"] })
-      
-      // Start polling to get real-time progress updates
-      startPolling()
+      // Realtime processing updates are handled by useContentSSE. Avoid
+      // additional polling here because it causes repeated refetches/re-renders
+      // right after uploading/updating content.
     },
-    onError: (e: any) => {
+    onError: (e: any, _payload, context) => {
+      optimisticIdRef.current = ""
+      if (context?.previousData) {
+        queryClient.setQueryData(["content", projectId, moduleId], context.previousData)
+      }
       if (e?.response?.status === 413) {
         toast.error("File quá lớn, vui lòng chọn file nhỏ hơn")
       } else if (e?.response?.status === 400) {

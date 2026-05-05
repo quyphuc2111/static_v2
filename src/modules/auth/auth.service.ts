@@ -27,18 +27,22 @@ export async function getMe() {
   if ((res as any)?.csrfToken) {
     storageService.set("csrf_token", (res as any).csrfToken)
   }
-  return res.user
+  return res?.user ?? null
 }
 
 export async function getMeOptional() {
-  const res = await httpService.get<LoginResponse>({
-    url: AUTH_API_URL.ME,
-    headers: { "X-Optional-Auth": "true" },
-  })
-  if ((res as any)?.csrfToken) {
-    storageService.set("csrf_token", (res as any).csrfToken)
+  try {
+    const res = await httpService.get<LoginResponse>({
+      url: AUTH_API_URL.ME,
+      headers: { "X-Optional-Auth": "true" },
+    })
+    if ((res as any)?.csrfToken) {
+      storageService.set("csrf_token", (res as any).csrfToken)
+    }
+    return res?.user ?? null
+  } catch {
+    return null
   }
-  return res.user
 }
 
 

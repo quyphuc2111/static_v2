@@ -55,14 +55,17 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       where: { id: cId as any }
     })
 
-    // Also remove physical files
+    // Also remove physical files + version archives
     try {
       const contentDir = join(process.cwd(), 'public', content.contentUrl)
       await rm(contentDir, { recursive: true, force: true })
-      console.log(`Hard deleted content directory: ${contentDir}`)
+      // Remove _versions_{contentId} sibling directory
+      const versionsDir = join(contentDir, '..', `_versions_${cId}`)
+      await rm(versionsDir, { recursive: true, force: true })
+      console.log(`Hard deleted content directory + versions: ${contentDir}`)
     } catch (fileError) {
       console.warn(`Failed to delete content directory: ${fileError}`)
-      // Don't fail the transaction if file deletion fails
+      // Don't fail the request if file deletion fails
     }
 
     // Log audit action

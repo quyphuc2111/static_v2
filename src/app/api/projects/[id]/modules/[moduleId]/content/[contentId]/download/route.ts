@@ -46,14 +46,17 @@ export async function GET(request: NextRequest, { params }: Params) {
     
     // Check if user can download this specific content
     const isOwner = Number(content.ownerId) === Number(session.user.id)
-    const canDownloadThis = isAdmin || canManageAll || canDownloadAny || (canManageOwn && isOwner)
+    const canDownloadThis = isAdmin || canManageAll || (isOwner && (canDownloadAny || canManageOwn))
     
     // If not owner and no general download permission, check sharing
     if (!canDownloadThis) {
       const share = await prisma.contentShare.findFirst({
         where: { contentId: content.id as any, sharedWithId: Number(session.user.id) as any, canDownload: true, status: ShareStatus.ACTIVE }
       })
-      if (!share) {
+      const moduleShare = await prisma.moduleShare.findFirst({
+        where: { moduleId: content.moduleId as any, sharedWithId: Number(session.user.id) as any, permission: { in: ['DOWNLOAD', 'EDIT'] }, status: ShareStatus.ACTIVE }
+      })
+      if (!share && !moduleShare) {
         return NextResponse.json({ error: "Bạn không có quyền tải xuống nội dung này" }, { status: 403 })
       }
     }

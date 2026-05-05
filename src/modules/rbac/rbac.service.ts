@@ -1,18 +1,21 @@
 import httpService from "@/services/instance"
 import { API_BASE_URL } from "@/constants/apiUrl"
-import { 
-  Role, 
-  Permission, 
-  UserRole, 
-  ContentShare, 
-  CreateRolePayload, 
-  AssignRolePayload, 
+import {
+  Role,
+  Permission,
+  UserRole,
+  ContentShare,
+  CreateRolePayload,
+  AssignRolePayload,
   ShareContentPayload,
   BulkSharePayload,
   UserWithRoles,
   CreateUserPayload,
   UpdateUserPayload,
-  RoleWithPermissions
+  RoleWithPermissions,
+  ModuleShareItem,
+  ShareModulePayload,
+  UpdateModuleSharePayload
 } from "./rbac.interface"
 
 const RBAC_API_URL = {
@@ -20,6 +23,7 @@ const RBAC_API_URL = {
   PERMISSIONS: "permissions",
   USER_ROLES: (userId: string) => `users/${userId}/roles`,
   CONTENT_SHARING: "content-sharing",
+  MODULE_SHARES: "v2/module-shares",
 }
 
 export async function getRoles(): Promise<RoleWithPermissions[]> {
@@ -187,4 +191,36 @@ export async function resetUserPassword(userId: number, newPassword: string): Pr
     data: { newPassword },
   })
   return res.data
+}
+
+// ========================
+// Module Sharing v2
+// ========================
+export async function getModuleShares(moduleId: number): Promise<ModuleShareItem[]> {
+  const res = await httpService.get<{ data: ModuleShareItem[] }>({
+    url: `${RBAC_API_URL.MODULE_SHARES}?moduleId=${moduleId}`
+  })
+  return res.data
+}
+
+export async function shareModule(payload: ShareModulePayload): Promise<ModuleShareItem> {
+  const res = await httpService.post<{ data: ModuleShareItem }>({
+    url: RBAC_API_URL.MODULE_SHARES,
+    data: payload
+  })
+  return res.data
+}
+
+export async function updateModuleShare(payload: UpdateModuleSharePayload): Promise<ModuleShareItem> {
+  const res = await httpService.patch<{ data: ModuleShareItem }>({
+    url: RBAC_API_URL.MODULE_SHARES,
+    data: payload
+  })
+  return res.data
+}
+
+export async function revokeModuleShare(shareId: number): Promise<void> {
+  await httpService.delete({
+    url: `${RBAC_API_URL.MODULE_SHARES}?id=${shareId}`
+  })
 }

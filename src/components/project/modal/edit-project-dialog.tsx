@@ -78,7 +78,7 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[500px] max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-[500px] max-h-[90vh] flex flex-col bg-white">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>Chỉnh sửa Dự án</DialogTitle>
           <DialogDescription>Cập nhật thông tin dự án</DialogDescription>

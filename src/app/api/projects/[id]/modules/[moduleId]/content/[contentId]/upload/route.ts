@@ -5,99 +5,22 @@ import { PermissionName } from "@prisma/client"
 import { hasPermission as checkPermission, hasAnyPermission } from "@/lib/permissions"
 import { logContentAction } from "@/lib/audit"
 import { Prisma } from "@prisma/client"
-import { writeFile, mkdir } from "fs/promises"
-import { join, dirname } from "path"
-import { existsSync, createWriteStream } from "fs"
-import yauzl from "yauzl"
+import { mkdir } from "fs/promises"
+import { join } from "path"
+import { existsSync } from "fs"
 import { SCORMService } from "@/services/scormService"
+import { contentEventBus } from "@/lib/content-events"
+import {
+  sanitizeVietnameseString,
+  streamFileToDisk,
+  scanZipEntries,
+  extractZipFromDisk,
+  findLaunchFileFromList,
+  cleanupTempZip,
+} from "@/lib/file-utils"
 
-// Helper function to remove Vietnamese diacritics and sanitize for file paths
-function sanitizeVietnameseString(str: string): string {
-  return str
-    .normalize('NFD') // Decompose accented characters
-    .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
-    .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters except spaces
-    .replace(/\s+/g, '_') // Replace spaces with underscores
-    .toLowerCase()
-}
-
-// Helper function to extract ZIP file
-function extractZip(zipPath: string, extractPath: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
-      if (err) {
-        console.error("Error opening ZIP file:", err)
-        reject(err)
-        return
-      }
-
-      if (!zipfile) {
-        reject(new Error("Failed to open ZIP file"))
-        return
-      }
-
-      zipfile.readEntry()
-      zipfile.on("entry", (entry) => {
-        if (/\/$/.test(entry.fileName)) {
-          // Directory entry - create directory
-          const dirPath = join(extractPath, entry.fileName)
-          mkdir(dirPath, { recursive: true })
-            .then(() => zipfile.readEntry())
-            .catch((dirErr) => {
-              console.error("Error creating directory:", dirErr)
-              reject(dirErr)
-            })
-        } else {
-          // File entry
-          zipfile.openReadStream(entry, (err, readStream) => {
-            if (err) {
-              console.error("Error opening read stream:", err)
-              reject(err)
-              return
-            }
-
-            if (!readStream) {
-              reject(new Error("Failed to create read stream"))
-              return
-            }
-
-            const filePath = join(extractPath, entry.fileName)
-            const fileDir = dirname(filePath)
-            
-            // Ensure directory exists before writing file
-            mkdir(fileDir, { recursive: true })
-              .then(() => {
-                const writeStream = createWriteStream(filePath)
-                
-                readStream.pipe(writeStream)
-                writeStream.on("close", () => {
-                  zipfile.readEntry()
-                })
-                writeStream.on("error", (writeErr) => {
-                  console.error("Error writing file:", writeErr)
-                  reject(writeErr)
-                })
-              })
-              .catch((dirErr) => {
-                console.error("Error creating file directory:", dirErr)
-                reject(dirErr)
-              })
-          })
-        }
-      })
-
-      zipfile.on("end", () => {
-        console.log("ZIP extraction completed successfully")
-        resolve()
-      })
-
-      zipfile.on("error", (zipErr) => {
-        console.error("ZIP file error:", zipErr)
-        reject(zipErr)
-      })
-    })
-  })
-}
+export const maxDuration = 300 // 5 minutes
+export const dynamic = 'force-dynamic'
 
 export async function POST(
   request: NextRequest,
@@ -108,64 +31,45 @@ export async function POST(
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-    
+
     const { id: projectId, moduleId, contentId } = await params
 
-    // Verify project and module exist
-    const project = await prisma.project.findUnique({
-      where: { id: Number(projectId) as any }
-    })
+    // Batch DB lookups in parallel
+    const [project, module, content] = await Promise.all([
+      prisma.project.findUnique({ where: { id: Number(projectId) as any } }),
+      prisma.module.findUnique({ where: { id: Number(moduleId) as any } }),
+      prisma.contentData.findUnique({
+        where: { id: Number(contentId) as any },
+        include: { owner: { select: { id: true, name: true, email: true } } }
+      })
+    ])
 
-    if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 })
-    }
+    if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 })
+    if (!module) return NextResponse.json({ error: "Module not found" }, { status: 404 })
+    if (!content) return NextResponse.json({ error: "Content not found" }, { status: 404 })
 
-    const module = await prisma.module.findUnique({
-      where: { id: Number(moduleId) as any }
-    })
-
-    if (!module) {
-      return NextResponse.json({ error: "Module not found" }, { status: 404 })
-    }
-
-    // Find the content to update
-    const content = await prisma.contentData.findUnique({
-      where: { id: Number(contentId) as any },
-      include: {
-        owner: { select: { id: true, name: true, email: true } }
-      }
-    })
-
-    if (!content) {
-      return NextResponse.json({ error: "Content not found" }, { status: 404 })
-    }
-
-    // Permission check for updating content
+    // Permission checks in parallel
     const isAdmin = (session.user.roles || []).includes("ADMINISTRATOR")
-    const canManageAll = isAdmin || await checkPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id)
-    const isOwner = content.ownerId === Number(session.user.id) as any
+    const [canManageAll, canUpdate, sharedContent] = await Promise.all([
+      isAdmin ? Promise.resolve(true) : checkPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id),
+      hasAnyPermission([PermissionName.EDIT_CONTENT, PermissionName.MANAGE_OWN_CONTENT], session.user.id),
+      prisma.contentShare.findFirst({
+        where: {
+          contentId: content.id as any,
+          sharedWithId: Number(session.user.id) as any,
+          status: 'ACTIVE',
+          canEdit: true
+        }
+      })
+    ])
 
-    // Check if user has edit permission via content sharing
-    const sharedContent = await prisma.contentShare.findFirst({
-      where: {
-        contentId: content.id as any,
-        sharedWithId: Number(session.user.id) as any,
-        status: 'ACTIVE',
-        canEdit: true
-      }
-    })
-    const hasEditPermissionViaShare = !!sharedContent
+    const isOwner = content.ownerId === (Number(session.user.id) as any)
+    const hasEditViaShare = !!sharedContent
 
-    if (!canManageAll && !isOwner && !hasEditPermissionViaShare) {
+    if (!canManageAll && !isOwner && !hasEditViaShare) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
-
-    const canUpdate = await hasAnyPermission([
-      PermissionName.EDIT_CONTENT,
-      PermissionName.MANAGE_OWN_CONTENT
-    ], session.user.id)
-    
-    if (!canUpdate && !hasEditPermissionViaShare) {
+    if (!canUpdate && !hasEditViaShare) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
@@ -175,317 +79,170 @@ export async function POST(
     const file = formData.get("file") as File
 
     if (!contentType || !file) {
-      return NextResponse.json(
-        { error: "Missing required fields: contentType and file" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Missing required fields: contentType and file" }, { status: 400 })
     }
+    if (file.size === 0) return NextResponse.json({ error: "File is empty" }, { status: 400 })
+    if (file.size > 1000 * 1024 * 1024) return NextResponse.json({ error: "File too large (max 1000MB)" }, { status: 400 })
+    if (!file.name.toLowerCase().endsWith('.zip')) return NextResponse.json({ error: "Only ZIP files are allowed" }, { status: 400 })
 
-    // Create directory structure: <project_name>/<module_name>/<file_name + timestamp>
+    // Build paths
     const timestamp = Date.now()
     const fileNameWithoutExt = file.name.replace(/\.[^/.]+$/, "")
     const extractedDirName = `${fileNameWithoutExt}_${timestamp}`
-    
-    const uploadDir = join(
-      process.cwd(), 
-      "public", 
-      "uploads", 
-      "content",
-      sanitizeVietnameseString(project.name), // Sanitize project name
-      sanitizeVietnameseString(module.name),  // Sanitize module name
-      extractedDirName
-    )
+    const sanitizedProject = sanitizeVietnameseString(project.name)
+    const sanitizedModule = sanitizeVietnameseString(module.name)
 
-    // Create directory structure
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true })
+    const uploadDir = join(process.cwd(), "public", "uploads", "content", sanitizedProject, sanitizedModule, extractedDirName)
+    const tempZipPath = join(process.cwd(), "public", "uploads", "content", sanitizedProject, sanitizedModule, `_tmp_${timestamp}.zip`)
+    const relativeDirPath = `/uploads/content/${sanitizedProject}/${sanitizedModule}/${extractedDirName}`
+
+    // Ensure upload directory exists
+    await mkdir(uploadDir, { recursive: true })
+
+    // Stream file to disk — does NOT load entire file into memory
+    await streamFileToDisk(file, tempZipPath)
+
+    // Validate: HTML type must have exactly 1 HTML file
+    if (contentType === "FILE_ZIP_HTML") {
+      const { htmlFiles: zipHtmlFiles } = await scanZipEntries(tempZipPath)
+      if (zipHtmlFiles.length === 0) {
+        await cleanupTempZip(tempZipPath)
+        return NextResponse.json(
+          { error: "File ZIP không chứa file HTML nào." },
+          { status: 400 }
+        )
+      }
+      if (zipHtmlFiles.length > 1) {
+        await cleanupTempZip(tempZipPath)
+        return NextResponse.json(
+          { error: `File ZIP chứa ${zipHtmlFiles.length} file HTML. Chỉ được phép 1 file HTML duy nhất.`, htmlFiles: zipHtmlFiles },
+          { status: 400 }
+        )
+      }
     }
 
-    // Save ZIP file temporarily
-    const tempZipPath = join(uploadDir, file.name)
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-    await writeFile(tempZipPath, buffer)
-
-    // Extract ZIP file
-    try {
-      console.log("Starting ZIP extraction...")
-      console.log("ZIP path:", tempZipPath)
-      console.log("Extract to:", uploadDir)
-      
-      await extractZip(tempZipPath, uploadDir)
-      console.log("ZIP extraction completed")
-      
-      // Remove temporary ZIP file
-      await require('fs').promises.unlink(tempZipPath)
-      console.log("Temporary ZIP file removed")
-    } catch (extractError) {
-      console.error("Error extracting ZIP:", extractError)
-      const errorMessage = extractError instanceof Error ? extractError.message : "Unknown error"
-      return NextResponse.json(
-        { error: "Failed to extract ZIP file", details: errorMessage },
-        { status: 400 }
-      )
-    }
-
-    // Update content record with new file
-    const relativePath = `/uploads/content/${project.name.replace(/[^a-zA-Z0-9]/g, "_")}/${module.name.replace(/[^a-zA-Z0-9]/g, "_")}/${extractedDirName}`
-    
-    // Update content with new file info
+    // Mark as PROCESSING
     await prisma.contentData.update({
       where: { id: Number(contentId) as any },
       data: {
         contentType,
-        contentUrl: relativePath,
+        contentUrl: relativeDirPath,
         fileSize: file.size,
         status: "PROCESSING" as any,
         progress: 0
       } as any
     })
 
-    // Process extracted content
-    setTimeout(async () => {
-      try {
-        // Update progress: Starting extraction (10%)
-        await prisma.contentData.update({
-          where: { id: Number(contentId) as any },
-          data: { progress: 10 } as any
-        })
+    // Log audit (non-blocking)
+    logContentAction(session.user.id, 'uploaded', contentId, {
+      contentTitle: content.title,
+      fileSize: file.size,
+      contentType
+    }).catch(console.error)
 
-        // Use transaction to ensure atomicity
-        await prisma.$transaction(async (tx) => {
-        // Find index file (index.html, index.htm, or first HTML file)
-        const fs = require('fs')
-        const path = require('path')
-        
-        // Update progress: Finding files (20%)
-        await tx.contentData.update({
-          where: { id: Number(contentId) as any },
-          data: { progress: 20 } as any
-        })
-        
-        const findIndexFile = (dir: string): string | null => {
-          const files = fs.readdirSync(dir)
-          
-          // Look for index files first
-          const indexFiles = files.filter((file: string) => 
-            file.toLowerCase() === 'index.html' || 
-            file.toLowerCase() === 'index.htm'
-          )
-          
-          if (indexFiles.length > 0) {
-            return path.join(dir, indexFiles[0])
-          }
-          
-          // Look for any HTML file
-          const htmlFiles = files.filter((file: string) => 
-            file.toLowerCase().endsWith('.html') || 
-            file.toLowerCase().endsWith('.htm')
-          )
-          
-          if (htmlFiles.length > 0) {
-            return path.join(dir, htmlFiles[0])
-          }
-          
-          // Look in subdirectories
-          for (const file of files) {
-            const fullPath = path.join(dir, file)
-            if (fs.statSync(fullPath).isDirectory()) {
-              const found = findIndexFile(fullPath)
-              if (found) return found
-            }
-          }
-          
-          return null
-        }
-        
-        const indexFile = findIndexFile(uploadDir)
-        
-        // Update progress: Files found (30%)
-        await tx.contentData.update({
-          where: { id: Number(contentId) as any },
-          data: { progress: 30 } as any
-        })
-        
+    // Return response immediately, process in background
+    const response = NextResponse.json({
+      message: "File upload started successfully",
+      contentId
+    })
+
+    // Process asynchronously
+    setImmediate(async () => {
+      try {
+        // Extract ZIP from disk — memory-efficient for large files
+        const { files: extractedFiles } = await extractZipFromDisk(tempZipPath, uploadDir)
+
+        // Remove temp ZIP file
+        await cleanupTempZip(tempZipPath)
+
         let launchFile: string | null = null
         let scormInfo: any = null
 
         if (contentType === "FILE_ZIP_SCORM") {
-          // Process SCORM package
-          console.log("Processing SCORM package...")
-          
-          // Update progress: Validating SCORM (40%)
-          await tx.contentData.update({
-            where: { id: Number(contentId) as any },
-            data: { progress: 40 } as any
-          })
-          
           try {
             const validation = await SCORMService.validateSCORMPackage(uploadDir)
-            
             if (validation.isValid && validation.manifest) {
               const manifest = validation.manifest
               const manifestPath = join(uploadDir, 'imsmanifest.xml')
-              const scormVersion = existsSync(manifestPath) 
+              const scormVersion = existsSync(manifestPath)
                 ? SCORMService.detectSCORMVersion(manifestPath)
                 : SCORMService.getSCORMVersion(manifest)
               launchFile = SCORMService.findLaunchFile(manifest, uploadDir)
-              
               scormInfo = {
                 version: scormVersion,
                 title: manifest.title,
                 identifier: manifest.identifier,
                 organizations: manifest.organizations.length,
                 resources: manifest.resources.length,
-                validation: {
-                  errors: validation.errors,
-                  warnings: validation.warnings
-                }
+                validation: { errors: validation.errors, warnings: validation.warnings }
               }
-              
-              // Update progress: SCORM processed (60%)
-              await tx.contentData.update({
-                where: { id: Number(contentId) as any },
-                data: { progress: 60 } as any
-              })
-              
-              console.log("SCORM package validated:", scormInfo)
             } else {
-              console.warn("SCORM validation failed, falling back to HTML processing:", validation.errors)
-              // Fallback to HTML processing if SCORM validation fails
-              if (indexFile) {
-                launchFile = indexFile.replace(uploadDir + '/', '')
-              }
+              console.warn("[upload] SCORM validation failed, falling back to HTML:", validation.errors)
+              launchFile = findLaunchFileFromList(extractedFiles)
             }
           } catch (scormError) {
-            console.warn("SCORM processing failed, falling back to HTML processing:", scormError)
-            // Fallback to HTML processing if SCORM processing fails
-            if (indexFile) {
-              launchFile = indexFile.replace(uploadDir + '/', '')
-            }
+            console.warn("[upload] SCORM processing failed, falling back to HTML:", scormError)
+            launchFile = findLaunchFileFromList(extractedFiles)
           }
         } else {
-          // Process HTML package
-          // Update progress: Processing HTML (50%)
-          await tx.contentData.update({
-            where: { id: Number(contentId) as any },
-            data: { progress: 50 } as any
-          })
-          
-          if (indexFile) {
-            launchFile = indexFile.replace(uploadDir + '/', '')
-          }
+          launchFile = findLaunchFileFromList(extractedFiles)
         }
-        
+
         if (launchFile) {
-          // Update progress: Saving content (80%)
-          await tx.contentData.update({
-            where: { id: Number(contentId) as any },
-            data: { progress: 80 } as any
-          })
-          
-          // Update content with directory path and SCORM info
-          const relativeDirPath = uploadDir.replace(process.cwd() + '/public', '')
-          
-          await tx.contentData.update({
+          const existingDesc = content.description && typeof content.description === 'object'
+            ? (content.description as Record<string, unknown>)
+            : {}
+          const newDesc: Record<string, unknown> = { ...existingDesc, launchFile }
+          if (scormInfo) newDesc.scorm = scormInfo
+
+          await prisma.contentData.update({
             where: { id: Number(contentId) as any },
             data: {
               status: "COMPLETED" as any,
               progress: 100,
               contentUrl: relativeDirPath,
-              // Store description with launch file and SCORM info (if available)
-              description: (() => {
-                try {
-                  const existingDesc = (content as any).description && typeof (content as any).description === 'object'
-                    ? (content as any).description
-                    : {}
-                  
-                  const newDesc: any = {
-                    ...existingDesc,
-                    launchFile: launchFile
-                  }
-                  
-                  // Add SCORM info if it's a SCORM package
-                  if (scormInfo) {
-                    newDesc.scorm = {
-                      version: scormInfo.version,
-                      title: scormInfo.title,
-                      identifier: scormInfo.identifier,
-                      organizations: scormInfo.organizations,
-                      resources: scormInfo.resources,
-                      validation: {
-                        errors: scormInfo.validation.errors,
-                        warnings: scormInfo.validation.warnings
-                      }
-                    }
-                  }
-                  
-                  return newDesc as Prisma.InputJsonValue
-                } catch (error) {
-                  console.error('Error merging existing description:', error)
-                  const fallbackDesc: any = {
-                    launchFile: launchFile
-                  }
-                  
-                  if (scormInfo) {
-                    fallbackDesc.scorm = {
-                      version: scormInfo.version,
-                      title: scormInfo.title,
-                      identifier: scormInfo.identifier
-                    }
-                  }
-                  
-                  return fallbackDesc as Prisma.InputJsonValue
-                }
-              })()
+              description: newDesc as Prisma.InputJsonValue
             } as any
           })
-          
-          console.log(`Content processed successfully. Launch file: ${launchFile}`)
+          console.log(`[upload] Content ${contentId} completed. Launch: ${launchFile}, Files: ${extractedFiles.length}`)
+          contentEventBus.emitStatusChange({
+            contentId: Number(contentId),
+            projectId: Number(projectId),
+            moduleId: Number(moduleId),
+            status: "COMPLETED",
+            progress: 100,
+          })
         } else {
-          // No index file found, mark as failed
-          await tx.contentData.update({
-            where: { id: Number(contentId) as any },
-            data: {
-              status: "FAILED" as any,
-              progress: 0
-            } as any
-          })
-        }
-        }) // End transaction
-      } catch (error) {
-        console.error("Error processing content:", error)
-        // If transaction fails, update status outside transaction
-        try {
           await prisma.contentData.update({
             where: { id: Number(contentId) as any },
-            data: {
-              status: "FAILED" as any,
-              progress: 0
-            } as any
+            data: { status: "FAILED" as any, progress: 0 } as any
           })
-        } catch (updateError) {
-          console.error("Failed to update status to FAILED:", updateError)
+          console.error(`[upload] No HTML file found in content ${contentId}`)
+          contentEventBus.emitStatusChange({
+            contentId: Number(contentId),
+            projectId: Number(projectId),
+            moduleId: Number(moduleId),
+            status: "FAILED",
+          })
         }
+      } catch (error) {
+        console.error(`[upload] Error processing content ${contentId}:`, error)
+        await cleanupTempZip(tempZipPath)
+        const errMsg = error instanceof Error ? error.message : String(error)
+        await prisma.contentData.update({
+          where: { id: Number(contentId) as any },
+          data: { status: "FAILED" as any, progress: 0, description: { error: errMsg } } as any
+        }).catch(console.error)
+        contentEventBus.emitStatusChange({
+          contentId: Number(contentId),
+          projectId: Number(projectId),
+          moduleId: Number(moduleId),
+          status: "FAILED",
+        })
       }
-    }, 2000)
-    
-    // Log audit
-    await logContentAction(
-      session.user.id,
-      'uploaded',
-      contentId,
-      {
-        contentTitle: content.title,
-        fileSize: file.size,
-        contentType: contentType
-      }
-    )
-
-    return NextResponse.json({ 
-      message: "File upload started successfully",
-      contentId: contentId 
     })
+
+    return response
   } catch (error) {
     console.error("Error uploading file:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

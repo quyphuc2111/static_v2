@@ -12,10 +12,12 @@ const nextConfig: NextConfig = {
   },
   trailingSlash: false,
 
+  // Allow large file uploads up to 1GB for ZIP content packages
   experimental: {
     serverActions: {
       bodySizeLimit: '1024mb',
     },
+    middlewareClientMaxBodySize: '1024mb',
   },
 };
 

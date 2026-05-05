@@ -1,10 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { softDeleteProject, hardDeleteProject, restoreProject } from "../project.service"
-import cachedKeys from "@/constants/cachedKeys"
+import { toast } from "react-toastify"
 
-/**
- * Hook for soft deleting a project
- */
 export function useSoftDeleteProject() {
   const queryClient = useQueryClient()
 
@@ -13,12 +10,13 @@ export function useSoftDeleteProject() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects", "list"] })
     },
+    onError: (error: any) => {
+      const message = error?.response?.data?.message || error?.data?.message || error?.message || "Xóa dự án thất bại"
+      toast.error(message)
+    },
   })
 }
 
-/**
- * Hook for hard deleting a project
- */
 export function useHardDeleteProject() {
   const queryClient = useQueryClient()
 
@@ -27,12 +25,13 @@ export function useHardDeleteProject() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects", "list"] })
     },
+    onError: (error: any) => {
+      const message = error?.response?.data?.message || error?.data?.message || error?.message || "Xóa vĩnh viễn dự án thất bại"
+      toast.error(message)
+    },
   })
 }
 
-/**
- * Hook for restoring a deleted project
- */
 export function useRestoreProject() {
   const queryClient = useQueryClient()
 
@@ -40,6 +39,10 @@ export function useRestoreProject() {
     mutationFn: restoreProject,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects", "list"] })
+    },
+    onError: (error: any) => {
+      const message = error?.response?.data?.message || error?.data?.message || error?.message || "Khôi phục dự án thất bại"
+      toast.error(message)
     },
   })
 }

@@ -35,7 +35,7 @@ interface ActionsProps {
 
 const ActionsCell: React.FC<ActionsProps> = ({ row, onEdit, onAssignRole, onResetPassword, onToggleStatus, onDelete, toggling }) => {
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon">
           <MoreHorizontal className="h-4 w-4" />
@@ -43,19 +43,19 @@ const ActionsCell: React.FC<ActionsProps> = ({ row, onEdit, onAssignRole, onRese
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <PermissionGuard permission={PermissionName.EDIT_USERS}>
-          <DropdownMenuItem onClick={() => onEdit(row)}>
+          <DropdownMenuItem onSelect={() => setTimeout(() => onEdit(row), 0)}>
             <Edit className="mr-2 h-4 w-4" />
             Chỉnh sửa
           </DropdownMenuItem>
         </PermissionGuard>
         <PermissionGuard permission={PermissionName.MANAGE_USER_PERMISSIONS}>
-          <DropdownMenuItem onClick={() => onAssignRole(row)}>
+          <DropdownMenuItem onSelect={() => setTimeout(() => onAssignRole(row), 0)}>
             <Shield className="mr-2 h-4 w-4" />
             Phân quyền
           </DropdownMenuItem>
         </PermissionGuard>
         <PermissionGuard permission={PermissionName.EDIT_USERS}>
-          <DropdownMenuItem onClick={() => onResetPassword(row)}>
+          <DropdownMenuItem onSelect={() => setTimeout(() => onResetPassword(row), 0)}>
             <Key className="mr-2 h-4 w-4" />
             Đặt lại mật khẩu
           </DropdownMenuItem>
@@ -63,19 +63,19 @@ const ActionsCell: React.FC<ActionsProps> = ({ row, onEdit, onAssignRole, onRese
         <DropdownMenuSeparator />
         <PermissionGuard permission={PermissionName.EDIT_USERS}>
           {row.status === "ACTIVE" ? (
-            <DropdownMenuItem onClick={() => onToggleStatus(row)} disabled={toggling}>
+            <DropdownMenuItem onSelect={() => setTimeout(() => onToggleStatus(row), 0)} disabled={toggling}>
               <UserX className="mr-2 h-4 w-4" />
               Vô hiệu hóa
             </DropdownMenuItem>
           ) : (
-            <DropdownMenuItem onClick={() => onToggleStatus(row)} disabled={toggling}>
+            <DropdownMenuItem onSelect={() => setTimeout(() => onToggleStatus(row), 0)} disabled={toggling}>
               <UserCheck className="mr-2 h-4 w-4" />
               Kích hoạt
             </DropdownMenuItem>
           )}
         </PermissionGuard>
         <PermissionGuard permission={PermissionName.HARD_DELETE_USERS}>
-          <DropdownMenuItem className="text-red-400" onClick={() => onDelete(row)}>
+          <DropdownMenuItem className="text-red-400" onSelect={() => setTimeout(() => onDelete(row), 0)}>
             <Trash2 className="mr-2 h-4 w-4" />
             Xóa
           </DropdownMenuItem>

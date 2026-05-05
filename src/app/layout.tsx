@@ -1,13 +1,19 @@
 import type React from "react";
 import type { Metadata } from "next";
-import { GeistSans } from "geist/font/sans";
-import { GeistMono } from "geist/font/mono";
+import { Be_Vietnam_Pro } from "next/font/google";
 import ProviderWrapper from "@/components/provider-wrapper";
 import { ToastContainer } from "react-toastify";
 import { NuqsAdapter } from "@/lib/nuqs-adapter";
 
 import "react-toastify/dist/ReactToastify.css";
 import "./globals.css";
+
+const beVietnamPro = Be_Vietnam_Pro({
+  subsets: ["latin", "vietnamese"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  variable: "--font-be-vietnam-pro",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Hệ thống Quản lý Tài liệu",
@@ -23,7 +29,7 @@ export default function RootLayout({
   return (
     <html lang="vi" suppressHydrationWarning>
       <body
-        className={`font-sans ${GeistSans.variable} ${GeistMono.variable} antialiased h-screen overflow-hidden`}
+        className={`${beVietnamPro.variable} font-sans antialiased`}
       >
         <ToastContainer
           position="top-right"

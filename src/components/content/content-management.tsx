@@ -13,6 +13,7 @@ import { useDownloadContent } from "@/modules/content/hooks/useDownloadContent"
 import { useBulkDeleteContent } from "@/modules/content/hooks/useBulkDeleteContent"
 import { useUploadContentFile } from "@/modules/content/hooks/useUploadContentFile"
 import { useUpdateContentFile } from "@/modules/content/hooks/useUpdateContentFile"
+import { useContentSSE } from "@/modules/content/hooks/useContentSSE"
 import { useSoftDeleteContent } from "@/modules/content/hooks/useSoftDeleteContent"
 import { useHardDeleteContent } from "@/modules/content/hooks/useHardDeleteContent"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -71,6 +72,7 @@ export function ContentManagement() {
   const [descriptionFilters, setDescriptionFilters] = useState<DescriptionFilterValue[]>([])
   const [showDeleted, setShowDeleted] = useState(false)
 
+  useContentSSE(projectId, moduleId)
   const projectsQuery = useProjects()
   const modulesQuery = useModules(projectId, !!projectId)
   const contentQuery = useContent(projectId, moduleId, !!projectId && !!moduleId)
@@ -316,16 +318,17 @@ export function ContentManagement() {
   }), [copiedUrl, downloadContentMut.isPending, deleteContentMut.isPending, restoreContentMut.isPending, uploadContentFileMut.isPending, updateContentFileMut.isPending, softDeleteContentMut.isPending, hardDeleteContentMut.isPending, isAdmin, me?.id])
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div className="flex flex-col gap-8 h-full animate-in fade-in duration-500">
+      {/* Page header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shrink-0">
         <div>
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Quản lý Nội dung</h2>
-          <p className="text-sm md:text-base text-muted-foreground">Quản lý tất cả tài liệu và nội dung trong hệ thống</p>
+          <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Quản lý Nội dung</h2>
+          <p className="text-muted-foreground mt-1">Quản lý tất cả tài liệu và nội dung trong hệ thống</p>
         </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full lg:w-auto flex-wrap">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto flex-wrap">
           <div className="w-full sm:w-56">
             <Select value={projectId} onValueChange={(v) => { setProjectId(v); setModuleId("") }}>
-              <SelectTrigger className="w-full bg-white">
+              <SelectTrigger className="w-full bg-white dark:bg-slate-900 border-slate-200">
                 <SelectValue placeholder={projectsQuery.isLoading ? "Đang tải dự án..." : "Chọn dự án"} />
               </SelectTrigger>
               <SelectContent>
@@ -337,7 +340,7 @@ export function ContentManagement() {
           </div>
           <div className="w-full sm:w-56">
             <Select value={moduleId} onValueChange={setModuleId} disabled={!projectId || modulesQuery.isLoading}>
-              <SelectTrigger className="w-full bg-white">
+              <SelectTrigger className="w-full bg-white dark:bg-slate-900 border-slate-200">
                 <SelectValue placeholder={!projectId ? "Chọn dự án trước" : (modulesQuery.isLoading ? "Đang tải module..." : "Chọn module")} />
               </SelectTrigger>
               <SelectContent>
@@ -350,119 +353,69 @@ export function ContentManagement() {
           {projectId && moduleId && (
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <PermissionGuard permissions={[PermissionName.CREATE_CONTENT, PermissionName.MANAGE_OWN_CONTENT]}>
-              <Button onClick={() => setShowCreateDialog(true)} className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
-                <Plus className="mr-2 h-4 w-4" />
+              <Button onClick={() => setShowCreateDialog(true)} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-sm w-full sm:w-auto">
+                <Plus className="h-4 w-4" />
                 <span className="hidden sm:inline">Tạo Nội dung mới</span>
                 <span className="sm:hidden">Tạo Mới</span>
               </Button>
             </PermissionGuard>
             <PermissionGuard permissions={[PermissionName.CREATE_CONTENT, PermissionName.MANAGE_OWN_CONTENT]}>
-            <Button variant="outline" onClick={() => setShowImportDialog(true)} className="w-full sm:w-auto">
-              <FileSpreadsheet className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Nhập Excel</span>
-              <span className="sm:hidden">Excel</span>
-            </Button>
-          </PermissionGuard>
+              <Button variant="outline" onClick={() => setShowImportDialog(true)} className="w-full sm:w-auto border-slate-200">
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Nhập Excel</span>
+                <span className="sm:hidden">Excel</span>
+              </Button>
+            </PermissionGuard>
           </div>
           )}
         </div>
       </div>
 
-      <div className=" gap-4 md:grid-cols-4 hidden md:grid">
-        <Card className={`bg-card border-border ${showDeleted ? 'opacity-50' : ''}`}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              {showDeleted ? "Nội dung Đã Xóa" : "Tổng Nội dung"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">
-              {showDeleted ? deletedContent.length : activeContent.length}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {showDeleted ? "nội dung đã xóa" : "đang hoạt động"}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className={`bg-card border-border ${showDeleted ? 'opacity-50' : ''}`}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Hoàn thành</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">
-              {showDeleted 
-                ? deletedContent.filter(c => c.status === 'COMPLETED').length
-                : activeContent.filter(c => c.status === 'COMPLETED').length
-              }
-            </div>
-            <p className="text-xs text-green-400">Đã xử lý xong</p>
-          </CardContent>
-        </Card>
-
-        <Card className={`bg-card border-border ${showDeleted ? 'opacity-50' : ''}`}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Đang xử lý</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">
-              {showDeleted 
-                ? deletedContent.filter(c => c.status === 'PROCESSING').length
-                : activeContent.filter(c => c.status === 'PROCESSING').length
-              }
-            </div>
-            <p className="text-xs text-blue-400">Đang upload/giải nén</p>
-          </CardContent>
-        </Card>
-
-        <Card className={`bg-card border-border ${showDeleted ? 'opacity-50' : ''}`}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Thất bại</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">
-              {showDeleted 
-                ? deletedContent.filter(c => c.status === 'FAILED').length
-                : activeContent.filter(c => c.status === 'FAILED').length
-              }
-            </div>
-            <p className="text-xs text-red-400">Cần xử lý lại</p>
-          </CardContent>
-        </Card>
+      {/* Stats mini */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 shrink-0">
+        {[
+          { label: showDeleted ? "Đã xóa" : "Tổng nội dung", value: showDeleted ? deletedContent.length : activeContent.length, color: "text-slate-900 dark:text-white" },
+          { label: "Hoàn thành", value: showDeleted ? deletedContent.filter(c => c.status === 'COMPLETED').length : activeContent.filter(c => c.status === 'COMPLETED').length, color: "text-green-600" },
+          { label: "Đang xử lý", value: showDeleted ? deletedContent.filter(c => c.status === 'PROCESSING').length : activeContent.filter(c => c.status === 'PROCESSING').length, color: "text-blue-600" },
+          { label: "Thất bại", value: showDeleted ? deletedContent.filter(c => c.status === 'FAILED').length : activeContent.filter(c => c.status === 'FAILED').length, color: "text-red-600" },
+        ].map((s, i) => (
+          <div key={i} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">{s.label}</p>
+            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+          </div>
+        ))}
       </div>
 
-      <Card className="bg-card border-border overflow-hidden">
-        <CardHeader>
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <CardTitle className="text-foreground text-lg sm:text-xl">Danh sách Tài liệu</CardTitle>
-              <CardDescription className="text-sm">Quản lý tất cả nội dung trong dự án và module</CardDescription>
-            </div>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              {projectId && moduleId && (
-                <PermissionGuard permissions={[PermissionName.VIEW_DELETED_ALL_CONTENT, PermissionName.VIEW_DELETED_OWN_CONTENT]}>
-                  <Tabs value={showDeleted ? "deleted" : "active"} onValueChange={(v) => setShowDeleted(v === "deleted")} className="w-full sm:w-auto">
-                    <TabsList className="w-full sm:w-auto grid grid-cols-2">
-                      <TabsTrigger value="active" className="text-xs sm:text-sm">Đang hoạt động</TabsTrigger>
-                      <TabsTrigger value="deleted" className="text-xs sm:text-sm">
-                        <Trash2 className="h-3 w-3 mr-1" />
-                        Đã xóa
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </PermissionGuard>
-              )}
-              {projectId && moduleId && rawContentData.length > 0 && (
-                <DescriptionFilter
-                  data={rawContentData}
-                  onFilterChange={setDescriptionFilters}
-                  activeFilters={descriptionFilters}
-                />
-              )}
-            </div>
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex-1">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-slate-900 dark:text-white">Danh sách Tài liệu</h3>
+            <p className="text-xs text-slate-500">Quản lý tất cả nội dung trong dự án và module</p>
           </div>
-        </CardHeader>
-        <CardContent className=" w-[calc(100vw-40px)] md:w-full">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+            {projectId && moduleId && (
+              <PermissionGuard permissions={[PermissionName.VIEW_DELETED_ALL_CONTENT, PermissionName.VIEW_DELETED_OWN_CONTENT]}>
+                <Tabs value={showDeleted ? "deleted" : "active"} onValueChange={(v) => setShowDeleted(v === "deleted")} className="w-full sm:w-auto">
+                  <TabsList className="w-full sm:w-auto grid grid-cols-2">
+                    <TabsTrigger value="active" className="text-xs sm:text-sm">Đang hoạt động</TabsTrigger>
+                    <TabsTrigger value="deleted" className="text-xs sm:text-sm">
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Đã xóa
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </PermissionGuard>
+            )}
+            {projectId && moduleId && rawContentData.length > 0 && (
+              <DescriptionFilter
+                data={rawContentData}
+                onFilterChange={setDescriptionFilters}
+                activeFilters={descriptionFilters}
+              />
+            )}
+          </div>
+        </div>
+        <div className="w-full overflow-x-auto">
           {contentQuery.isLoading ? (
             <div className="text-center py-8 px-4 text-muted-foreground">
               Đang tải nội dung...
@@ -507,8 +460,8 @@ export function ContentManagement() {
               }}
             />
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <CreateContentDialog 
         open={showCreateDialog} 

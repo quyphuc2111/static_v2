@@ -44,7 +44,7 @@ export function ModuleManagementDialog({ project, open, onOpenChange }: ModuleMa
   const { data: modules, isLoading } = useModules(project.id)
   const createModuleMutation = useCreateModule()
   const updateModuleMutation = useUpdateModule()
-  const deleteModuleMutation = useDeleteModule()
+  const deleteModuleMutation = useDeleteModule(project.id)
   
   const [isAddingModule, setIsAddingModule] = useState(false)
   const [editingModule, setEditingModule] = useState<Module | null>(null)

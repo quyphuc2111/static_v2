@@ -57,7 +57,7 @@ export function EditModuleDialog({ open, onOpenChange, projectId, module }: Edit
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[520px]">
+      <DialogContent className="max-w-[520px] bg-white">
         <DialogHeader>
           <DialogTitle>Chỉnh sửa Module</DialogTitle>
           <DialogDescription>Cập nhật thông tin module hiện tại.</DialogDescription>

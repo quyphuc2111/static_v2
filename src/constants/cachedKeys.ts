@@ -12,6 +12,7 @@ const cachedKeys = {
     content: {
         list: (projectId: string, moduleId: string) => ["content", projectId, moduleId],
         stats: (projectId?: string) => projectId ? ["content", "stats", projectId] : ["content", "stats"],
+        versions: (projectId: string, moduleId: string, contentId: string) => ["content-versions", projectId, moduleId, contentId],
     },
     project: {
         list: (params?: any) => ["projects", "list", params],

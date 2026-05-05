@@ -2,154 +2,25 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/session"
 import { PermissionName } from "@prisma/client"
-import { hasPermission as checkPermission, hasAnyPermission } from "@/lib/permissions"
+import { hasPermission as checkPermission } from "@/lib/permissions"
 import { logContentAction } from "@/lib/audit"
 import { Prisma } from "@prisma/client"
-import { writeFile, mkdir } from "fs/promises"
-import { join, dirname } from "path"
-import { existsSync, createWriteStream } from "fs"
-// @ts-ignore
-import unzipper from "unzipper"
+import { mkdir, rm, stat as fsStat } from "fs/promises"
+import { join } from "path"
+import { existsSync } from "fs"
 import { SCORMService } from "@/services/scormService"
+import { contentEventBus } from "@/lib/content-events"
+import {
+  sanitizeVietnameseString,
+  streamFileToDisk,
+  scanZipEntries,
+  extractZipFromDisk,
+  cleanupTempZip,
+  archiveDirectory,
+} from "@/lib/file-utils"
 
-// Helper function to remove Vietnamese diacritics and sanitize for file paths
-function sanitizeVietnameseString(str: string): string {
-  return str
-    .normalize('NFD') // Decompose accented characters
-    .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
-    .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters except spaces
-    .replace(/\s+/g, '_') // Replace spaces with underscores
-    .toLowerCase()
-}
-
-// Helper function to detect wrapper folder in ZIP
-function detectWrapperFolder(allFiles: string[]): string | null {
-  if (allFiles.length === 0) return null
-  
-  // Find common prefix in all file paths
-  const paths = allFiles.map(f => f.split('/'))
-  if (paths.length === 0) return null
-  
-  const firstPath = paths[0]
-  let commonPrefix = ''
-  
-  for (let i = 0; i < firstPath.length; i++) {
-    const segment = firstPath[i]
-    if (paths.every(path => path[i] === segment)) {
-      commonPrefix += (commonPrefix ? '/' : '') + segment
-    } else {
-      break
-    }
-  }
-  
-  // If all files share a common prefix folder, that's likely the wrapper
-  if (commonPrefix && paths.every(path => path.length > 1 && path[0] === commonPrefix.split('/')[0])) {
-    return commonPrefix.split('/')[0]
-  }
-  
-  return null
-}
-
-// Helper function to validate ZIP contains expected HTML file
-async function validateZipContainsHtmlFile(
-  buffer: Buffer, 
-  expectedHtmlFile: string | null, 
-  launchDir: string | null
-): Promise<{ isValid: boolean; error?: string; foundFiles?: string[]; wrapperFolder?: string }> {
-  return new Promise((resolve) => {
-    const stream = unzipper.Parse()
-    let foundExpectedFile = false
-    let foundAnyHtmlFile = false
-    const foundHtmlFiles: string[] = []
-    const allFiles: string[] = []
-    
-    stream.on('entry', (entry: any) => {
-      const fileName = entry.path.replace(/\\/g, '/')
-      const type = entry.type
-      
-      if (type === 'Directory') {
-        entry.autodrain()
-        return
-      }
-      
-      allFiles.push(fileName)
-      
-      // Check if it's an HTML file
-      if (fileName.toLowerCase().endsWith('.html') || fileName.toLowerCase().endsWith('.htm')) {
-        foundAnyHtmlFile = true
-        foundHtmlFiles.push(fileName)
-        
-        // If we have a specific expected file, check for it with multiple patterns
-        if (expectedHtmlFile && launchDir) {
-          // Pattern 1: exact match with launchDir
-          const expectedPath1 = `${launchDir}/${expectedHtmlFile}`
-          // Pattern 2: file in any subdirectory with same name
-          const expectedPath2 = `**/${expectedHtmlFile}`
-          // Pattern 3: file in root with same name
-          const expectedPath3 = expectedHtmlFile
-          
-          if (fileName === expectedPath1 || 
-              fileName.endsWith(`/${expectedHtmlFile}`) ||
-              fileName === expectedPath3 ||
-              fileName.includes(`/${expectedHtmlFile}`)) {
-            foundExpectedFile = true
-          }
-        } else if (expectedHtmlFile) {
-          // If no launchDir, check if file exists anywhere
-          if (fileName === expectedHtmlFile || 
-              fileName.endsWith(`/${expectedHtmlFile}`) ||
-              fileName.includes(`/${expectedHtmlFile}`)) {
-            foundExpectedFile = true
-          }
-        }
-      }
-      
-      entry.autodrain()
-    })
-    
-    stream.on('end', () => {
-      // Detect wrapper folder
-      const wrapperFolder = detectWrapperFolder(allFiles)
-      
-      if (expectedHtmlFile) {
-        if (foundExpectedFile) {
-          resolve({ 
-            isValid: true, 
-            wrapperFolder: wrapperFolder || undefined
-          })
-        } else {
-          resolve({ 
-            isValid: false, 
-            error: `File ZIP không chứa file HTML mong đợi: ${expectedHtmlFile}. Các file HTML tìm thấy: ${foundHtmlFiles.join(', ')}. ${wrapperFolder ? `Phát hiện folder wrapper: ${wrapperFolder}` : ''} Vui lòng kiểm tra lại cấu trúc file ZIP.`,
-            foundFiles: foundHtmlFiles,
-            wrapperFolder: wrapperFolder || undefined
-          })
-        }
-      } else {
-        if (foundAnyHtmlFile) {
-          resolve({ 
-            isValid: true,
-            wrapperFolder: wrapperFolder || undefined
-          })
-        } else {
-          resolve({ 
-            isValid: false, 
-            error: "File ZIP không chứa file HTML nào. Vui lòng kiểm tra lại file ZIP." 
-          })
-        }
-      }
-    })
-    
-    stream.on('error', () => {
-      resolve({ 
-        isValid: false, 
-        error: "Lỗi khi đọc file ZIP. Vui lòng kiểm tra lại file." 
-      })
-    })
-    
-    stream.end(buffer)
-  })
-}
+export const maxDuration = 300 // 5 minutes
+export const dynamic = 'force-dynamic'
 
 export async function POST(
   request: NextRequest,
@@ -166,41 +37,39 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Check if content exists and user has permission
-    const content = await prisma.contentData.findFirst({
-      where: {
-        id: cId as any,
-        projectId: pId as any,
-        moduleId: mId as any,
-        isDeleted: false
-      },
-      include: {
-        owner: true
-      }
-    })
+    // Fetch content + shared permission in parallel
+    const [content, sharedContent] = await Promise.all([
+      prisma.contentData.findFirst({
+        where: { id: cId as any, projectId: pId as any, moduleId: mId as any, isDeleted: false },
+        include: { owner: true }
+      }),
+      prisma.contentShare.findFirst({
+        where: {
+          contentId: cId as any,
+          sharedWithId: Number(session.user.id) as any,
+          status: 'ACTIVE',
+          canEdit: true
+        }
+      }),
+      prisma.moduleShare.findFirst({
+        where: {
+          moduleId: mId as any,
+          sharedWithId: Number(session.user.id) as any,
+          status: 'ACTIVE',
+          permission: 'EDIT'
+        }
+      })
+    ])
 
     if (!content) {
       return NextResponse.json({ error: "Content not found" }, { status: 404 })
     }
 
-    // Check permissions
     const isOwner = Number(content.owner?.id ?? NaN) === Number(session.user.id)
-    const hasManageOwnContent = await checkPermission(PermissionName.MANAGE_OWN_CONTENT, session.user.id)
     const hasManageAllContent = await checkPermission(PermissionName.MANAGE_ALL_CONTENT, session.user.id)
+    const hasEditViaShare = !!sharedContent || !!sharedModule
 
-    // Check if user has edit permission via content sharing
-    const sharedContent = await prisma.contentShare.findFirst({
-      where: {
-        contentId: cId as any,
-        sharedWithId: Number(session.user.id) as any,
-        status: 'ACTIVE',
-        canEdit: true
-      }
-    })
-
-    const hasEditPermissionViaShare = !!sharedContent
-
-    if (!isOwner && !hasManageAllContent && !hasEditPermissionViaShare) {
+    if (!isOwner && !hasManageAllContent && !hasEditViaShare) {
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 })
     }
 
@@ -212,376 +81,276 @@ export async function POST(
     if (!contentType || !file) {
       return NextResponse.json({ error: "Missing contentType or file" }, { status: 400 })
     }
-
     if (!["FILE_ZIP_HTML", "FILE_ZIP_SCORM"].includes(contentType)) {
       return NextResponse.json({ error: "Invalid contentType" }, { status: 400 })
     }
+    if (file.size === 0) return NextResponse.json({ error: "File is empty" }, { status: 400 })
+    if (file.size > 1000 * 1024 * 1024) return NextResponse.json({ error: "File too large (max 1000MB)" }, { status: 400 })
+    if (!file.name.toLowerCase().endsWith('.zip')) return NextResponse.json({ error: "Only ZIP files are allowed" }, { status: 400 })
 
-    // Validate file
-    if (file.size === 0) {
-      return NextResponse.json({ error: "File is empty" }, { status: 400 })
-    }
-
-    if (file.size > 1000 * 1024 * 1024) { // 1000MB limit
-      return NextResponse.json({ error: "File too large (max 1000MB)" }, { status: 400 })
-    }
-
-    if (!file.name.toLowerCase().endsWith('.zip')) {
-      return NextResponse.json({ error: "Only ZIP files are allowed" }, { status: 400 })
-    }
-
-    // Get current content URL to preserve the path
     const currentContentUrl = content.contentUrl
     if (!currentContentUrl) {
       return NextResponse.json({ error: "Content has no existing file path" }, { status: 400 })
     }
 
-    // Update content status to PROCESSING and reset progress to 0 using transaction
-    await prisma.$transaction(async (tx) => {
-      await tx.contentData.update({
-        where: { id: cId as any },
-        data: { 
-          status: "PROCESSING",
-          progress: 0,
-          contentType: contentType as "FILE_ZIP_HTML" | "FILE_ZIP_SCORM",
-          fileSize: file.size // Update file size
-        }
-      })
+    // Snapshot current version: archive current directory into zip
+    const uploadsDir = join(process.cwd(), "public", "uploads")
+    const contentDir = join(uploadsDir, currentContentUrl.replace('/uploads/', ''))
+    const versionsDir = join(contentDir, '..', `_versions_${cId}`)
+    await mkdir(versionsDir, { recursive: true })
+
+    const maxVersion = await (prisma as any).contentVersion.findFirst({
+      where: { contentId: cId },
+      orderBy: { version: "desc" },
+      select: { version: true }
+    })
+    const nextVersion = (maxVersion?.version || 0) + 1
+
+    // Archive current content directory into a zip for version history
+    const versionZipName = `v${nextVersion}.zip`
+    const versionZipPath = join(versionsDir, versionZipName)
+    const versionZipRelUrl = currentContentUrl.replace(/[^/]+$/, `_versions_${cId}/${versionZipName}`)
+
+    let archiveSizeBytes: number | null = null
+    if (existsSync(contentDir)) {
+      await archiveDirectory(contentDir, versionZipPath)
+      try {
+        const zipStat = await fsStat(versionZipPath)
+        archiveSizeBytes = zipStat.size
+      } catch { /* ignore */ }
+    }
+
+    await (prisma as any).contentVersion.create({
+      data: {
+        version: nextVersion,
+        contentUrl: versionZipRelUrl,
+        launchFile: (content as any).launchFile ?? null,
+        fileSize: content.fileSize,
+        archiveSize: archiveSizeBytes,
+        status: content.status,
+        contentId: cId,
+        createdById: Number(session.user.id),
+      }
     })
 
-    // Process file asynchronously
-    setTimeout(async () => {
+    // Mark as PROCESSING
+    await prisma.contentData.update({
+      where: { id: cId as any },
+      data: {
+        status: "PROCESSING",
+        progress: 0,
+        contentType: contentType as "FILE_ZIP_HTML" | "FILE_ZIP_SCORM",
+        fileSize: file.size
+      }
+    })
+
+    // Stream file to temp location on disk — does NOT load into memory
+    const timestamp = Date.now()
+    const tempZipPath = join(uploadsDir, `_tmp_update_${cId}_${timestamp}.zip`)
+
+    await streamFileToDisk(file, tempZipPath)
+
+    // Validate: HTML type must have exactly 1 HTML file
+    if (contentType === "FILE_ZIP_HTML") {
+      const { htmlFiles: zipHtmlFiles } = await scanZipEntries(tempZipPath)
+      if (zipHtmlFiles.length === 0) {
+        await cleanupTempZip(tempZipPath)
+        return NextResponse.json(
+          { error: "File ZIP không chứa file HTML nào." },
+          { status: 400 }
+        )
+      }
+      if (zipHtmlFiles.length > 1) {
+        await cleanupTempZip(tempZipPath)
+        return NextResponse.json(
+          { error: `File ZIP chứa ${zipHtmlFiles.length} file HTML. Chỉ được phép 1 file HTML duy nhất.`, htmlFiles: zipHtmlFiles },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Log audit (non-blocking)
+    logContentAction(session.user.id, 'file_updated', String(cId), {
+      contentTitle: content.title,
+      fileSize: file.size,
+      contentType
+    }).catch(console.error)
+
+    // Return response immediately
+    const response = NextResponse.json({
+      message: "File update started successfully",
+      contentId: cId
+    })
+
+    // Process asynchronously
+    setImmediate(async () => {
       try {
-        const buffer = Buffer.from(await file.arrayBuffer())
-        const uploadsDir = join(process.cwd(), "public", "uploads")
-        const contentDir = join(uploadsDir, currentContentUrl.replace('/uploads/', ''))
-        
-        // Get current launchFile from existing content description
+        // Parse existing launchFile from description
         let currentLaunchFile: string | null = null
         if (content.description) {
           try {
-            const desc = typeof content.description === 'string' 
-              ? JSON.parse(content.description) 
+            const desc = typeof content.description === 'string'
+              ? JSON.parse(content.description)
               : content.description
             currentLaunchFile = desc.launchFile || null
-          } catch (e) {
-            console.warn("Failed to parse existing description:", e)
+          } catch {
+            console.warn("[update-file] Failed to parse existing description")
           }
         }
-        
-        // First, remove ALL contents from the content directory (contentUrl)
-        const fs = require('fs')
-        if (existsSync(contentDir)) {
-          // Function to recursively remove directory contents
-          const removeDirectoryContents = (dir: string) => {
-            if (fs.existsSync(dir)) {
-              const files = fs.readdirSync(dir)
-              for (const file of files) {
-                const filePath = join(dir, file)
-                const stat = fs.statSync(filePath)
-                if (stat.isDirectory()) {
-                  // Recursively remove subdirectory
-                  removeDirectoryContents(filePath)
-                  fs.rmdirSync(filePath)
-                } else {
-                  // Remove file
-                  fs.unlinkSync(filePath)
-                }
-              }
-            }
-          }
-          
-          // Remove all contents of the content directory
-          removeDirectoryContents(contentDir)
-        }
-        
-        // Determine target directory based on current launchFile to preserve URL structure
+
+        // Determine target directory and expected HTML file
         let targetDir = contentDir
         let launchDir: string | null = null
         let expectedHtmlFile: string | null = null
-        
+
         if (currentLaunchFile && currentLaunchFile.includes('/')) {
-          // Extract directory from launchFile (e.g., "chon_so_thich_hop/index.html" -> "chon_so_thich_hop")
           launchDir = currentLaunchFile.split('/')[0]
-          expectedHtmlFile = currentLaunchFile.split('/')[1] // e.g., "index.html"
+          expectedHtmlFile = currentLaunchFile.split('/').slice(1).join('/')
           targetDir = join(contentDir, launchDir)
         }
-        
-        // Ensure target directory exists
-        await mkdir(targetDir, { recursive: true })
 
-        // First, validate that the ZIP contains the expected HTML file
-        const zipValidationResult = await validateZipContainsHtmlFile(buffer, expectedHtmlFile, launchDir)
-        if (!zipValidationResult.isValid) {
-          // Rollback: remove the created directory and update status to FAILED
-          const fs = require('fs')
-          if (existsSync(targetDir)) {
-            fs.rmSync(targetDir, { recursive: true, force: true })
+        // Scan ZIP entries to compute strip prefix (memory-efficient, reads only central directory)
+        const { allFiles, htmlFiles: zipHtmlFiles, wrapperFolder } = await scanZipEntries(tempZipPath)
+
+        // Compute strip prefix
+        let stripPrefix = ''
+        if (expectedHtmlFile) {
+          const match = allFiles.find(f => {
+            const parts = f.split('/')
+            return parts[parts.length - 1].toLowerCase() === expectedHtmlFile!.toLowerCase()
+          })
+          if (match) {
+            const idx = match.lastIndexOf(expectedHtmlFile)
+            if (idx > 0) stripPrefix = match.substring(0, idx)
           }
-          
-          await prisma.$transaction(async (tx) => {
-            await tx.contentData.update({
+        } else if (wrapperFolder) {
+          stripPrefix = wrapperFolder + '/'
+        }
+
+        // Also strip launchDir prefix if targetDir already includes it
+        const launchDirPrefix = launchDir && targetDir !== contentDir ? launchDir + '/' : ''
+        if (launchDirPrefix && !stripPrefix.endsWith(launchDirPrefix)) {
+          // If stripPrefix doesn't already include launchDir, we need to handle it during extraction
+        }
+
+        // Validate ZIP contains expected HTML
+        if (expectedHtmlFile) {
+          const found = zipHtmlFiles.some(f =>
+            f === expectedHtmlFile ||
+            f.endsWith(`/${expectedHtmlFile}`) ||
+            f.includes(`/${expectedHtmlFile}`)
+          )
+          if (!found) {
+            await cleanupTempZip(tempZipPath)
+            await prisma.contentData.update({
               where: { id: cId as any },
-              data: { 
+              data: {
                 status: "FAILED",
                 description: {
-                  error: zipValidationResult.error,
+                  error: `File ZIP không chứa file HTML mong đợi: ${expectedHtmlFile}. Các file HTML tìm thấy: ${zipHtmlFiles.join(', ')}`,
                   originalLaunchFile: currentLaunchFile,
-                  foundFiles: zipValidationResult.foundFiles || [],
-                  wrapperFolder: zipValidationResult.wrapperFolder
+                  foundFiles: zipHtmlFiles
                 } as Prisma.InputJsonValue
               }
             })
+            return
+          }
+        } else if (zipHtmlFiles.length === 0) {
+          await cleanupTempZip(tempZipPath)
+          await prisma.contentData.update({
+            where: { id: cId as any },
+            data: {
+              status: "FAILED",
+              description: { error: "File ZIP không chứa file HTML nào." } as Prisma.InputJsonValue
+            }
           })
-          
-          console.log(`ZIP validation failed for content ${cId}:`, {
-            expectedHtmlFile,
-            launchDir,
-            foundFiles: zipValidationResult.foundFiles,
-            wrapperFolder: zipValidationResult.wrapperFolder,
-            error: zipValidationResult.error
-          })
-          
-          throw new Error(zipValidationResult.error)
+          return
         }
 
-        // Store wrapper folder info for extraction
-        const wrapperFolder = zipValidationResult.wrapperFolder
+        // Clear old content directory and recreate (already archived above)
+        // _versions dir is a sibling, not inside contentDir, so safe to rm -rf
+        await rm(contentDir, { recursive: true, force: true })
+        await mkdir(targetDir, { recursive: true })
 
-        // Extract ZIP file using unzipper
-        await new Promise<void>((resolve, reject) => {
-          const stream = unzipper.Parse()
-          let processedEntries = 0
-          let totalEntries = 0
-          let isComplete = false
+        // Extract ZIP from disk with prefix stripping — memory-efficient
+        const { files: extractedFiles, htmlFiles: extractedHtmlFiles } = await extractZipFromDisk(
+          tempZipPath,
+          targetDir,
+          stripPrefix
+        )
 
-          // First pass: count total files
-          const countStream = unzipper.Parse()
-          countStream.on('entry', (entry: any) => {
-            if (entry.type === 'File') {
-              totalEntries++
-            }
-            entry.autodrain()
-          })
-          
-          countStream.on('end', () => {
-            // Second pass: extract files
-            const extractStream = unzipper.Parse()
-            
-            extractStream.on('entry', async (entry: any) => {
-              const fileName = entry.path
-              const type = entry.type
-              
-              if (type === 'Directory') {
-                entry.autodrain()
-                return
-              }
+        // Remove temp ZIP
+        await cleanupTempZip(tempZipPath)
 
-              // Normalize entry path and handle wrapper folder
-              const normalizedEntry = fileName.replace(/\\/g, '/')
-              let relativePath = normalizedEntry
-              
-              // First, strip wrapper folder if detected
-              if (wrapperFolder && relativePath.startsWith(wrapperFolder + '/')) {
-                relativePath = relativePath.slice(wrapperFolder.length + 1)
-              }
-              
-              // Then, if we already extract into launchDir, and the zip entries also start with the same folder,
-              // strip that prefix to avoid duplicated nested folders like launchDir/launchDir/...
-              if (launchDir && targetDir !== contentDir) {
-                const prefix = launchDir + '/'
-                if (relativePath.startsWith(prefix)) {
-                  relativePath = relativePath.slice(prefix.length)
-                }
-              }
-              
-              const filePath = join(targetDir, relativePath)
-              const dir = dirname(filePath)
-              
-              try {
-                // Ensure directory exists
-                await mkdir(dir, { recursive: true })
-                
-                // Create write stream and pipe entry to it
-                const writeStream = createWriteStream(filePath)
-                entry.pipe(writeStream)
-                
-                writeStream.on('close', () => {
-                  processedEntries++
-                  if (isComplete && processedEntries === totalEntries) {
-                    resolve()
-                  }
-                })
-                
-                writeStream.on('error', (err) => {
-                  reject(err)
-                })
-              } catch (err) {
-                reject(err)
-              }
-            })
+        console.log(`[update-file] Extracted ${extractedFiles.length} files for content ${cId}`)
 
-            extractStream.on('end', () => {
-              isComplete = true
-              if (processedEntries === totalEntries) {
-                resolve()
-              }
-            })
-
-            extractStream.on('error', (err: any) => {
-              reject(err)
-            })
-
-            // Start extraction
-            extractStream.end(buffer)
-          })
-          
-          countStream.on('error', (err: any) => {
-            reject(err)
-          })
-          
-          // Count entries first
-          countStream.end(buffer)
-        })
-
-        // Process based on content type
-        let description: any = {}
+        // Determine launch file and description
+        let description: Record<string, unknown> = {}
         let launchFile: string | null = null
 
         if (contentType === "FILE_ZIP_SCORM") {
-          // Process SCORM package
           const scormData = await SCORMService.parseManifest(targetDir)
-          
           if (scormData) {
-            // Find launch file from resources
             const scormLaunchFile = scormData.resources?.[0]?.href || "index.html"
-            description = {
-              scorm: scormData,
-              launchFile: scormLaunchFile
-            }
+            description = { scorm: scormData, launchFile: scormLaunchFile }
             launchFile = scormLaunchFile
           } else {
             throw new Error("Failed to process SCORM package")
           }
-        } else if (contentType === "FILE_ZIP_HTML") {
-          // Keep the existing launchFile to preserve URL structure
+        } else {
           if (currentLaunchFile) {
-            // Use the existing launchFile to maintain the same URL
             launchFile = currentLaunchFile
-            description = {
-              launchFile,
-              type: "html"
-            }
+            description = { launchFile, type: "html" }
           } else {
-            // Fallback: Find HTML launch file if no existing launchFile
-            const fs = require('fs')
-            const findHtmlFile = (dir: string): string | null => {
-              const files = fs.readdirSync(dir)
-              
-              // First, look for subdirectories that might contain index.html
-              const subdirs = files.filter((f: string) => {
-                const filePath = join(dir, f)
-                const stat = fs.statSync(filePath)
-                return stat.isDirectory()
-              })
-              
-              // Check subdirectories for index.html first (priority)
-              for (const subdir of subdirs) {
-                const subdirPath = join(dir, subdir)
-                const subdirFiles = fs.readdirSync(subdirPath)
-                const indexFile = subdirFiles.find((f: string) => f.toLowerCase() === 'index.html')
-                if (indexFile) {
-                  return join(subdir, indexFile)
-                }
-              }
-              
-              // Then look for index.html in root directory
-              const indexFile = files.find((f: string) => f.toLowerCase() === 'index.html')
-              if (indexFile) {
-                return indexFile
-              }
-              
-              // Look for any HTML file in subdirectories
-              for (const subdir of subdirs) {
-                const subdirPath = join(dir, subdir)
-                const subdirFiles = fs.readdirSync(subdirPath)
-                const htmlFile = subdirFiles.find((f: string) => f.toLowerCase().endsWith('.html'))
-                if (htmlFile) {
-                  return join(subdir, htmlFile)
-                }
-              }
-              
-              // Finally, look for any HTML file in root
-              const htmlFile = files.find((f: string) => f.toLowerCase().endsWith('.html'))
-              if (htmlFile) {
-                return htmlFile
-              }
-              
-              return null
-            }
-            
-            const absoluteLaunchFile = findHtmlFile(targetDir)
-            if (!absoluteLaunchFile) {
-              throw new Error("No HTML file found in package")
-            }
-            
-            // Convert absolute path to relative path for launchFile
-            launchFile = absoluteLaunchFile.replace(targetDir + '/', '')
-            
-            description = {
-              launchFile,
-              type: "html"
-            }
+            const candidates = extractedHtmlFiles
+            launchFile =
+              candidates.find(f => f.includes('/') && f.toLowerCase().endsWith('index.html')) ??
+              candidates.find(f => !f.includes('/') && f.toLowerCase() === 'index.html') ??
+              candidates[0] ?? null
+
+            if (!launchFile) throw new Error("No HTML file found in package")
+            description = { launchFile, type: "html" }
           }
         }
 
-        // Update content with new description and status using transaction
-        await prisma.$transaction(async (tx) => {
-          await tx.contentData.update({
-            where: { id: content.id as any },
-            data: {
-              description: description as Prisma.InputJsonValue,
-              status: "COMPLETED",
-              progress: 100
-            }
-          })
+        await prisma.contentData.update({
+          where: { id: content.id as any },
+          data: {
+            description: description as Prisma.InputJsonValue,
+            status: "COMPLETED",
+            progress: 100
+          }
         })
 
-        console.log(`Successfully updated content ${cId} with new file`)
-
+        console.log(`[update-file] Content ${cId} updated successfully. Launch: ${launchFile}`)
+        contentEventBus.emitStatusChange({
+          contentId: cId,
+          projectId: pId,
+          moduleId: mId,
+          status: "COMPLETED",
+          progress: 100,
+        })
       } catch (error) {
-        console.error("Error processing file for content:", cId, error)
-        
-        // Update content status to FAILED using transaction
-        try {
-          await prisma.$transaction(async (tx) => {
-            await tx.contentData.update({
-              where: { id: content.id as any },
-              data: { status: "FAILED" }
-            })
-          })
-        } catch (updateError) {
-          console.error("Failed to update status to FAILED:", updateError)
-        }
+        console.error(`[update-file] Error processing content ${cId}:`, error)
+        await cleanupTempZip(tempZipPath)
+        const errMsg = error instanceof Error ? error.message : String(error)
+        await prisma.contentData.update({
+          where: { id: content.id as any },
+          data: {
+            status: "FAILED",
+            description: { error: errMsg } as any
+          }
+        }).catch(console.error)
+        contentEventBus.emitStatusChange({
+          contentId: cId,
+          projectId: pId,
+          moduleId: mId,
+          status: "FAILED",
+        })
       }
-    }, 2000)
-
-    // Log audit
-    await logContentAction(
-      session.user.id,
-      'file_updated',
-      String(cId),
-      {
-        contentTitle: content.title,
-        fileSize: file.size,
-        contentType: contentType
-      }
-    )
-    
-    return NextResponse.json({ 
-      message: "File update started successfully",
-      contentId: cId 
     })
+
+    return response
   } catch (error) {
     console.error("Error updating file:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

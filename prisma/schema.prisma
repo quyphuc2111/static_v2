@@ -99,10 +99,15 @@ model User {
     auditLogs       AuditLog[]      @relation("UserAuditLogs")
     sharedContent   ContentShare[]  @relation("ContentSharedBy")
     receivedContent ContentShare[]  @relation("ContentSharedWith")
+    contentVersions ContentVersion[] @relation("UserContentVersions")
 
     // Back-relations for ShareBatch
     batchesSharedBy   ShareBatch[]  @relation("BatchSharedBy")
     batchesSharedWith ShareBatch[]  @relation("BatchSharedWith")
+
+    // Back-relations for ModuleShare
+    moduleSharesBy    ModuleShare[] @relation("ModuleSharedBy")
+    moduleSharesWith  ModuleShare[] @relation("ModuleSharedWith")
 }
 
 model ContentData {
@@ -114,6 +119,7 @@ model ContentData {
     status      ContentStatus @default(PROCESSING)
     progress    Int        @default(0) // 0-100
     fileSize    Int?       // in bytes
+    launchFile  String?    // entry point file inside ZIP
     isDeleted   Boolean    @default(false)
     deletedAt   DateTime?
 
@@ -131,8 +137,35 @@ model ContentData {
     // sharing
     shares      ContentShare[]
 
+    // versioning
+    versions    ContentVersion[]
+
     createdAt   DateTime   @default(now())
     updatedAt   DateTime   @updatedAt
+}
+
+model ContentVersion {
+    id          Int            @id @default(autoincrement())
+    version     Int            // version number (1, 2, 3...)
+    contentUrl  String         // URL to the version archive zip
+    launchFile  String?        // entry point file
+    fileSize    Int?           // original content size in bytes
+    archiveSize Int?           // archive zip size in bytes
+    status      ContentStatus  @default(PROCESSING)
+    errorMessage String?       // error details if FAILED
+
+    // relation to parent content
+    contentId   Int
+    content     ContentData    @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+    // who uploaded this version
+    createdById Int?
+    createdBy   User?          @relation("UserContentVersions", fields: [createdById], references: [id])
+
+    createdAt   DateTime       @default(now())
+
+    @@unique([contentId, version])
+    @@index([contentId])
 }
 
 model Project {
@@ -148,6 +181,7 @@ model Project {
     // back-relations
     modules      Module[]
     contentData  ContentData[]
+    moduleShares ModuleShare[]
 }
 
 model Module {
@@ -166,6 +200,7 @@ model Module {
 
     // back-relations
     contentData  ContentData[]
+    moduleShares ModuleShare[]
 
     @@unique([projectId, name])
 }
@@ -226,6 +261,32 @@ model UserPermission {
     permission Permission @relation(fields: [permissionId], references: [id])
 
     @@id([userId, permissionId])
+}
+
+// =========================
+// Module Sharing (v2)
+// =========================
+model ModuleShare {
+    id           Int         @id @default(autoincrement())
+    moduleId     Int
+    module       Module      @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+    projectId    Int
+    project      Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+    sharedById   Int
+    sharedBy     User        @relation("ModuleSharedBy", fields: [sharedById], references: [id])
+    sharedWithId Int
+    sharedWith   User        @relation("ModuleSharedWith", fields: [sharedWithId], references: [id])
+    permission   SharePermission @default(VIEW)
+    status       ShareStatus @default(ACTIVE)
+    revokedAt    DateTime?
+    createdAt    DateTime    @default(now())
+    updatedAt    DateTime    @updatedAt
+
+    @@unique([moduleId, sharedWithId])
+    @@index([sharedById])
+    @@index([sharedWithId])
+    @@index([moduleId])
+    @@index([projectId])
 }
 
 // =========================
@@ -331,4 +392,10 @@ enum ShareScope {
 enum ShareStatus {
   ACTIVE
   REVOKED
+}
+
+enum SharePermission {
+  VIEW
+  DOWNLOAD
+  EDIT
 }

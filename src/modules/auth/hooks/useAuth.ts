@@ -20,7 +20,10 @@ export function useAuth(optionalOnLoginPage: boolean = false) {
 
   const logoutMutation = useMutation({
     mutationFn: () => logout(),
-    onSuccess: () => qc.invalidateQueries({ queryKey: cachedKeys.auth.me }),
+    onSuccess: () => {
+      qc.clear()
+      window.location.href = '/login'
+    },
   })
 
   return {

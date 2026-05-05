@@ -22,28 +22,28 @@ services:
     networks:
       - app-network
 
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: scs-app
-    restart: unless-stopped
-    ports:
-      - "3099:3000"
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=mysql://appuser:apppass@mysql:3306/appdb
-      - NEXTAUTH_SECRET=your-nextauth-secret-here
-      - NEXTAUTH_URL=http://localhost:3099
-      - SESSION_PASSWORD=your-session-password-here-must-be-at-least-32-characters-long
-      - SESSION_COOKIE_NAME=bkt_session
-    depends_on:
-      mysql:
-        condition: service_healthy
-    networks:
-      - app-network
-    volumes:
-      - ./uploads:/app/uploads
+  # app:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: scs-app
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3099:3000"
+  #   environment:
+  #     - NODE_ENV=production
+  #     - DATABASE_URL=mysql://appuser:apppass@mysql:3306/appdb
+  #     - NEXTAUTH_SECRET=your-nextauth-secret-here
+  #     - NEXTAUTH_URL=http://localhost:3099
+  #     - SESSION_PASSWORD=your-session-password-here-must-be-at-least-32-characters-long
+  #     - SESSION_COOKIE_NAME=bkt_session
+  #   depends_on:
+  #     mysql:
+  #       condition: service_healthy
+  #   networks:
+  #     - app-network
+  #   volumes:
+  #     - ./uploads:/app/uploads
     # healthcheck:
     #   test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
     #   interval: 30s

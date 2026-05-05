@@ -4,7 +4,7 @@ export interface ContentData extends SoftDeletableEntity, StatusEntity, NamedEnt
   title: string
   contentUrl: string
   contentType: "FILE_ZIP_HTML" | "FILE_ZIP_SCORM"
-  status: "PROCESSING" | "COMPLETED" | "FAILED"
+  status: "UPLOADING" | "PROCESSING" | "COMPLETED" | "FAILED"
   progress: number
   fileSize?: number
   projectId: string

@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { RefreshCw, Archive, Code, BookOpen, CheckCircle, AlertCircle, Info } from "lucide-react"
+import { RefreshCw, Archive, Code, BookOpen, CheckCircle, AlertCircle, Info, XCircle } from "lucide-react"
 import { toast } from "react-toastify"
 import { Button } from "@/components/ui/button"
 import {
@@ -54,6 +54,7 @@ export function UpdateFileDialog({ open, onOpenChange, content, projectId, modul
   const [selectedType, setSelectedType] = useState<"FILE_ZIP_HTML" | "FILE_ZIP_SCORM" | "">("")
   const [file, setFile] = useState<File | null>(null)
   const [detectedLaunchFile, setDetectedLaunchFile] = useState<string | null>(null)
+  const [htmlFilesList, setHtmlFilesList] = useState<string[]>([])
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
 
@@ -76,62 +77,35 @@ export function UpdateFileDialog({ open, onOpenChange, content, projectId, modul
     
     setIsAnalyzing(true)
     setDetectedLaunchFile(null)
+    setHtmlFilesList([])
     
     try {
-      // Create a temporary URL for the file
-      const fileUrl = URL.createObjectURL(file)
-      
-      // Use JSZip to read the ZIP file
       const JSZip = (await import('jszip')).default
       const zip = await JSZip.loadAsync(file)
       
-      // Find HTML files
       const htmlFiles: string[] = []
-      const indexFiles: string[] = []
-      const subdirIndexFiles: string[] = []
       
       zip.forEach((relativePath: string, zipEntry: any) => {
-        if (!zipEntry.dir) {
+        if (!zipEntry.dir && !relativePath.startsWith('__MACOSX/') && !relativePath.includes('/__MACOSX/')) {
           const fileName = relativePath.toLowerCase()
           if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
             htmlFiles.push(relativePath)
-            
-            // Check for index files
-            const baseName = fileName.split('/').pop() || ''
-            if (baseName === 'index.html' || baseName === 'index.htm') {
-              // Check if it's in a subdirectory
-              const pathParts = relativePath.split('/')
-              if (pathParts.length > 1) {
-                subdirIndexFiles.push(relativePath)
-              } else {
-                indexFiles.push(relativePath)
-              }
-            }
           }
         }
       })
       
-      // Determine launch file priority
-      let launchFile: string | null = null
+      setHtmlFilesList(htmlFiles)
       
-      if (subdirIndexFiles.length > 0) {
-        // Prefer index.html in subdirectories first
-        launchFile = subdirIndexFiles[0]
-      } else if (indexFiles.length > 0) {
-        // Then index.html in root directory
-        launchFile = indexFiles[0]
-      } else if (htmlFiles.length > 0) {
-        // Finally, any HTML file
+      let launchFile: string | null = null
+      if (htmlFiles.length === 1) {
         launchFile = htmlFiles[0]
       }
       
       setDetectedLaunchFile(launchFile)
       
-      // Clean up
-      URL.revokeObjectURL(fileUrl)
-      
     } catch (error) {
       console.error('Error analyzing ZIP file:', error)
+      setHtmlFilesList([])
       setDetectedLaunchFile(null)
     } finally {
       setIsAnalyzing(false)
@@ -177,16 +151,6 @@ export function UpdateFileDialog({ open, onOpenChange, content, projectId, modul
     }
   }
 
-  const handleContentTypeChange = (contentType: "FILE_ZIP_HTML" | "FILE_ZIP_SCORM") => {
-    setSelectedType(contentType)
-    
-    // Re-analyze file if it's HTML type
-    if (file && contentType === "FILE_ZIP_HTML") {
-      analyzeZipFile(file)
-    } else {
-      setDetectedLaunchFile(null)
-    }
-  }
 
   const handleSubmit = async () => {
     if (!content || !selectedType || !file) {
@@ -212,6 +176,7 @@ export function UpdateFileDialog({ open, onOpenChange, content, projectId, modul
     setSelectedType("")
     setFile(null)
     setDetectedLaunchFile(null)
+    setHtmlFilesList([])
     setIsAnalyzing(false)
   }
 
@@ -236,34 +201,29 @@ export function UpdateFileDialog({ open, onOpenChange, content, projectId, modul
 
         <ScrollArea className="flex-1 px-6 py-4">
         <div className="space-y-4">
-          {/* Content Type Selection */}
+          {/* Content Type (locked to current type) */}
           <div className="space-y-2">
             <Label className="text-foreground text-sm font-medium">Loại tài liệu</Label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {contentTypes.map((type) => (
-                <Card
-                  key={type.id}
-                  className={`cursor-pointer transition-all duration-200 border ${
-                    selectedType === type.id 
-                      ? `${type.borderColor} ${type.bgColor}` 
-                      : "border-border hover:border-primary/50"
-                  }`}
-                  onClick={() => handleContentTypeChange(type.id as "FILE_ZIP_HTML" | "FILE_ZIP_SCORM")}
-                >
+            {(() => {
+              const currentType = contentTypes.find((t) => t.id === selectedType)
+              if (!currentType) return null
+              return (
+                <Card className={`border ${currentType.borderColor} ${currentType.bgColor}`}>
                   <CardContent className="p-3">
                     <div className="flex items-center gap-2">
-                      <div className={`p-1.5 rounded ${type.bgColor}`}>
-                        <type.icon className={`h-4 w-4 ${type.color}`} />
+                      <div className={`p-1.5 rounded ${currentType.bgColor}`}>
+                        <currentType.icon className={`h-4 w-4 ${currentType.color}`} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-foreground text-sm truncate">{type.name}</h3>
-                        <p className="text-xs text-muted-foreground truncate">{type.description}</p>
+                        <h3 className="font-medium text-foreground text-sm truncate">{currentType.name}</h3>
+                        <p className="text-xs text-muted-foreground truncate">{currentType.description}</p>
                       </div>
+                      <Badge variant="secondary" className="text-[10px] shrink-0 bg-slate-100 text-slate-500">Loại hiện tại</Badge>
                     </div>
                   </CardContent>
                 </Card>
-              ))}
-            </div>
+              )
+            })()}
           </div>
 
           {/* File Upload */}
@@ -327,6 +287,7 @@ export function UpdateFileDialog({ open, onOpenChange, content, projectId, modul
                         onClick={() => {
                           setFile(null)
                           setDetectedLaunchFile(null)
+                          setHtmlFilesList([])
                         }}
                       >
                         <RefreshCw className="h-3 w-3" />
@@ -335,11 +296,25 @@ export function UpdateFileDialog({ open, onOpenChange, content, projectId, modul
                   </div>
                   
                   {selectedType === "FILE_ZIP_HTML" && (
-                    <div className="p-2 bg-muted/50 rounded border border-border">
+                    <div className={`p-2 rounded border ${htmlFilesList.length > 1 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : 'bg-muted/50 border-border'}`}>
                       {isAnalyzing ? (
                         <div className="flex items-center gap-2">
                           <div className="animate-spin h-3 w-3 border-2 border-primary border-t-transparent rounded-full"></div>
                           <p className="text-xs text-muted-foreground">Đang phân tích...</p>
+                        </div>
+                      ) : htmlFilesList.length > 1 ? (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <XCircle className="h-3 w-3 text-red-500 shrink-0" />
+                            <p className="text-xs font-medium text-red-600 dark:text-red-400">
+                              ZIP chứa {htmlFilesList.length} file HTML. Chỉ được phép 1 file.
+                            </p>
+                          </div>
+                          <div className="pl-4 space-y-0.5">
+                            {htmlFilesList.map((f, i) => (
+                              <p key={i} className="text-xs font-mono text-red-500/80 break-all">• {f}</p>
+                            ))}
+                          </div>
                         </div>
                       ) : detectedLaunchFile ? (
                         <div className="space-y-1">
@@ -391,7 +366,7 @@ export function UpdateFileDialog({ open, onOpenChange, content, projectId, modul
             size="sm"
             className="bg-primary hover:bg-primary/90"
             onClick={handleSubmit}
-            disabled={updateContentFileMut.isPending || !selectedType || !file}
+            disabled={updateContentFileMut.isPending || !selectedType || !file || (selectedType === "FILE_ZIP_HTML" && htmlFilesList.length !== 1)}
           >
             {updateContentFileMut.isPending ? (
               <>

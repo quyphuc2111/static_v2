@@ -2,7 +2,7 @@
 FROM node:20-alpine AS base
 
 # Cài đặt dependencies cần thiết
-RUN apk add --no-cache libc6-compat curl git
+RUN apk add --no-cache libc6-compat curl git unzip
 WORKDIR /app
 
 # Cài đặt pnpm

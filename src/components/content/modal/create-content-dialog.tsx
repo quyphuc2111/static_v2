@@ -1,8 +1,8 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
-import { Upload, Archive, Code, BookOpen, Plus, Trash2 } from "lucide-react"
+import { useState, useRef } from "react"
+import { UploadCloud, Archive, Code, BookOpen, Plus, Trash2, File as FileIcon, X, CheckCircle2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -11,17 +11,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogPortal,
-  DialogOverlay,
 } from "@/components/ui/dialog"
-import * as DialogPrimitive from "@radix-ui/react-dialog"
-import { XIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent } from "@/components/ui/card"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useCreateContent } from "@/modules/content/hooks/useCreateContent"
 import { CreateContentPayload } from "@/modules/content/content.interface"
 import { toast } from "react-toastify"
@@ -33,75 +26,61 @@ interface CreateContentDialogProps {
   moduleId: string
 }
 
-const contentTypes = [
-  {
-    id: "FILE_ZIP_HTML",
-    name: "HTML Package",
-    description: "File ZIP chứa HTML, CSS, JS",
-    icon: Code,
-    color: "text-blue-400",
-    bgColor: "bg-blue-500/10",
-    borderColor: "border-blue-500/30",
-  },
-  {
-    id: "FILE_ZIP_SCORM",
-    name: "SCORM Package",
-    description: "File ZIP theo chuẩn SCORM",
-    icon: BookOpen,
-    color: "text-green-400",
-    bgColor: "bg-green-500/10",
-    borderColor: "border-green-500/30",
-  },
-]
-
 type DescriptionItem = {
   id: string
   key: string
   value: string
 }
 
+const MAX_VISIBLE_FILE_NAME_LENGTH = 48
+
+const getDisplayFileName = (fileName: string) => {
+  if (fileName.length <= MAX_VISIBLE_FILE_NAME_LENGTH) return fileName
+
+  const extensionMatch = fileName.match(/\.[^./\\]+$/)
+  const extension = extensionMatch?.[0] ?? ''
+  const nameWithoutExtension = extension ? fileName.slice(0, -extension.length) : fileName
+  const headLength = 28
+  const tailLength = Math.max(10, MAX_VISIBLE_FILE_NAME_LENGTH - headLength - extension.length - 3)
+
+  return `${nameWithoutExtension.slice(0, headLength)}...${nameWithoutExtension.slice(-tailLength)}${extension}`
+}
+
 export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }: CreateContentDialogProps) {
-  const [selectedType, setSelectedType] = useState<"FILE_ZIP_HTML" | "FILE_ZIP_SCORM" | "">("")
+  const [selectedType, setSelectedType] = useState<"FILE_ZIP_HTML" | "FILE_ZIP_SCORM" | "">("FILE_ZIP_HTML")
   const [title, setTitle] = useState("")
   const [descriptionItems, setDescriptionItems] = useState<DescriptionItem[]>([])
   const [file, setFile] = useState<File | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [detectedLaunchFile, setDetectedLaunchFile] = useState<string | null>(null)
+  const [htmlFilesList, setHtmlFilesList] = useState<string[]>([])
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const createContentMut = useCreateContent(projectId, moduleId)
 
-  // Function to analyze ZIP file and find HTML launch file
-  const analyzeZipFile = async (file: File) => {
+  const analyzeZipFile = async (zipFile: File) => {
     if (selectedType !== "FILE_ZIP_HTML") return
-    
+
     setIsAnalyzing(true)
     setDetectedLaunchFile(null)
-    
+    setHtmlFilesList([])
+
     try {
-      // Create a temporary URL for the file
-      const fileUrl = URL.createObjectURL(file)
-      
-      // Use JSZip to read the ZIP file
       const JSZip = (await import('jszip')).default
-      const zip = await JSZip.loadAsync(file)
-      
-      // Find HTML files
+      const zip = await JSZip.loadAsync(zipFile)
+
       const htmlFiles: string[] = []
       const indexFiles: string[] = []
       const subdirIndexFiles: string[] = []
-      
+
       zip.forEach((relativePath: string, zipEntry: any) => {
-        if (!zipEntry.dir) {
+        if (!zipEntry.dir && !relativePath.startsWith('__MACOSX/') && !relativePath.includes('/__MACOSX/')) {
           const fileName = relativePath.toLowerCase()
           if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
             htmlFiles.push(relativePath)
-            
-            // Check for index files
             const baseName = fileName.split('/').pop() || ''
             if (baseName === 'index.html' || baseName === 'index.htm') {
-              // Check if it's in a subdirectory
               const pathParts = relativePath.split('/')
               if (pathParts.length > 1) {
                 subdirIndexFiles.push(relativePath)
@@ -112,85 +91,69 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
           }
         }
       })
-      
-      // Determine launch file priority
+
+      setHtmlFilesList(htmlFiles)
+
       let launchFile: string | null = null
-      
-      if (subdirIndexFiles.length > 0) {
-        // Prefer index.html in subdirectories first
-        launchFile = subdirIndexFiles[0]
-      } else if (indexFiles.length > 0) {
-        // Then index.html in root directory
-        launchFile = indexFiles[0]
-      } else if (htmlFiles.length > 0) {
-        // Finally, any HTML file
+      if (htmlFiles.length === 1) {
         launchFile = htmlFiles[0]
+      } else if (htmlFiles.length > 1) {
+        // >1 HTML files — don't set launchFile, error will show
+        launchFile = null
       }
-      
+
       setDetectedLaunchFile(launchFile)
-      
-      // Clean up
-      URL.revokeObjectURL(fileUrl)
-      
     } catch (error) {
       console.error('Error analyzing ZIP file:', error)
       setDetectedLaunchFile(null)
+      setHtmlFilesList([])
     } finally {
       setIsAnalyzing(false)
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!selectedType || !title || !file) {
       toast.error("Vui lòng điền đầy đủ thông tin")
       return
     }
 
-    setIsSubmitting(true)
-    
-    try {
-      // Convert description items to JSON
-      const descriptionJson = descriptionItems.reduce((acc, item) => {
-        if (item.key.trim() && item.value.trim()) {
-          acc[item.key.trim()] = item.value.trim()
-        }
-        return acc
-      }, {} as Record<string, string>)
-
-      const payload: CreateContentPayload = {
-        title: title.trim(),
-        description: Object.keys(descriptionJson).length > 0 ? JSON.stringify(descriptionJson) : undefined,
-        contentType: selectedType,
-        file,
+    const descriptionJson = descriptionItems.reduce((acc, item) => {
+      if (item.key.trim() && item.value.trim()) {
+        acc[item.key.trim()] = item.value.trim()
       }
+      return acc
+    }, {} as Record<string, string>)
 
-      await createContentMut.mutateAsync(payload)
-      
-      // Reset form
-      resetForm()
-      onOpenChange(false)
-    } catch (error) {
-      // Error handling is done by the hook
-    } finally {
-      setIsSubmitting(false)
+    const payload: CreateContentPayload = {
+      title: title.trim(),
+      description: Object.keys(descriptionJson).length > 0 ? JSON.stringify(descriptionJson) : undefined,
+      contentType: selectedType,
+      file,
     }
+
+    // Fire and forget — close modal immediately, upload runs in background
+    createContentMut.mutate(payload)
+    toast.info("Đang tải lên nội dung, vui lòng chờ...")
+    resetForm()
+    onOpenChange(false)
   }
 
   const resetForm = () => {
-    setSelectedType("")
+    setSelectedType("FILE_ZIP_HTML")
     setTitle("")
     setDescriptionItems([])
     setFile(null)
     setDetectedLaunchFile(null)
     setIsAnalyzing(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0] || null
     setFile(selectedFile)
-    
     if (selectedFile && selectedType === "FILE_ZIP_HTML") {
       analyzeZipFile(selectedFile)
     } else {
@@ -207,7 +170,9 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
   const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.stopPropagation()
-    setIsDragging(false)
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragging(false)
+    }
   }
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -226,13 +191,16 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
     }
   }
 
+  const handleRemoveFile = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setFile(null)
+    setDetectedLaunchFile(null)
+    setHtmlFilesList([])
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
   const addDescriptionItem = () => {
-    const newItem: DescriptionItem = {
-      id: Date.now().toString(),
-      key: "",
-      value: ""
-    }
-    setDescriptionItems([...descriptionItems, newItem])
+    setDescriptionItems([...descriptionItems, { id: Date.now().toString(), key: "", value: "" }])
   }
 
   const removeDescriptionItem = (id: string) => {
@@ -240,328 +208,230 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
   }
 
   const updateDescriptionItem = (id: string, field: 'key' | 'value', value: string) => {
-    setDescriptionItems(descriptionItems.map(item => 
+    setDescriptionItems(descriptionItems.map(item =>
       item.id === id ? { ...item, [field]: value } : item
     ))
   }
 
   return (
-    <Dialog open={open} onOpenChange={(open) => {
-      if (!open) resetForm()
-      onOpenChange(open)
-    }}>
-      <DialogContent 
-        className="bg-card border-border overflow-hidden flex flex-col w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[80vw] xl:w-[75vw] max-w-6xl h-[90vh] sm:h-[85vh] md:h-[80vh] p-4 sm:p-6"
-      >
-        <DialogHeader className="flex-shrink-0 pb-4">
-          <DialogTitle className="text-foreground text-lg sm:text-xl">Tạo Nội dung mới</DialogTitle>
-          <DialogDescription className="text-muted-foreground text-sm">
+    <Dialog open={open} onOpenChange={(v) => { if (!v) resetForm(); onOpenChange(v) }}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto bg-white">
+        <DialogHeader>
+          <DialogTitle>Tạo Nội dung mới</DialogTitle>
+          <DialogDescription>
             Upload file ZIP (HTML hoặc SCORM) để tạo nội dung học tập
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
-          <ScrollArea className="flex-1 pr-2 min-h-0">
-            <div className="space-y-4 sm:space-y-6 pr-2">
-            {/* Content Type Selection */}
-            <div className="space-y-3">
-              <Label className="text-foreground font-medium text-sm sm:text-base">Chọn loại nội dung <span className="text-red-400">*</span></Label>
-              <div className="grid grid-cols-1 gap-3">
-                {contentTypes.map((type) => (
-                  <Card
-                    key={type.id}
-                    className={`cursor-pointer transition-all duration-200 border-2 ${
-                      selectedType === type.id 
-                        ? `${type.borderColor} ${type.bgColor} shadow-md` 
-                        : "border-border hover:border-primary/50 hover:shadow-sm"
-                    }`}
-                    onClick={() => {
-                      setSelectedType(type.id as "FILE_ZIP_HTML" | "FILE_ZIP_SCORM")
-                      // Re-analyze file if it's HTML type
-                      if (file && type.id === "FILE_ZIP_HTML") {
-                        analyzeZipFile(file)
-                      } else {
-                        setDetectedLaunchFile(null)
-                      }
-                    }}
-                  >
-                    <CardContent className="p-3 sm:p-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${type.bgColor} flex-shrink-0`}>
-                          <type.icon className={`h-5 w-5 sm:h-6 sm:w-6 ${type.color}`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-foreground text-sm sm:text-base">{type.name}</h3>
-                          <p className="text-xs text-muted-foreground">{type.description}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+        <form onSubmit={handleSubmit} className="space-y-5 py-2">
+          {/* Content Type */}
+          <div className="space-y-2">
+            <Label>Loại nội dung <span className="text-red-500">*</span></Label>
+            <Select
+              value={selectedType}
+              onValueChange={(v) => {
+                setSelectedType(v as "FILE_ZIP_HTML" | "FILE_ZIP_SCORM")
+                if (file && v === "FILE_ZIP_HTML") analyzeZipFile(file)
+                else setDetectedLaunchFile(null)
+              }}
+            >
+              <SelectTrigger className="w-full bg-white dark:bg-slate-900">
+                <SelectValue placeholder="Chọn loại nội dung" />
+              </SelectTrigger>
+              <SelectContent>
+                  <SelectItem value="FILE_ZIP_HTML">
+                  <div className="flex items-center gap-2">
+                    <Code className="h-4 w-4 text-blue-500" />
+                    HTML Package (.zip)
+                  </div>
+                </SelectItem>
+                <SelectItem value="FILE_ZIP_SCORM">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-4 w-4 text-green-500" />
+                    SCORM Package (.zip)
+                  </div>
+                </SelectItem>
+              
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Title */}
+          <div className="space-y-2">
+            <Label htmlFor="create-title">Tiêu đề <span className="text-red-500">*</span></Label>
+            <Input
+              id="create-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Nhập tiêu đề nội dung"
+              className="bg-white dark:bg-slate-900"
+              required
+            />
+          </div>
+
+          {/* Description Key-Value */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Mô tả chi tiết</Label>
+              <Button type="button" variant="ghost" size="sm" onClick={addDescriptionItem} className="h-7 text-xs gap-1">
+                <Plus className="h-3.5 w-3.5" /> Thêm
+              </Button>
             </div>
 
-            {/* Main Content Grid */}
-            <div className="space-y-4 sm:space-y-6">
-              {/* Title */}
-              <div className="space-y-2">
-                <Label htmlFor="title" className="text-foreground font-medium text-sm sm:text-base">
-                  Tiêu đề <span className="text-red-400">*</span>
-                </Label>
-                <Input
-                  id="title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Nhập tiêu đề nội dung"
-                  className="bg-background border-border hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary/20 text-sm sm:text-base"
-                  required
-                />
+            {descriptionItems.length === 0 ? (
+              <div className="text-center py-6 text-slate-500 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                <p className="text-xs">Chưa có mô tả. Click "Thêm" để bổ sung.</p>
               </div>
-
-              {/* Description Key-Value */}
-              <div className="space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                  <Label className="text-foreground font-medium text-sm sm:text-base">
-                    Mô tả chi tiết 
-                    {descriptionItems.length > 3 && (
-                      <span className="text-xs text-muted-foreground ml-2">
-                        (có thể scroll để xem thêm)
-                      </span>
-                    )}
-                  </Label>
+            ) : (
+              <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+                {descriptionItems.map((item) => (
+                  <div key={item.id} className="flex gap-2 items-start">
+                    <div className="flex-1 grid grid-cols-2 gap-2">
+                      <Input
+                        placeholder="Tên (VD: Tác giả)"
+                        value={item.key}
+                        onChange={(e) => updateDescriptionItem(item.id, 'key', e.target.value)}
+                        className="text-sm h-9 bg-white dark:bg-slate-900"
+                      />
+                      <Input
+                        placeholder="Giá trị (VD: Admin)"
+                        value={item.value}
+                        onChange={(e) => updateDescriptionItem(item.id, 'value', e.target.value)}
+                        className="text-sm h-9 bg-white dark:bg-slate-900"
+                      />
+                    </div>
                     <Button
                       type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={addDescriptionItem}
-                      className="h-8 px-3 w-full sm:w-auto"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeDescriptionItem(item.id)}
+                      className="h-9 w-9 text-slate-400 hover:text-red-500 shrink-0"
                     >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Thêm
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                  
-                  {descriptionItems.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground border-2 border-dashed border-border rounded-lg">
-                      <p className="text-sm">Chưa có mô tả nào</p>
-                      <p className="text-xs">Click "Thêm" để thêm thông tin chi tiết</p>
-                    </div>
-                  ) : (
-                    <div className="border border-border rounded-lg bg-background/50 backdrop-blur-sm">
-                      <div className="max-h-[200px] sm:max-h-[250px] overflow-y-auto p-3 space-y-3">
-                        {descriptionItems.map((item) => (
-                          <div key={item.id} className="flex flex-col sm:flex-row gap-2 items-start">
-                            <div className="flex-1 space-y-2 w-full">
-                              <Input
-                                placeholder="Tên thuộc tính (VD: Tác giả, Phiên bản)"
-                                value={item.key}
-                                onChange={(e) => updateDescriptionItem(item.id, 'key', e.target.value)}
-                                className="bg-background border-border hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary/20"
-                              />
-                              <Input
-                                placeholder="Giá trị (VD: Nguyễn Văn A, 1.0)"
-                                value={item.value}
-                                onChange={(e) => updateDescriptionItem(item.id, 'value', e.target.value)}
-                                className="bg-background border-border hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary/20"
-                              />
-                            </div>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => removeDescriptionItem(item.id)}
-                              className="h-8 w-8 p-0 text-red-400 hover:text-red-600 flex-shrink-0"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                ))}
               </div>
+            )}
+          </div>
 
-              {/* File Upload */}
-              {selectedType ? (
-                <div className="space-y-4">
-                  <Label className="text-foreground font-medium text-sm sm:text-base">
-                    Upload File ZIP <span className="text-red-400">*</span>
-                  </Label>
-                  <div 
-                    className={`border-2 border-dashed rounded-lg p-3 sm:p-4 text-center transition-all duration-200 bg-background/30 backdrop-blur-sm ${
-                      isDragging 
-                        ? "border-primary bg-primary/10 scale-[1.02]" 
-                        : "border-border hover:border-primary/50 hover:bg-primary/5"
-                    }`}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                  >
-                    <Archive className={`mx-auto h-8 w-8 sm:h-12 sm:w-12 mb-2 sm:mb-3 transition-colors ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
-                    <div className="space-y-2 sm:space-y-3">
-                      <div>
-                        <p className={`font-medium mb-1 text-sm sm:text-base ${isDragging ? "text-primary" : "text-foreground"}`}>
-                          {isDragging ? "Thả file vào đây" : "Kéo thả file ZIP vào đây"}
-                        </p>
-                        <p className="text-xs sm:text-sm text-muted-foreground">
-                          Hoặc click để chọn file từ máy tính
+          {/* File Upload */}
+          <div className="space-y-2">
+            <Label>Upload File ZIP <span className="text-red-500">*</span></Label>
+
+            {!file ? (
+              <div
+                className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-8 transition-colors cursor-pointer group ${
+                  isDragging
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                    : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50'
+                } ${!selectedType ? 'opacity-50 pointer-events-none' : ''}`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => selectedType && fileInputRef.current?.click()}
+              >
+                <div className={`p-3 rounded-full mb-3 ${
+                  isDragging
+                    ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 group-hover:text-blue-600'
+                }`}>
+                  <UploadCloud className="h-7 w-7" />
+                </div>
+                <p className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-1 text-center">
+                  {!selectedType ? "Chọn loại nội dung trước" : "Click để chọn hoặc kéo thả file"}
+                </p>
+                <p className="text-xs text-slate-500 text-center">
+                  Chỉ hỗ trợ file .zip
+                </p>
+                <input
+                  type="file"
+                  accept=".zip,application/zip"
+                  className="hidden"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                />
+              </div>
+            ) : (
+              <div className="p-4 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900/50 space-y-3">
+                <div className="flex min-w-0 items-center justify-between gap-3">
+                  <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
+                    <div className="h-10 w-10 shrink-0 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-lg flex items-center justify-center">
+                      <FileIcon className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1 overflow-hidden">
+                      <p
+                        className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium text-slate-900 dark:text-slate-100"
+                        title={file.name}
+                      >
+                        {getDisplayFileName(file.name)}
+                      </p>
+                      <p className="text-xs text-slate-500">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={handleRemoveFile} className="h-8 w-8 shrink-0 text-slate-500 hover:text-red-500">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* HTML launch file detection */}
+                {selectedType === "FILE_ZIP_HTML" && (
+                  <div className={`p-3 rounded-lg border ${htmlFilesList.length > 1 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'}`}>
+                    {isAnalyzing ? (
+                      <div className="flex items-center gap-2">
+                        <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full" />
+                        <p className="text-xs text-slate-500">Đang phân tích file ZIP...</p>
+                      </div>
+                    ) : htmlFilesList.length > 1 ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
+                          <p className="text-xs font-medium text-red-600 dark:text-red-400">
+                            File ZIP chứa {htmlFilesList.length} file HTML. Chỉ được phép 1 file HTML.
+                          </p>
+                        </div>
+                        <div className="pl-6 space-y-0.5">
+                          {htmlFilesList.map((f, i) => (
+                            <p key={i} className="text-xs font-mono text-red-500/80 break-all">• {f}</p>
+                          ))}
+                        </div>
+                      </div>
+                    ) : detectedLaunchFile ? (
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-green-500" />
+                          <p className="text-xs font-medium text-slate-700 dark:text-slate-300">File HTML chính:</p>
+                        </div>
+                        <p className="text-xs font-mono text-blue-600 dark:text-blue-400 bg-slate-100 dark:bg-slate-800 rounded px-2 py-1 break-all">
+                          {detectedLaunchFile}
                         </p>
                       </div>
-                      <Input
-                        id="file"
-                        type="file"
-                        accept=".zip"
-                        onChange={handleFileChange}
-                        className="hidden"
-                      />
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        onClick={() => document.getElementById("file")?.click()}
-                        className="bg-muted/50 border-border hover:bg-muted w-full sm:w-auto"
-                      >
-                        <Upload className="mr-2 h-4 w-4" />
-                        Chọn File ZIP
-                      </Button>
-                    </div>
-                    {file && (
-                      <div className="mt-4 space-y-3">
-                        <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
-                          <div className="flex items-center gap-2">
-                            <Archive className="h-5 w-5 text-blue-400" />
-                            <div className="flex-1 text-left">
-                              <p className="text-sm font-medium text-foreground">{file.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {(file.size / 1024 / 1024).toFixed(2)} MB
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {selectedType === "FILE_ZIP_HTML" && (
-                          <div className="p-3 bg-muted/50 rounded-lg border border-border">
-                            {isAnalyzing ? (
-                              <div className="flex items-center gap-2">
-                                <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
-                                <p className="text-xs sm:text-sm text-muted-foreground">Đang phân tích file ZIP...</p>
-                              </div>
-                            ) : detectedLaunchFile ? (
-                              <div className="space-y-2">
-                                <div className="flex items-center gap-2">
-                                  <Code className="h-4 w-4 text-green-400" />
-                                  <p className="text-xs sm:text-sm font-medium text-foreground">File HTML chính được phát hiện:</p>
-                                </div>
-                                <div className="bg-background/50 rounded p-2 border border-border">
-                                  <p className="text-xs sm:text-sm font-mono text-foreground break-all">
-                                    {detectedLaunchFile}
-                                  </p>
-                                </div>
-                                <p className="text-xs text-muted-foreground">
-                                  File này sẽ được sử dụng làm trang chủ khi xem nội dung
-                                </p>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <Code className="h-4 w-4 text-yellow-400" />
-                                <p className="text-xs sm:text-sm text-muted-foreground">
-                                  Không tìm thấy file HTML trong ZIP
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-yellow-500" />
+                        <p className="text-xs text-slate-500">Không tìm thấy file HTML trong ZIP</p>
                       </div>
                     )}
                   </div>
+                )}
+              </div>
+            )}
+          </div>
 
-                  {/* Requirements Info */}
-                  <div className="bg-background/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 border border-border">
-                    <h4 className="font-medium text-foreground mb-2 text-sm sm:text-base">Yêu cầu file:</h4>
-                    <ul className="text-xs sm:text-sm text-muted-foreground space-y-1">
-                      <li>• File phải có định dạng .zip</li>
-                      <li>• HTML Package: Chứa file HTML, CSS, JS</li>
-                      <li>• SCORM Package: Tuân thủ chuẩn SCORM 1.2 hoặc 2004</li>
-                      <li>• Kích thước tối đa: ∞</li>
-                    </ul>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Placeholder khi chưa chọn loại nội dung */}
-                  <div className="border-2 border-dashed border-border rounded-lg p-6 sm:p-8 text-center bg-muted/20">
-                    <div className="flex flex-col items-center gap-3 sm:gap-4">
-                      <div className="p-3 sm:p-4 rounded-full bg-muted/50 border border-border">
-                        <Archive className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground" />
-                      </div>
-                      <div className="space-y-2">
-                        <h3 className="text-base sm:text-lg font-medium text-foreground">
-                          Chọn loại nội dung trước
-                        </h3>
-                        <p className="text-xs sm:text-sm text-muted-foreground max-w-sm">
-                          Vui lòng chọn loại nội dung (HTML Package hoặc SCORM Package) ở trên để có thể upload file ZIP
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 px-3 py-1.5 rounded-full">
-                        <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-                        <span>Đang chờ lựa chọn</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Requirements Info */}
-                  <div className="bg-background/50 backdrop-blur-sm rounded-lg p-3 sm:p-4 border border-border">
-                    <h4 className="font-medium text-foreground mb-2 sm:mb-3 text-sm sm:text-base flex items-center gap-2">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                      Yêu cầu file:
-                    </h4>
-                    <ul className="text-xs sm:text-sm text-muted-foreground space-y-1.5 sm:space-y-2">
-                      <li className="flex items-start gap-2">
-                        <span className="text-blue-400 mt-0.5">•</span>
-                        <span>File phải có định dạng .zip</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-green-400 mt-0.5">•</span>
-                        <span>HTML Package: Chứa file HTML, CSS, JS</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-green-400 mt-0.5">•</span>
-                        <span>HTML Package: Chứa file index.html</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-purple-400 mt-0.5">•</span>
-                        <span>SCORM Package: Tuân thủ chuẩn SCORM 1.2 hoặc 2004</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-orange-400 mt-0.5">•</span>
-                        <span>Kích thước tối đa: Không giới hạn</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-
-          <DialogFooter className="gap-2 sm:gap-3 pt-4 flex-shrink-0 flex-col sm:flex-row border-t border-border mt-4">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => {
-                resetForm()
-                onOpenChange(false)
-              }}
-              disabled={isSubmitting}
-              className="w-full sm:w-auto order-2 sm:order-1"
+          <DialogFooter className="gap-2 pt-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => { resetForm(); onOpenChange(false) }}
             >
               Hủy
             </Button>
-            <Button 
-              type="submit" 
-              className="bg-primary hover:bg-primary/90 w-full sm:w-auto order-1 sm:order-2"
-              disabled={isSubmitting || !selectedType || !title || !file}
+            <Button
+              type="submit"
+              className="bg-blue-600 hover:bg-blue-700 text-white min-w-24"
+              disabled={!selectedType || !title || !file || (selectedType === "FILE_ZIP_HTML" && htmlFilesList.length > 1)}
             >
-              {isSubmitting ? "Đang tạo..." : "Tạo Nội dung"}
+              Tạo Nội dung
             </Button>
           </DialogFooter>
         </form>

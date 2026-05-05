@@ -4,6 +4,7 @@ import { getSession } from "@/lib/session"
 import { hasPermission } from "@/lib/permissions"
 import { PermissionName, UserStatus } from "@prisma/client"
 import { logUserAction } from "@/lib/audit"
+import { userEventBus } from "@/lib/user-events"
 
 type Params = { params: Promise<{ userId: string }> }
 
@@ -89,6 +90,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         changes: updateData
       }
     )
+
+    // Emit SSE event nếu status thay đổi thành DISABLED
+    if (status === UserStatus.DISABLED) {
+      userEventBus.emitUserDisabled(numericUserId)
+    } else if (status === UserStatus.ACTIVE) {
+      userEventBus.emitUserEnabled(numericUserId)
+    }
 
     return NextResponse.json({ data: updated })
   } catch (error: any) {

@@ -90,6 +90,23 @@ const getStatusBadge = (status: string, progress?: number) => {
           )} */}
         </div>
       )
+    case "UPLOADING":
+      return (
+        <div className="flex items-center gap-2">
+          <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 animate-pulse">Đang tải lên</Badge>
+          {progress !== undefined && progress > 0 && (
+            <div className="flex items-center gap-1">
+              <div className="w-12 bg-muted rounded-full h-1.5">
+                <div
+                  className="bg-amber-400 h-1.5 rounded-full transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-amber-400 font-medium">{progress}%</span>
+            </div>
+          )}
+        </div>
+      )
     case "FAILED":
       return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Thất bại</Badge>
     default:

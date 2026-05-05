@@ -23,7 +23,7 @@ import {
   useHardDeleteProject,
   useRestoreProject,
 } from "@/modules/project/hooks"
-import { toast } from "sonner"
+import { toast } from "react-toastify"
 
 interface ActionButtonsProps {
   project: Project

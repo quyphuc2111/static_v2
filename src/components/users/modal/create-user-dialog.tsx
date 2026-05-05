@@ -278,7 +278,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
       </Dialog>
       
       {/* Password Dialog */}
-      <Dialog open={showPasswordDialog} onOpenChange={(v) => { setShowPasswordDialog(v); if (!v) onOpenChange(false) }}>
+      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
       <DialogContent className="max-w-[95vw] sm:max-w-[460px] bg-card border-border">
         <DialogHeader>
           <DialogTitle className="text-foreground text-lg sm:text-xl">Copy thông tin tài khoản mới</DialogTitle>

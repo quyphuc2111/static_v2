@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getSession } from "@/lib/session"
 import { prisma } from "@/lib/prisma"
 import { getOrCreateCsrfToken } from "@/lib/csrf"
+import { UserStatus } from "@prisma/client"
 
 export async function GET() {
   try {
@@ -29,7 +30,17 @@ export async function GET() {
     })
 
     if (!dbUser) {
+      session.destroy()
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    }
+
+    // Nếu tài khoản bị vô hiệu hoá → huỷ session, trả 401
+    if (dbUser.status === UserStatus.DISABLED) {
+      session.destroy()
+      return NextResponse.json(
+        { message: "ACCOUNT_DISABLED", reason: "Tài khoản của bạn đã bị vô hiệu hoá" },
+        { status: 401 }
+      )
     }
 
     const roles = dbUser.roles.map(ur => ({

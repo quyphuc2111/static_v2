@@ -83,6 +83,50 @@ export interface ShareContentPayload {
   canDelete?: boolean
 }
 
+export interface ModuleShareItem {
+  id: number
+  moduleId: number
+  projectId: number
+  sharedById: number
+  sharedWithId: number
+  permission: "VIEW" | "DOWNLOAD" | "EDIT"
+  status: "ACTIVE" | "REVOKED"
+  createdAt: string
+  updatedAt: string
+  sharedBy?: {
+    id: number
+    name?: string
+    email?: string
+    username: string
+  }
+  sharedWith?: {
+    id: number
+    name?: string
+    email?: string
+    username: string
+  }
+  module?: {
+    id: number
+    name: string
+  }
+  project?: {
+    id: number
+    name: string
+  }
+}
+
+export interface ShareModulePayload {
+  moduleId: number
+  projectId: number
+  sharedWithId: number
+  permission?: "VIEW" | "DOWNLOAD" | "EDIT"
+}
+
+export interface UpdateModuleSharePayload {
+  id: number
+  permission: "VIEW" | "DOWNLOAD" | "EDIT"
+}
+
 export interface BulkSharePayload {
   sharedWithId: number
   canView?: boolean

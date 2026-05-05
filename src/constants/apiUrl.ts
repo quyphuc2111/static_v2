@@ -29,6 +29,8 @@ export const CONTENT_API_URL = {
     SOFT_DELETE: (projectId: string, moduleId: string, contentId: string) => `projects/${projectId}/modules/${moduleId}/content/${contentId}/soft-delete`,
     HARD_DELETE: (projectId: string, moduleId: string, contentId: string) => `projects/${projectId}/modules/${moduleId}/content/${contentId}/hard-delete`,
     BULK_DELETE: (projectId: string, moduleId: string) => `projects/${projectId}/modules/${moduleId}/content/bulk-delete`,
-  IMPORT: (projectId: string, moduleId: string) => `projects/${projectId}/modules/${moduleId}/content/import`,
+    IMPORT: (projectId: string, moduleId: string) => `projects/${projectId}/modules/${moduleId}/content/import`,
+    VERSIONS: (projectId: string, moduleId: string, contentId: string) => `projects/${projectId}/modules/${moduleId}/content/${contentId}/versions`,
+    RESTORE_VERSION: (projectId: string, moduleId: string, contentId: string, versionId: string) => `projects/${projectId}/modules/${moduleId}/content/${contentId}/versions/${versionId}/restore`,
     STATS: (projectId?: string) => projectId ? `projects/${projectId}/content/stats` : "content/stats",
 }

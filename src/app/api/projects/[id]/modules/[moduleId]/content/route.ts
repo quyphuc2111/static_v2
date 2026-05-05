@@ -5,102 +5,15 @@ import { PermissionName, ShareStatus } from "@prisma/client"
 import { hasPermission as checkPermission, hasAnyPermission } from "@/lib/permissions"
 import { logContentAction } from "@/lib/audit"
 import { Prisma } from "@prisma/client"
-import { writeFile, mkdir } from "fs/promises"
-import { join, dirname } from "path"
-import { existsSync, createWriteStream } from "fs"
-import yauzl from "yauzl"
+import { writeFile, mkdir, rm } from "fs/promises"
+import { join } from "path"
+import { existsSync } from "fs"
 import { SCORMService } from "@/services/scormService"
+import { contentEventBus } from "@/lib/content-events"
+import { sanitizeVietnameseString, extractZipToDir, scanZipEntries } from "@/lib/file-utils"
 
 export const maxDuration = 300 // 5 minutes
 export const dynamic = 'force-dynamic'
-
-// Helper function to remove Vietnamese diacritics and sanitize for file paths
-function sanitizeVietnameseString(str: string): string {
-  return str
-    .normalize('NFD') // Decompose accented characters
-    .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
-    .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters except spaces
-    .replace(/\s+/g, '_') // Replace spaces with underscores
-    .toLowerCase()
-}
-
-// Helper function to extract ZIP file
-function extractZip(zipPath: string, extractPath: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
-      if (err) {
-        console.error("Error opening ZIP file:", err)
-        reject(err)
-        return
-      }
-
-      if (!zipfile) {
-        reject(new Error("Failed to open ZIP file"))
-        return
-      }
-
-      zipfile.readEntry()
-      zipfile.on("entry", (entry) => {
-        if (/\/$/.test(entry.fileName)) {
-          // Directory entry - create directory
-          const dirPath = join(extractPath, entry.fileName)
-          mkdir(dirPath, { recursive: true })
-            .then(() => zipfile.readEntry())
-            .catch((dirErr) => {
-              console.error("Error creating directory:", dirErr)
-              reject(dirErr)
-            })
-        } else {
-          // File entry
-          zipfile.openReadStream(entry, (err, readStream) => {
-            if (err) {
-              console.error("Error opening read stream:", err)
-              reject(err)
-              return
-            }
-
-            if (!readStream) {
-              reject(new Error("Failed to create read stream"))
-              return
-            }
-
-            const filePath = join(extractPath, entry.fileName)
-            const fileDir = dirname(filePath)
-            
-            // Ensure directory exists before writing file
-            mkdir(fileDir, { recursive: true })
-              .then(() => {
-                const writeStream = createWriteStream(filePath)
-                
-                readStream.pipe(writeStream)
-                writeStream.on("close", () => {
-                  zipfile.readEntry()
-                })
-                writeStream.on("error", (writeErr) => {
-                  console.error("Error writing file:", writeErr)
-                  reject(writeErr)
-                })
-              })
-              .catch((dirErr) => {
-                console.error("Error creating file directory:", dirErr)
-                reject(dirErr)
-              })
-          })
-        }
-      })
-
-      zipfile.on("end", () => {
-        console.log("ZIP extraction completed successfully")
-        resolve()
-      })
-
-      zipfile.on("error", (zipErr) => {
-        console.error("ZIP file error:", zipErr)
-        reject(zipErr)
-      })
-    })
-  })
-}
 
 export async function GET(
   request: NextRequest,
@@ -161,10 +74,23 @@ export async function GET(
         orConditions.push({ ownerId: Number(session.user.id) as any, isDeleted: false })
       }
       
-      // Shared content - ALWAYS exclude deleted (shared users should NOT see deleted content)
-      orConditions.push({ 
-        isDeleted: false, // Critical: shared content must not be deleted
-        shares: { some: { sharedWithId: Number(session.user.id) as any, canView: true, status: ShareStatus.ACTIVE } } 
+      // Content-level sharing - ALWAYS exclude deleted
+      orConditions.push({
+        isDeleted: false,
+        shares: { some: { sharedWithId: Number(session.user.id) as any, canView: true, status: ShareStatus.ACTIVE } }
+      })
+
+      // Module-level sharing - user có ModuleShare ACTIVE cho module này thì thấy tất cả content active
+      orConditions.push({
+        isDeleted: false,
+        module: {
+          moduleShares: {
+            some: {
+              sharedWithId: Number(session.user.id) as any,
+              status: ShareStatus.ACTIVE,
+            }
+          }
+        }
       })
       
       whereClause.OR = orConditions
@@ -179,6 +105,14 @@ export async function GET(
         shares: {
           where: { sharedWithId: Number(session.user.id) as any, status: ShareStatus.ACTIVE },
           select: { canView: true, canDownload: true, canEdit: true, canDelete: true, sharedById: true }
+        },
+        module: {
+          select: {
+            moduleShares: {
+              where: { sharedWithId: Number(session.user.id) as any, status: ShareStatus.ACTIVE },
+              select: { permission: true, sharedById: true }
+            }
+          }
         }
       },
       orderBy: {
@@ -187,17 +121,37 @@ export async function GET(
     })
 
     // Transform to include share permissions for current user
+    // Priority: content-level share > module-level share
     const transformedContent = content.map(item => {
-      const share = item.shares?.[0] // Get user's share if exists
+      const contentShare = item.shares?.[0]
+      const moduleShare = item.module?.moduleShares?.[0]
+      const isShared = !!contentShare || !!moduleShare
+
+      let sharePermissions = null
+      if (contentShare) {
+        sharePermissions = {
+          canView: contentShare.canView,
+          canDownload: contentShare.canDownload,
+          canEdit: contentShare.canEdit,
+          canDelete: contentShare.canDelete
+        }
+      } else if (moduleShare) {
+        // Map ModuleShare permission (VIEW/DOWNLOAD/EDIT) to content permissions
+        const perm = moduleShare.permission
+        sharePermissions = {
+          canView: true,
+          canDownload: perm === 'DOWNLOAD' || perm === 'EDIT',
+          canEdit: perm === 'EDIT',
+          canDelete: false
+        }
+      }
+
+      // Remove nested module.moduleShares from response
+      const { module: _module, ...rest } = item
       return {
-        ...item,
-        isShared: !!share,
-        sharePermissions: share ? {
-          canView: share.canView,
-          canDownload: share.canDownload,
-          canEdit: share.canEdit,
-          canDelete: share.canDelete
-        } : null
+        ...rest,
+        isShared,
+        sharePermissions
       }
     })
 
@@ -305,13 +259,34 @@ export async function POST(
     const buffer = Buffer.from(bytes)
     await writeFile(tempZipPath, buffer)
 
+    // Validate: HTML type must have exactly 1 HTML file
+    if (contentType === "FILE_ZIP_HTML") {
+      const { htmlFiles: zipHtmlFiles } = await scanZipEntries(tempZipPath)
+      if (zipHtmlFiles.length === 0) {
+        await require('fs').promises.unlink(tempZipPath)
+        await rm(uploadDir, { recursive: true, force: true }).catch(() => {})
+        return NextResponse.json(
+          { error: "File ZIP không chứa file HTML nào." },
+          { status: 400 }
+        )
+      }
+      if (zipHtmlFiles.length > 1) {
+        await require('fs').promises.unlink(tempZipPath)
+        await rm(uploadDir, { recursive: true, force: true }).catch(() => {})
+        return NextResponse.json(
+          { error: `File ZIP chứa ${zipHtmlFiles.length} file HTML. Chỉ được phép 1 file HTML duy nhất.`, htmlFiles: zipHtmlFiles },
+          { status: 400 }
+        )
+      }
+    }
+
     // Extract ZIP file
     try {
       console.log("Starting ZIP extraction...")
       console.log("ZIP path:", tempZipPath)
       console.log("Extract to:", uploadDir)
       
-      await extractZip(tempZipPath, uploadDir)
+      await extractZipToDir(tempZipPath, uploadDir)
       console.log("ZIP extraction completed")
       
       // Remove temporary ZIP file
@@ -326,8 +301,8 @@ export async function POST(
       )
     }
 
-    // Create content record
-    const relativePath = `/uploads/content/${project.name.replace(/[^a-zA-Z0-9]/g, "_")}/${module.name.replace(/[^a-zA-Z0-9]/g, "_")}/${extractedDirName}`
+    // Create content record — use same sanitize function as directory creation
+    const relativePath = `/uploads/content/${sanitizeVietnameseString(project.name)}/${sanitizeVietnameseString(module.name)}/${extractedDirName}`
     
     const content = await prisma.contentData.create({
       data: {
@@ -375,59 +350,35 @@ export async function POST(
         })
         
         const findIndexFile = (dir: string): string | null => {
-          const files = fs.readdirSync(dir)
+          // Recursive search: collect all HTML files with their relative paths
+          const allHtmlFiles: string[] = []
           
-          // First, look for subdirectories that might contain index.html
-          const subdirs = files.filter((file: string) => {
-            const fullPath = path.join(dir, file)
-            return fs.statSync(fullPath).isDirectory()
-          })
-          
-          // Check subdirectories for index.html first (priority)
-          for (const subdir of subdirs) {
-            const subdirPath = path.join(dir, subdir)
-            const subdirFiles = fs.readdirSync(subdirPath)
-            const indexFile = subdirFiles.find((f: string) => 
-              f.toLowerCase() === 'index.html' || f.toLowerCase() === 'index.htm'
-            )
-            if (indexFile) {
-              return path.join(subdirPath, indexFile)
+          const walk = (currentDir: string) => {
+            const entries = fs.readdirSync(currentDir)
+            for (const entry of entries) {
+              // Skip __MACOSX metadata folders
+              if (entry === '__MACOSX' || entry.startsWith('.')) continue
+              const fullPath = path.join(currentDir, entry)
+              try {
+                const stat = fs.statSync(fullPath)
+                if (stat.isDirectory()) {
+                  walk(fullPath)
+                } else if (entry.toLowerCase().endsWith('.html') || entry.toLowerCase().endsWith('.htm')) {
+                  allHtmlFiles.push(fullPath)
+                }
+              } catch { /* skip inaccessible */ }
             }
           }
+          walk(dir)
           
-          // Then look for index files in root directory
-          const indexFiles = files.filter((file: string) => 
-            file.toLowerCase() === 'index.html' || 
-            file.toLowerCase() === 'index.htm'
+          if (allHtmlFiles.length === 0) return null
+          
+          // Priority: index.html anywhere > any .html
+          return (
+            allHtmlFiles.find(f => path.basename(f).toLowerCase() === 'index.html') ??
+            allHtmlFiles.find(f => path.basename(f).toLowerCase() === 'index.htm') ??
+            allHtmlFiles[0]
           )
-          
-          if (indexFiles.length > 0) {
-            return path.join(dir, indexFiles[0])
-          }
-          
-          // Look for any HTML file in subdirectories
-          for (const subdir of subdirs) {
-            const subdirPath = path.join(dir, subdir)
-            const subdirFiles = fs.readdirSync(subdirPath)
-            const htmlFile = subdirFiles.find((f: string) => 
-              f.toLowerCase().endsWith('.html') || f.toLowerCase().endsWith('.htm')
-            )
-            if (htmlFile) {
-              return path.join(subdirPath, htmlFile)
-            }
-          }
-          
-          // Finally, look for any HTML file in root
-          const htmlFiles = files.filter((file: string) => 
-            file.toLowerCase().endsWith('.html') || 
-            file.toLowerCase().endsWith('.htm')
-          )
-          
-          if (htmlFiles.length > 0) {
-            return path.join(dir, htmlFiles[0])
-          }
-          
-          return null
         }
         
         const indexFile = findIndexFile(uploadDir)
@@ -573,6 +524,13 @@ export async function POST(
           })
           
           console.log(`Content processed successfully. Launch file: ${launchFile}`)
+          contentEventBus.emitStatusChange({
+            contentId: content.id,
+            projectId: pId,
+            moduleId: mId,
+            status: "COMPLETED",
+            progress: 100,
+          })
         } else {
           // No index file found, mark as failed
           await tx.contentData.update({
@@ -582,22 +540,36 @@ export async function POST(
               progress: 0
             } as any
           })
+          contentEventBus.emitStatusChange({
+            contentId: content.id,
+            projectId: pId,
+            moduleId: mId,
+            status: "FAILED",
+          })
         }
         }) // End transaction
       } catch (error) {
         console.error("Error processing content:", error)
+        const errMsg = error instanceof Error ? error.message : String(error)
         // If transaction fails, update status outside transaction
         try {
           await prisma.contentData.update({
             where: { id: content.id },
             data: {
               status: "FAILED" as any,
-              progress: 0
+              progress: 0,
+              description: { error: errMsg } as any
             } as any
           })
         } catch (updateError) {
           console.error("Failed to update status to FAILED:", updateError)
         }
+        contentEventBus.emitStatusChange({
+          contentId: content.id,
+          projectId: pId,
+          moduleId: mId,
+          status: "FAILED",
+        })
       }
     }, 2000)
     

@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { AlertTriangle } from "lucide-react"
+import { Trash2 } from "lucide-react"
 import type { ContentItem } from "@/components/content/table"
 
 interface SoftDeleteDialogProps {
@@ -20,42 +20,45 @@ export function SoftDeleteDialog({
 }: SoftDeleteDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-md bg-white">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-yellow-500" />
-            Xóa mềm nội dung?
-          </DialogTitle>
-          <DialogDescription className="space-y-3 pt-2">
-            <p>
-              Bạn có chắc chắn muốn chuyển nội dung <span className="font-semibold text-foreground">"{content?.title}"</span> vào thùng rác?
-            </p>
-            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-              <p className="text-sm text-blue-700 dark:text-blue-400">
-                ℹ️ Nội dung sẽ được lưu trữ trong thùng rác và có thể khôi phục sau này.
-              </p>
+          <DialogTitle className="flex items-center gap-2 text-slate-900">
+            <div className="flex items-center justify-center h-9 w-9 rounded-full bg-amber-100">
+              <Trash2 className="h-4.5 w-4.5 text-amber-600" />
             </div>
+            Chuyển vào thùng rác?
+          </DialogTitle>
+          <DialogDescription className="pt-3 text-slate-600">
+            Bạn có chắc chắn muốn chuyển nội dung{" "}
+            <span className="font-semibold text-slate-900">"{content?.title}"</span>{" "}
+            vào thùng rác?
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="gap-2 sm:gap-0">
+
+        <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mt-1">
+          <p className="text-sm text-blue-700 dark:text-blue-400 flex items-start gap-2">
+            <span className="shrink-0">ℹ️</span>
+            <span>Nội dung sẽ được lưu trữ trong thùng rác và có thể khôi phục sau này.</span>
+          </p>
+        </div>
+
+        <DialogFooter className="gap-2 pt-2">
           <Button
-            variant="outline"
+            variant="ghost"
             onClick={() => onOpenChange(false)}
             disabled={isDeleting}
           >
             Hủy
           </Button>
           <Button
-            variant="default"
             onClick={onConfirm}
             disabled={isDeleting}
-            className="bg-yellow-600 hover:bg-yellow-700"
+            className="bg-amber-600 hover:bg-amber-700 text-white"
           >
-            {isDeleting ? "Đang xóa..." : "Xóa mềm"}
+            {isDeleting ? "Đang xóa..." : "Chuyển vào thùng rác"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   )
 }
-

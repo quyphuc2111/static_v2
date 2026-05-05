@@ -3,16 +3,37 @@
 import { useState, useEffect, useMemo } from "react"
 import { useProjects } from "@/modules/project/hooks/useProjects"
 import { debounce } from "lodash"
-import { DataTable, Project } from "./table"
-import { FolderOpen } from "lucide-react"
+import { ProjectCard } from "./project-card"
+import { FolderKanban, Plus } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface ProjectListProps {
   searchQuery: string
   showDeleted?: boolean
 }
 
+function ProjectCardSkeleton() {
+  return (
+    <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+      <div className="flex justify-between items-start">
+        <Skeleton className="h-9 w-9 rounded-lg" />
+        <Skeleton className="h-5 w-16 rounded" />
+      </div>
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-3 w-2/3" />
+      </div>
+      <div className="flex justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
+        <Skeleton className="h-5 w-20 rounded-md" />
+        <Skeleton className="h-4 w-16" />
+      </div>
+    </div>
+  )
+}
+
 export function ProjectList({ searchQuery, showDeleted = false }: ProjectListProps) {
-  const { projects, isLoading, deleteProject } = useProjects({ includeDeleted: true })
+  const { projects, isLoading } = useProjects({ includeDeleted: true })
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery)
 
   const debouncedSetSearchQuery = useMemo(
@@ -31,7 +52,6 @@ export function ProjectList({ searchQuery, showDeleted = false }: ProjectListPro
 
   const filteredProjects = useMemo(() => {
     if (!projects) return []
-    
     return projects
       .filter((project) => showDeleted ? project.isDeleted : !project.isDeleted)
       .filter(
@@ -41,51 +61,43 @@ export function ProjectList({ searchQuery, showDeleted = false }: ProjectListPro
       )
   }, [projects, debouncedSearchQuery, showDeleted])
 
-  const handleDeleteProject = async (projectId: string) => {
-    await deleteProject(projectId)
-  }
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-8 px-6">
-        <p className="text-muted-foreground">Đang tải...</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <ProjectCardSkeleton key={i} />
+        ))}
       </div>
     )
   }
 
   if (filteredProjects.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 px-6 text-center ">
-        <div className="rounded-full bg-muted p-4 mb-4">
-          <FolderOpen className="h-8 w-8 text-muted-foreground" />
-        </div>
-        <h3 className="text-lg font-semibold mb-1">
+      <div className="col-span-full flex flex-col items-center justify-center p-12 text-center border rounded-xl border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50">
+        <FolderKanban className="h-10 w-10 text-slate-300 dark:text-slate-600 mb-4" />
+        <span className="text-sm font-semibold text-slate-900 dark:text-white">
           {showDeleted ? "Không có dự án đã xóa" : "Không có dự án"}
-        </h3>
-        <p className="text-sm text-muted-foreground max-w-md">
-          {showDeleted 
+        </span>
+        <p className="text-slate-500 dark:text-slate-400 mt-1 max-w-sm text-xs">
+          {showDeleted
             ? "Chưa có dự án nào bị xóa. Các dự án đã xóa mềm sẽ hiển thị ở đây."
-            : searchQuery 
+            : searchQuery
               ? "Không tìm thấy dự án phù hợp với tìm kiếm của bạn."
-              : "Bắt đầu bằng cách tạo dự án mới để quản lý tài liệu."
-          }
+              : "Bắt đầu bằng cách tạo dự án mới để quản lý tài liệu."}
         </p>
       </div>
     )
   }
 
   return (
-    <div className="w-[calc(100vw-40px)] md:w-full">
-      <div className="flex md:hidden items-center justify-center text-xs text-muted-foreground py-2 bg-muted/30 border-b">
-        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-        </svg>
-        Vuốt sang để xem thêm
-      </div>
-      <DataTable 
-        data={filteredProjects as Project[]} 
-        onDelete={handleDeleteProject}
-      />
+    <div className="py-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 flex-1 min-h-0 overflow-y-auto pr-2 pb-4 content-start">
+      {filteredProjects.map((project) => (
+        <ProjectCard
+          key={project.id}
+          project={project as any}
+        />
+      ))}
     </div>
   )
 }

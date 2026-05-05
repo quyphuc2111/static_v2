@@ -15,6 +15,7 @@ export const Permissions = {
     VIEW_DELETED_ALL: PermissionName.VIEW_DELETED_ALL_CONTENT,
     VIEW_DELETED_OWN: PermissionName.VIEW_DELETED_OWN_CONTENT,
     RESTORE: PermissionName.RESTORE_CONTENT,
+    SHARE: PermissionName.SHARE_CONTENT_ACCESS
   },
 
   // Content Scope

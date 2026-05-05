@@ -20,7 +20,7 @@ interface DeleteModuleDialogProps {
 }
 
 export function DeleteModuleDialog({ open, onOpenChange, projectId, module }: DeleteModuleDialogProps) {
-  const deleteMutation = useDeleteModule()
+  const deleteMutation = useDeleteModule(projectId || "")
   const contentCount = module?._count?.content || 0
 
   const handleDelete = async () => {

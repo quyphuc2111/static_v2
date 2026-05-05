@@ -4,6 +4,8 @@ import { getSession } from "@/lib/session"
 import { PermissionName } from "@prisma/client"
 import { hasAnyPermission } from "@/lib/permissions"
 import { logContentAction } from "@/lib/audit"
+import { rm } from "fs/promises"
+import { join } from "path"
 
 interface Params {
   params: Promise<{
@@ -58,7 +60,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         id: { in: numericIds as any },
         moduleId: mId as any
       },
-      select: { id: true, title: true }
+      select: { id: true, title: true, contentUrl: true }
     })
 
     if (existingContent.length !== contentIds.length) {
@@ -104,6 +106,19 @@ export async function POST(req: NextRequest, { params }: Params) {
             moduleId: mId as any
           }
         })
+
+        // Remove physical files + version archives
+        for (const item of existingContent) {
+          try {
+            if (item.contentUrl) {
+              const contentDir = join(process.cwd(), 'public', item.contentUrl)
+              await rm(contentDir, { recursive: true, force: true })
+              const versionsDir = join(contentDir, '..', `_versions_${item.id}`)
+              await rm(versionsDir, { recursive: true, force: true })
+            }
+          } catch { /* ignore file errors */ }
+        }
+
         return deleteResult
       } else {
         // Non-admin: soft delete only

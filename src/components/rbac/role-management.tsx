@@ -319,23 +319,23 @@ export function RoleManagement() {
                     </div>
                   </div>
                   <PermissionGuard permission="MANAGE_USER_PERMISSIONS">
-                    <DropdownMenu>
+                    <DropdownMenu modal={false}>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEditRole(role)}>
+                        <DropdownMenuItem onSelect={() => setTimeout(() => handleEditRole(role), 0)}>
                           <Edit className="h-4 w-4 mr-2" />
                           Chỉnh sửa
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleCloneRole(role.id.toString())}>
+                        <DropdownMenuItem onSelect={() => setTimeout(() => handleCloneRole(role.id.toString()), 0)}>
                           <Copy className="h-4 w-4 mr-2" />
                           Nhân bản
                         </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => handleToggleStatus(role.id.toString())}
+                        <DropdownMenuItem
+                          onSelect={() => setTimeout(() => handleToggleStatus(role.id.toString()), 0)}
                           disabled={isSystem}
                         >
                           {role.isActive ? (
@@ -351,10 +351,10 @@ export function RoleManagement() {
                           )}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem 
-                          className="text-red-600" 
+                        <DropdownMenuItem
+                          className="text-red-600"
                           disabled={isSystem}
-                          onClick={() => handleDeleteRole(role.id.toString())}
+                          onSelect={() => setTimeout(() => handleDeleteRole(role.id.toString()), 0)}
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
                           Xóa vai trò

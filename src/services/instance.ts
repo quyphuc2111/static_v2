@@ -35,8 +35,19 @@ axiosInstance.interceptors.response.use(
     const originalRequest = error.config;
     const status = error.response?.status;
     const errorMessage = error.response?.data?.errors;
+    const serverMessage = error.response?.data?.message;
     const isOptionalAuth =
       originalRequest.headers?.["X-Optional-Auth"] === "true";
+
+    // Tài khoản bị vô hiệu hoá → redirect login ngay lập tức
+    if (status === 401 && serverMessage === "ACCOUNT_DISABLED") {
+      storageService.remove("access_token");
+      storageService.remove("refresh_token");
+      if (typeof window !== "undefined") {
+        window.location.href = "/login?reason=disabled";
+      }
+      return Promise.reject(error);
+    }
 
     // Kiểm tra nếu là lỗi token hết hạn
     if (
