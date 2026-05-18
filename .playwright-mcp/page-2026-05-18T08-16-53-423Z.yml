@@ -1,0 +1,193 @@
+- generic [active] [ref=e1]:
+  - region "Notifications Alt+T"
+  - button "Open Next.js Dev Tools" [ref=e173] [cursor=pointer]:
+    - img [ref=e174]
+  - alert [ref=e177]: STATIC SERVER
+  - generic [ref=e196]:
+    - generic [ref=e198]:
+      - generic [ref=e200]:
+        - generic [ref=e201]:
+          - generic [ref=e202]: SC
+          - heading "Static Server" [level=1] [ref=e203]
+        - button [ref=e204]:
+          - img
+      - navigation [ref=e205]:
+        - link "Dashboard" [ref=e206] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e207]
+          - generic [ref=e212]: Dashboard
+        - link "Quản lý Dự án" [ref=e213] [cursor=pointer]:
+          - /url: /project
+          - img [ref=e214]
+          - generic [ref=e217]: Quản lý Dự án
+        - link "Quản lý Người dùng" [ref=e218] [cursor=pointer]:
+          - /url: /users
+          - img [ref=e219]
+          - generic [ref=e224]: Quản lý Người dùng
+        - link "Quản lý Quyền hạn" [ref=e225] [cursor=pointer]:
+          - /url: /rbac
+          - img [ref=e226]
+          - generic [ref=e228]: Quản lý Quyền hạn
+      - generic [ref=e229]:
+        - generic [ref=e230]:
+          - img [ref=e232]
+          - generic [ref=e233]:
+            - paragraph [ref=e234]: admin@example.com
+            - paragraph [ref=e235]: ADMINISTRATOR
+        - button "Đăng xuất" [ref=e236]:
+          - img
+          - generic [ref=e237]: Đăng xuất
+    - heading [level=2]
+    - generic [ref=e238]:
+      - banner [ref=e239]:
+        - navigation [ref=e241]:
+          - generic [ref=e242]: Home
+          - generic [ref=e243]: /
+          - generic [ref=e244]: Quản lý Dự án
+        - generic [ref=e245]:
+          - button "Chuyển đổi giao diện" [ref=e246]:
+            - img
+          - generic [ref=e247]:
+            - generic [ref=e248]:
+              - generic [ref=e249]: Nguyễn Văn Admin
+              - generic [ref=e250]: ADMINISTRATOR
+            - img [ref=e252]
+      - main [ref=e253]:
+        - generic [ref=e317]:
+          - generic [ref=e319]:
+            - link [ref=e320] [cursor=pointer]:
+              - /url: /project
+              - img
+            - generic [ref=e321]:
+              - heading "Dự án" [level=2] [ref=e323]
+              - paragraph [ref=e324]: Quản lý modules và tải lên nội dung web tĩnh hoặc gói SCORM.
+          - generic [ref=e325]:
+            - generic [ref=e326]:
+              - generic [ref=e327]:
+                - generic [ref=e328]:
+                  - heading "Modules" [level=3] [ref=e329]
+                  - button [ref=e330]:
+                    - img
+                - generic [ref=e331]:
+                  - generic [ref=e332]:
+                    - img [ref=e333]
+                    - textbox "Tìm module..." [ref=e336]
+                  - button [ref=e337]:
+                    - img
+              - generic [ref=e338]:
+                - button "Tạo ra một Module vipproTạo ra một Module vippro" [ref=e340]:
+                  - generic [ref=e341]:
+                    - img [ref=e342]
+                    - generic [ref=e344]: Tạo ra một Module vipproTạo ra một Module vippro
+                  - img [ref=e346]
+                - button "Module Này Đỉnh Vl" [ref=e351]:
+                  - generic [ref=e352]:
+                    - img [ref=e353]
+                    - generic [ref=e355]: Module Này Đỉnh Vl
+                  - img [ref=e357]
+                - button "qwfqwfdsfdsaf" [ref=e362]:
+                  - generic [ref=e363]:
+                    - img [ref=e364]
+                    - generic [ref=e366]: qwfqwfdsfdsaf
+                  - img [ref=e368]
+                - button "ádfwqfqfq" [ref=e373]:
+                  - generic [ref=e374]:
+                    - img [ref=e375]
+                    - generic [ref=e377]: ádfwqfqfq
+                  - img [ref=e379]
+                - button "ádfasdfasdf" [ref=e384]:
+                  - generic [ref=e385]:
+                    - img [ref=e386]
+                    - generic [ref=e388]: ádfasdfasdf
+                  - img [ref=e390]
+                - button "ádfasdfasdvasdvasd" [ref=e395]:
+                  - generic [ref=e396]:
+                    - img [ref=e397]
+                    - generic [ref=e399]: ádfasdfasdvasdvasd
+                  - img [ref=e401]
+                - button "ádfasdvas" [ref=e406]:
+                  - generic [ref=e407]:
+                    - img [ref=e408]
+                    - generic [ref=e410]: ádfasdvas
+                  - img [ref=e412]
+                - button "sadfasvasdv" [ref=e417]:
+                  - generic [ref=e418]:
+                    - img [ref=e419]
+                    - generic [ref=e421]: sadfasvasdv
+                  - img [ref=e423]
+                - button "ádfasdfasdfasdf" [ref=e428]:
+                  - generic [ref=e429]:
+                    - img [ref=e430]
+                    - generic [ref=e432]: ádfasdfasdfasdf
+                  - img [ref=e434]
+                - button "12321ff12f12f" [ref=e439]:
+                  - generic [ref=e440]:
+                    - img [ref=e441]
+                    - generic [ref=e443]: 12321ff12f12f
+                  - img [ref=e445]
+                - button "12312f12ff12f12f" [ref=e450]:
+                  - generic [ref=e451]:
+                    - img [ref=e452]
+                    - generic [ref=e454]: 12312f12ff12f12f
+                  - img [ref=e456]
+                - button "12312f12f" [ref=e461]:
+                  - generic [ref=e462]:
+                    - img [ref=e463]
+                    - generic [ref=e465]: 12312f12f
+                  - img [ref=e467]
+                - button "1231212f" [ref=e472]:
+                  - generic [ref=e473]:
+                    - img [ref=e474]
+                    - generic [ref=e476]: 1231212f
+                  - img [ref=e478]
+                - button "123123123" [ref=e483]:
+                  - generic [ref=e484]:
+                    - img [ref=e485]
+                    - generic [ref=e487]: "123123123"
+                  - img [ref=e489]
+                - 'button "Tuần 2: Dự án Baby Shark Doo Doo Doo" [ref=e494]':
+                  - generic [ref=e495]:
+                    - img [ref=e496]
+                    - generic [ref=e498]: "Tuần 2: Dự án Baby Shark Doo Doo Doo"
+                  - img [ref=e500]
+                - 'button "Tuần 1 : Dự án BabyShark" [ref=e505]':
+                  - generic [ref=e506]:
+                    - img [ref=e507]
+                    - generic [ref=e509]: "Tuần 1 : Dự án BabyShark"
+                  - img [ref=e511]
+            - generic [ref=e515]:
+              - generic [ref=e516]:
+                - generic [ref=e517]:
+                  - generic [ref=e518]:
+                    - heading "Tạo ra một Module vipproTạo ra một Module vippro" [level=3] [ref=e519]
+                    - paragraph [ref=e520]: 0 gói nội dung
+                  - generic [ref=e521]:
+                    - generic [ref=e522]:
+                      - img [ref=e523]
+                      - textbox "Tìm nội dung..." [ref=e526]
+                    - button "Chia sẻ" [ref=e527]:
+                      - img
+                      - text: Chia sẻ
+                    - button "Tải lên" [ref=e528]:
+                      - img
+                      - text: Tải lên
+                - tablist [ref=e530]:
+                  - tab "Nội dung" [selected] [ref=e531]:
+                    - img [ref=e532]
+                    - text: Nội dung
+                  - tab "Thùng rác" [ref=e535]:
+                    - img [ref=e536]
+                    - text: Thùng rác
+              - table [ref=e541]:
+                - rowgroup [ref=e542]:
+                  - row "Tiêu đề Mô tả Loại Kích thước Trạng thái Người tạo Thao tác" [ref=e543]:
+                    - columnheader "Tiêu đề" [ref=e544]
+                    - columnheader "Mô tả" [ref=e545]
+                    - columnheader "Loại" [ref=e546]
+                    - columnheader "Kích thước" [ref=e547]
+                    - columnheader "Trạng thái" [ref=e548]
+                    - columnheader "Người tạo" [ref=e549]
+                    - columnheader "Thao tác" [ref=e550]
+                - rowgroup [ref=e551]:
+                  - row "Chưa có nội dung nào trong module này." [ref=e552]:
+                    - cell "Chưa có nội dung nào trong module này." [ref=e553]

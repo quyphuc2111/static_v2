@@ -124,6 +124,7 @@ export interface ShareModulePayload {
 
 export interface UpdateModuleSharePayload {
   id: number
+  moduleId: number
   permission: "VIEW" | "DOWNLOAD" | "EDIT"
 }
 

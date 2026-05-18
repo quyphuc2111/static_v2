@@ -7,12 +7,14 @@
     "build": "next build && node scripts/copyFiles.js",
     "start": "next start",
     "lint": "next lint",
+    "setup": "node scripts/dev-setup.js",
     "db:up": "docker compose up -d mysql",
     "db:down": "docker compose down",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:push": "prisma db push",
-    "prisma:studio": "prisma studio",
+    "db:reset": "docker compose down -v && docker compose up -d mysql",
+    "prisma:generate": "npx prisma generate",
+    "prisma:migrate": "npx prisma migrate dev",
+    "prisma:push": "npx prisma db push",
+    "prisma:studio": "npx prisma studio",
     "prisma:seed": "node scripts/seed-rbac.js && node scripts/seed-test-users.js"
   },
   "dependencies": {

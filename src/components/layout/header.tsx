@@ -72,7 +72,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             </div>
           </div>
           <Avatar className="h-9 w-9 border border-slate-200">
-            <AvatarImage src={`https://api.dicebear.com/7.x/notionists/svg?seed=${me?.name || me?.email || "User"}`} />
+            <AvatarImage src={`https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(me?.name || me?.email || "User")}`} />
             <AvatarFallback>{(me?.name || me?.email || "U").slice(0, 2).toUpperCase()}</AvatarFallback>
           </Avatar>
         </div>

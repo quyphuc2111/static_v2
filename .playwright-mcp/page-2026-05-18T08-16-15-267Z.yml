@@ -1,0 +1,108 @@
+- generic [active] [ref=e1]:
+  - region "Notifications Alt+T"
+  - button "Open Next.js Dev Tools" [ref=e173] [cursor=pointer]:
+    - img [ref=e174]
+  - alert [ref=e177]
+  - generic [ref=e196]:
+    - generic [ref=e198]:
+      - generic [ref=e200]:
+        - generic [ref=e201]:
+          - generic [ref=e202]: SC
+          - heading "Static Server" [level=1] [ref=e203]
+        - button [ref=e204]:
+          - img
+      - navigation [ref=e205]:
+        - link "Dashboard" [ref=e206] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e207]
+          - generic [ref=e212]: Dashboard
+        - link "Quản lý Dự án" [ref=e213] [cursor=pointer]:
+          - /url: /project
+          - img [ref=e214]
+          - generic [ref=e217]: Quản lý Dự án
+        - link "Quản lý Người dùng" [ref=e218] [cursor=pointer]:
+          - /url: /users
+          - img [ref=e219]
+          - generic [ref=e224]: Quản lý Người dùng
+        - link "Quản lý Quyền hạn" [ref=e225] [cursor=pointer]:
+          - /url: /rbac
+          - img [ref=e226]
+          - generic [ref=e228]: Quản lý Quyền hạn
+      - generic [ref=e229]:
+        - generic [ref=e230]:
+          - img [ref=e232]
+          - generic [ref=e233]:
+            - paragraph [ref=e234]: admin@example.com
+            - paragraph [ref=e235]: ADMINISTRATOR
+        - button "Đăng xuất" [ref=e236]:
+          - img
+          - generic [ref=e237]: Đăng xuất
+    - heading [level=2]
+    - generic [ref=e238]:
+      - banner [ref=e239]:
+        - navigation [ref=e241]:
+          - generic [ref=e242]: Home
+          - generic [ref=e243]: /
+          - generic [ref=e244]: Quản lý Dự án
+        - generic [ref=e245]:
+          - button "Chuyển đổi giao diện" [ref=e246]:
+            - img
+          - generic [ref=e247]:
+            - generic [ref=e248]:
+              - generic [ref=e249]: Nguyễn Văn Admin
+              - generic [ref=e250]: ADMINISTRATOR
+            - img [ref=e252]
+      - main [ref=e253]:
+        - generic [ref=e255]:
+          - generic [ref=e256]:
+            - generic [ref=e257]:
+              - heading "Dự án" [level=2] [ref=e258]
+              - paragraph [ref=e259]: Quản lý tất cả dự án và module. 2 dự án đang hoạt động.
+            - button "Tạo Dự án Mới" [ref=e260]:
+              - img
+              - text: Tạo Dự án Mới
+          - generic [ref=e261]:
+            - tablist [ref=e263]:
+              - tab "Đang hoạt động 2" [selected] [ref=e264]:
+                - text: Đang hoạt động
+                - generic [ref=e265]: "2"
+              - tab "Đã xóa 1" [ref=e266]:
+                - img [ref=e267]
+                - text: Đã xóa
+                - generic [ref=e270]: "1"
+            - generic [ref=e271]:
+              - img [ref=e272]
+              - searchbox "Tìm kiếm dự án..." [ref=e275]
+          - generic [ref=e276]:
+            - generic [ref=e277] [cursor=pointer]:
+              - generic [ref=e278]:
+                - img [ref=e280]
+                - generic [ref=e282]:
+                  - generic [ref=e283]: Hoạt động
+                  - button [ref=e284]:
+                    - img
+              - heading "11" [level=3] [ref=e285]
+              - paragraph [ref=e286]: Chưa có mô tả
+              - generic [ref=e287]:
+                - generic [ref=e288]:
+                  - img [ref=e289]
+                  - text: 1 Module
+                - generic [ref=e293]:
+                  - img [ref=e294]
+                  - text: 05/05/2026
+            - generic [ref=e297] [cursor=pointer]:
+              - generic [ref=e298]:
+                - img [ref=e300]
+                - generic [ref=e302]:
+                  - generic [ref=e303]: Hoạt động
+                  - button [ref=e304]:
+                    - img
+              - heading "Dự án mới" [level=3] [ref=e305]
+              - paragraph [ref=e306]: Chưa có mô tả
+              - generic [ref=e307]:
+                - generic [ref=e308]:
+                  - img [ref=e309]
+                  - text: 16 Module
+                - generic [ref=e313]:
+                  - img [ref=e314]
+                  - text: 25/04/2026

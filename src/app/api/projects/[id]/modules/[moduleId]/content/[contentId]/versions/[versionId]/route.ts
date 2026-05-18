@@ -44,11 +44,22 @@ export async function DELETE(
       return NextResponse.json({ error: "Version not found" }, { status: 404 })
     }
 
-    // Delete the archive zip file from disk
+    // Delete DB record first to avoid leaving a record pointing to a missing file
+    await (prisma as any).contentVersion.delete({
+      where: { id: vId }
+    })
+
+    // Then delete the archive zip file from disk
     if (version.contentUrl) {
       const uploadsDir = join(process.cwd(), "public", "uploads")
-      const zipPath = join(uploadsDir, version.contentUrl.replace('/uploads/', ''))
-      if (existsSync(zipPath)) {
+      const contentUrlSegment = version.contentUrl.replace('/uploads/', '')
+      const zipPath = join(uploadsDir, contentUrlSegment)
+      // Path traversal protection: ensure resolved path is within uploadsDir
+      const resolvedZip = require("path").resolve(zipPath)
+      const resolvedUploads = require("path").resolve(uploadsDir)
+      if (!resolvedZip.startsWith(resolvedUploads + "/") && resolvedZip !== resolvedUploads) {
+        console.warn(`[delete-version] Path traversal attempt blocked: ${version.contentUrl}`)
+      } else if (existsSync(zipPath)) {
         try {
           await unlink(zipPath)
         } catch (err) {
@@ -56,11 +67,6 @@ export async function DELETE(
         }
       }
     }
-
-    // Delete DB record
-    await (prisma as any).contentVersion.delete({
-      where: { id: vId }
-    })
 
     // Audit log
     logContentAction(session.user.id, 'version_deleted', String(cId), {

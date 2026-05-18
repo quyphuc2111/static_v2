@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useRef, useEffect } from "react"
 import httpService from "@/services/instance"
 import { toast } from "react-toastify"
 import cachedKeys from "@/constants/cachedKeys"
@@ -9,9 +10,9 @@ interface UpdateContentFilePayload {
 }
 
 async function updateContentFile(
-  projectId: string, 
-  moduleId: string, 
-  contentId: string, 
+  projectId: string,
+  moduleId: string,
+  contentId: string,
   payload: UpdateContentFilePayload
 ) {
   if (!payload.file) throw new Error("Không có file được chọn")
@@ -23,7 +24,7 @@ async function updateContentFile(
   formData.append("contentType", payload.contentType)
   formData.append("file", payload.file)
 
-  return httpService.post<{ message: string; contentId: string }>({ 
+  return httpService.post<{ message: string; contentId: string }>({
     url: `projects/${projectId}/modules/${moduleId}/content/${contentId}/update-file`,
     data: formData,
     headers: { 'Content-Type': 'multipart/form-data' }
@@ -32,19 +33,37 @@ async function updateContentFile(
 
 export function useUpdateContentFile(projectId: string, moduleId: string) {
   const queryClient = useQueryClient()
+  const timeoutsRef = useRef<NodeJS.Timeout[]>([])
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      timeoutsRef.current.forEach(id => clearTimeout(id))
+      timeoutsRef.current = []
+    }
+  }, [])
 
   return useMutation({
     mutationFn: ({ contentId, payload }: { contentId: string; payload: UpdateContentFilePayload }) =>
       updateContentFile(projectId, moduleId, contentId, payload),
     onSuccess: async () => {
       toast.success("Đang xử lý file...")
-      await queryClient.invalidateQueries({ 
-        queryKey: cachedKeys.content.list(projectId, moduleId) 
+      await queryClient.invalidateQueries({
+        queryKey: cachedKeys.content.list(projectId, moduleId)
       })
-      await queryClient.invalidateQueries({ 
-        queryKey: cachedKeys.content.stats(projectId) 
+      await queryClient.invalidateQueries({
+        queryKey: cachedKeys.content.stats(projectId)
       })
-      // SSE will handle real-time status updates — no polling needed
+      // Background processing takes 2-10s. Schedule delayed re-invalidations
+      // to catch when processing completes (polling hook handles long-running cases)
+      const delays = [3000, 6000, 10000]
+      delays.forEach(delay => {
+        const id = setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: cachedKeys.content.list(projectId, moduleId) })
+          queryClient.invalidateQueries({ queryKey: cachedKeys.content.stats(projectId) })
+        }, delay)
+        timeoutsRef.current.push(id)
+      })
     },
     onError: (error: any) => {
       console.error("Update content file error:", error)

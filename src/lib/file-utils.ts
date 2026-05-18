@@ -1,15 +1,124 @@
 /**
  * Shared file utility functions for content management routes.
- * Centralizes ZIP handling, file streaming, and path sanitization.
+ * Centralizes ZIP handling, file streaming, path sanitization, and validation.
  */
 
 import { mkdir, unlink } from "fs/promises"
-import { join, dirname } from "path"
+import { join, dirname, sep } from "path"
 import { createWriteStream } from "fs"
 import { pipeline } from "stream/promises"
 import { Readable } from "stream"
 import yauzl from "yauzl"
 import archiver from "archiver"
+
+// ─── File Validation ────────────────────────────────────────────────────────
+
+export interface FileValidationError {
+  error: string
+  code: 'NO_FILE' | 'EMPTY_FILE' | 'FILE_TOO_LARGE' | 'INVALID_EXTENSION' | 'INVALID_CONTENT_TYPE'
+}
+
+export interface FileValidationOptions {
+  maxSizeBytes?: number
+  allowedExtensions?: string[]
+  allowedContentTypes?: string[]
+}
+
+const DEFAULT_MAX_SIZE = 1000 * 1024 * 1024 // 1000MB
+
+/**
+ * Validate an uploaded file. Returns null if valid, or an error object.
+ * Reusable across all upload/update routes.
+ */
+export function validateUploadedFile(
+  file: File | null | undefined,
+  options: FileValidationOptions = {}
+): FileValidationError | null {
+  const {
+    maxSizeBytes = DEFAULT_MAX_SIZE,
+    allowedExtensions = ['.zip'],
+    allowedContentTypes,
+  } = options
+
+  if (!file) {
+    return { error: "Không có file được chọn", code: 'NO_FILE' }
+  }
+  if (file.size === 0) {
+    return { error: "File rỗng, vui lòng chọn file khác", code: 'EMPTY_FILE' }
+  }
+  if (file.size > maxSizeBytes) {
+    const maxMB = Math.round(maxSizeBytes / (1024 * 1024))
+    return { error: `File quá lớn (tối đa ${maxMB}MB, file hiện tại ${Math.round(file.size / (1024 * 1024))}MB)`, code: 'FILE_TOO_LARGE' }
+  }
+  if (allowedExtensions.length > 0) {
+    const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+    if (!allowedExtensions.includes(ext)) {
+      return { error: `Chỉ chấp nhận file ${allowedExtensions.join(', ')}. File "${file.name}" không hợp lệ.`, code: 'INVALID_EXTENSION' }
+    }
+  }
+  if (allowedContentTypes && allowedContentTypes.length > 0) {
+    if (!allowedContentTypes.includes(file.type)) {
+      return { error: `Loại file không hợp lệ: ${file.type}`, code: 'INVALID_CONTENT_TYPE' }
+    }
+  }
+  return null
+}
+
+/**
+ * Sanitize a filename for safe use in file system paths.
+ * Handles spaces, Vietnamese characters, and special characters.
+ * Preserves the file extension.
+ */
+export function sanitizeFileName(fileName: string): string {
+  // Split extension
+  const lastDot = fileName.lastIndexOf('.')
+  const name = lastDot > 0 ? fileName.slice(0, lastDot) : fileName
+  const ext = lastDot > 0 ? fileName.slice(lastDot) : ''
+
+  const sanitized = name
+    // Normalize unicode (decompose Vietnamese diacritics)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    // Replace đ/Đ
+    .replace(/[đĐ]/g, 'd')
+    // Replace spaces and common separators with underscore
+    .replace(/[\s\-]+/g, '_')
+    // Remove any remaining special characters (keep alphanumeric, underscore, dot)
+    .replace(/[^a-zA-Z0-9_]/g, '')
+    // Collapse multiple underscores
+    .replace(/_+/g, '_')
+    // Trim underscores from start/end
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase()
+
+  // Fallback if name becomes empty after sanitization
+  return (sanitized || 'file') + ext.toLowerCase()
+}
+
+/**
+ * Convert a file system path to use forward slashes (POSIX style).
+ * Critical for cross-platform compatibility — Windows uses backslashes
+ * but URLs and stored paths must always use forward slashes.
+ */
+export function toPosixPath(fsPath: string): string {
+  return fsPath.split(sep).join('/')
+}
+
+/**
+ * Get the relative path from a base directory, always using forward slashes.
+ * Replaces patterns like: filePath.replace(baseDir + '/', '')
+ */
+export function relativePosixPath(filePath: string, baseDir: string): string {
+  const normalizedFile = toPosixPath(filePath)
+  const normalizedBase = toPosixPath(baseDir)
+  if (normalizedFile.startsWith(normalizedBase + '/')) {
+    return normalizedFile.slice(normalizedBase.length + 1)
+  }
+  if (normalizedFile.startsWith(normalizedBase)) {
+    return normalizedFile.slice(normalizedBase.length)
+  }
+  return normalizedFile
+}
 
 /**
  * Remove Vietnamese diacritics and sanitize string for file system paths.
@@ -31,8 +140,8 @@ export function sanitizeVietnameseString(str: string): string {
 export async function streamFileToDisk(file: File, destPath: string): Promise<void> {
   const dir = dirname(destPath)
   await mkdir(dir, { recursive: true })
-  const webStream = file.stream()
-  const nodeReadable = Readable.fromWeb(webStream as any)
+  const webStream = file.stream() as unknown as import("stream/web").ReadableStream
+  const nodeReadable = Readable.fromWeb(webStream)
   const writeStream = createWriteStream(destPath)
   await pipeline(nodeReadable, writeStream)
 }

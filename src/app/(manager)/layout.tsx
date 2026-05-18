@@ -28,7 +28,7 @@ export default function ManagerPage({children}: {children: React.ReactNode}) {
       
       {/* Mobile Sheet */}
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-        <SheetTitle></SheetTitle>
+        <SheetTitle className="sr-only">Navigation menu</SheetTitle>
         <SheetContent side="left" className="w-64 p-0">
           <MobileSidebar onClose={() => setMobileMenuOpen(false)} />
         </SheetContent>

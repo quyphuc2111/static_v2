@@ -1,0 +1,21 @@
+- generic [active] [ref=e1]:
+  - region "Notifications Alt+T"
+  - button "Open Next.js Dev Tools" [ref=e173] [cursor=pointer]:
+    - img [ref=e174]
+  - alert [ref=e177]
+  - generic [ref=e179]:
+    - generic [ref=e180]:
+      - img [ref=e182]
+      - generic [ref=e184]: Chào mừng trở lại
+      - generic [ref=e185]: Đăng nhập vào hệ thống quản lý Static Content Server
+    - generic [ref=e186]:
+      - generic [ref=e187]:
+        - generic [ref=e188]:
+          - generic [ref=e189]: Tên đăng nhập hoặc Email
+          - textbox "Tên đăng nhập hoặc Email" [ref=e190]:
+            - /placeholder: admin@example.com
+        - generic [ref=e191]:
+          - generic [ref=e192]: Mật khẩu
+          - textbox "Mật khẩu" [ref=e193]:
+            - /placeholder: ••••••••
+      - button "Đăng nhập" [ref=e195]

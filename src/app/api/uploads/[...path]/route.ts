@@ -34,6 +34,16 @@ export async function GET(
 
   const abs = join(process.cwd(), "public", "uploads", rel)
 
+  // No-cache headers to prevent browsers and CDNs (Cloudflare) from caching uploaded content
+  const noCacheHeaders = (filePath: string) => ({
+    "Content-Type": contentTypeFor(filePath),
+    "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+    "CDN-Cache-Control": "no-store",
+    "Cloudflare-CDN-Cache-Control": "no-store",
+  })
+
   try {
     const stat = await fsp.stat(abs)
     if (stat.isDirectory()) {
@@ -41,7 +51,9 @@ export async function GET(
       const indexHtml = join(abs, "index.html")
       if (existsSync(indexHtml)) {
         const file = await fsp.readFile(indexHtml)
-        return new NextResponse(file as any, { headers: { "Content-Type": contentTypeFor(indexHtml) } })
+        return new NextResponse(file as any, {
+          headers: noCacheHeaders(indexHtml)
+        })
       }
 
       // Try first html in folder
@@ -49,16 +61,27 @@ export async function GET(
       const firstHtml = entries.find((f) => f.toLowerCase().endsWith(".html") || f.toLowerCase().endsWith(".htm"))
       if (firstHtml) {
         const file = await fsp.readFile(join(abs, firstHtml))
-        return new NextResponse(file as any, { headers: { "Content-Type": contentTypeFor(firstHtml) } })
+        return new NextResponse(file as any, {
+          headers: noCacheHeaders(firstHtml)
+        })
       }
 
       // Directory listing fallback
       const listing = entries.map((e) => `<li><a href="${req.nextUrl.pathname.replace(/\/$/, "")}/${e}">${e}</a></li>`).join("")
-      return new NextResponse(`<ul>${listing}</ul>`, { headers: { "Content-Type": "text/html; charset=utf-8" } })
+      return new NextResponse(`<ul>${listing}</ul>`, {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+          "Pragma": "no-cache",
+          "Expires": "0",
+        }
+      })
     }
 
     const file = await fsp.readFile(abs)
-    return new NextResponse(file as any, { headers: { "Content-Type": contentTypeFor(abs) } })
+    return new NextResponse(file as any, {
+      headers: noCacheHeaders(abs)
+    })
   } catch (e) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }

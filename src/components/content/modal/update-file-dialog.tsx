@@ -97,7 +97,14 @@ export function UpdateFileDialog({ open, onOpenChange, content, projectId, modul
       setHtmlFilesList(htmlFiles)
       
       let launchFile: string | null = null
-      if (htmlFiles.length === 1) {
+      // Prefer index.html if present
+      const indexFile = htmlFiles.find(f => {
+        const baseName = f.split('/').pop()?.toLowerCase() || ''
+        return baseName === 'index.html' || baseName === 'index.htm'
+      })
+      if (indexFile) {
+        launchFile = indexFile
+      } else if (htmlFiles.length === 1) {
         launchFile = htmlFiles[0]
       }
       

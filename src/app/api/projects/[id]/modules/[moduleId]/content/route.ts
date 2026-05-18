@@ -5,12 +5,12 @@ import { PermissionName, ShareStatus } from "@prisma/client"
 import { hasPermission as checkPermission, hasAnyPermission } from "@/lib/permissions"
 import { logContentAction } from "@/lib/audit"
 import { Prisma } from "@prisma/client"
-import { writeFile, mkdir, rm } from "fs/promises"
+import { writeFile, mkdir, rm, unlink } from "fs/promises"
 import { join } from "path"
 import { existsSync } from "fs"
 import { SCORMService } from "@/services/scormService"
 import { contentEventBus } from "@/lib/content-events"
-import { sanitizeVietnameseString, extractZipToDir, scanZipEntries } from "@/lib/file-utils"
+import { sanitizeVietnameseString, sanitizeFileName, validateUploadedFile, extractZipToDir, scanZipEntries, relativePosixPath, toPosixPath } from "@/lib/file-utils"
 
 export const maxDuration = 300 // 5 minutes
 export const dynamic = 'force-dynamic'
@@ -208,11 +208,24 @@ export async function POST(
     const contentType = formData.get("contentType") as "FILE_ZIP_HTML" | "FILE_ZIP_SCORM"
     const file = formData.get("file") as File
 
-    if (!title || !contentType || !file) {
+    if (!title || !contentType) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Thiếu thông tin bắt buộc: tiêu đề và loại nội dung" },
         { status: 400 }
       )
+    }
+
+    if (!["FILE_ZIP_HTML", "FILE_ZIP_SCORM"].includes(contentType)) {
+      return NextResponse.json(
+        { error: `Loại nội dung không hợp lệ: "${contentType}". Chỉ chấp nhận FILE_ZIP_HTML hoặc FILE_ZIP_SCORM.` },
+        { status: 400 }
+      )
+    }
+
+    // Validate file using shared utility
+    const fileError = validateUploadedFile(file)
+    if (fileError) {
+      return NextResponse.json({ error: fileError.error, code: fileError.code }, { status: 400 })
     }
 
     // Check if content with same title already exists for this owner
@@ -234,8 +247,10 @@ export async function POST(
     }
 
     // Create directory structure: <project_name>/<module_name>/<file_name + timestamp>
+    // Sanitize filename to handle spaces, Vietnamese chars, and special characters
     const timestamp = Date.now()
-    const fileNameWithoutExt = file.name.replace(/\.[^/.]+$/, "")
+    const sanitizedName = sanitizeFileName(file.name)
+    const fileNameWithoutExt = sanitizedName.replace(/\.[^/.]+$/, "")
     const extractedDirName = `${fileNameWithoutExt}_${timestamp}`
     
     const uploadDir = join(
@@ -253,8 +268,8 @@ export async function POST(
       await mkdir(uploadDir, { recursive: true })
     }
 
-    // Save ZIP file temporarily
-    const tempZipPath = join(uploadDir, file.name)
+    // Save ZIP file temporarily (use sanitized name to avoid path issues with special chars)
+    const tempZipPath = join(uploadDir, `_temp_${timestamp}.zip`)
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
     await writeFile(tempZipPath, buffer)
@@ -263,7 +278,7 @@ export async function POST(
     if (contentType === "FILE_ZIP_HTML") {
       const { htmlFiles: zipHtmlFiles } = await scanZipEntries(tempZipPath)
       if (zipHtmlFiles.length === 0) {
-        await require('fs').promises.unlink(tempZipPath)
+        await unlink(tempZipPath)
         await rm(uploadDir, { recursive: true, force: true }).catch(() => {})
         return NextResponse.json(
           { error: "File ZIP không chứa file HTML nào." },
@@ -271,7 +286,7 @@ export async function POST(
         )
       }
       if (zipHtmlFiles.length > 1) {
-        await require('fs').promises.unlink(tempZipPath)
+        await unlink(tempZipPath)
         await rm(uploadDir, { recursive: true, force: true }).catch(() => {})
         return NextResponse.json(
           { error: `File ZIP chứa ${zipHtmlFiles.length} file HTML. Chỉ được phép 1 file HTML duy nhất.`, htmlFiles: zipHtmlFiles },
@@ -352,24 +367,32 @@ export async function POST(
         const findIndexFile = (dir: string): string | null => {
           // Recursive search: collect all HTML files with their relative paths
           const allHtmlFiles: string[] = []
+          const MAX_DEPTH = 20
+          const visitedPaths = new Set<string>()
           
-          const walk = (currentDir: string) => {
+          const walk = (currentDir: string, depth: number = 0) => {
+            if (depth > MAX_DEPTH) return
             const entries = fs.readdirSync(currentDir)
             for (const entry of entries) {
               // Skip __MACOSX metadata folders
               if (entry === '__MACOSX' || entry.startsWith('.')) continue
               const fullPath = path.join(currentDir, entry)
               try {
-                const stat = fs.statSync(fullPath)
-                if (stat.isDirectory()) {
-                  walk(fullPath)
+                const lstat = fs.lstatSync(fullPath)
+                // Skip symlinks to prevent cycles
+                if (lstat.isSymbolicLink()) continue
+                if (lstat.isDirectory()) {
+                  const realPath = fs.realpathSync(fullPath)
+                  if (visitedPaths.has(realPath)) continue
+                  visitedPaths.add(realPath)
+                  walk(fullPath, depth + 1)
                 } else if (entry.toLowerCase().endsWith('.html') || entry.toLowerCase().endsWith('.htm')) {
                   allHtmlFiles.push(fullPath)
                 }
               } catch { /* skip inaccessible */ }
             }
           }
-          walk(dir)
+          walk(dir, 0)
           
           if (allHtmlFiles.length === 0) return null
           
@@ -436,14 +459,14 @@ export async function POST(
               console.warn("SCORM validation failed, falling back to HTML processing:", validation.errors)
               // Fallback to HTML processing if SCORM validation fails
               if (indexFile) {
-                launchFile = indexFile.replace(uploadDir + '/', '')
+                launchFile = relativePosixPath(indexFile, uploadDir)
               }
             }
           } catch (scormError) {
             console.warn("SCORM processing failed, falling back to HTML processing:", scormError)
             // Fallback to HTML processing if SCORM processing fails
             if (indexFile) {
-              launchFile = indexFile.replace(uploadDir + '/', '')
+              launchFile = relativePosixPath(indexFile, uploadDir)
             }
           }
         } else {
@@ -455,7 +478,7 @@ export async function POST(
           })
           
           if (indexFile) {
-            launchFile = indexFile.replace(uploadDir + '/', '')
+            launchFile = relativePosixPath(indexFile, uploadDir)
           }
         }
         
@@ -467,7 +490,8 @@ export async function POST(
           })
           
           // Update content with directory path and SCORM info
-          const relativeDirPath = uploadDir.replace(process.cwd() + '/public', '')
+          const publicDir = join(process.cwd(), 'public')
+          const relativeDirPath = '/' + relativePosixPath(uploadDir, publicDir)
           
           await tx.contentData.update({
             where: { id: content.id },
@@ -590,6 +614,10 @@ export async function POST(
     return NextResponse.json({ data: content })
   } catch (error) {
     console.error("Error creating content:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    const message = error instanceof Error ? error.message : "Lỗi không xác định"
+    return NextResponse.json(
+      { error: `Lỗi server khi tạo nội dung: ${message}` },
+      { status: 500 }
+    )
   }
 }

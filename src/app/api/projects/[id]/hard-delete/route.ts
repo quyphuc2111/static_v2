@@ -61,15 +61,13 @@ export async function DELETE(
     for (const content of allContent) {
       if (content.contentUrl) {
         try {
-          const contentDir = path.join(process.cwd(), "static", path.dirname(content.contentUrl))
+          const contentDir = path.join(process.cwd(), "public", path.dirname(content.contentUrl))
           await fs.rm(contentDir, { recursive: true, force: true })
+          // Xóa thư mục versions (sibling of content dir)
+          const versionsDir = path.join(contentDir, '..', `_versions_${content.id}`)
+          await fs.rm(versionsDir, { recursive: true, force: true })
         } catch { /* ignore */ }
       }
-      // Xóa thư mục versions
-      try {
-        const versionsDir = path.join(process.cwd(), "static", "uploads", "content", `_versions_${content.id}`)
-        await fs.rm(versionsDir, { recursive: true, force: true })
-      } catch { /* ignore */ }
     }
 
     await prisma.project.delete({

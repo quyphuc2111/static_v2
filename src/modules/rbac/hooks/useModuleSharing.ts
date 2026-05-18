@@ -27,13 +27,13 @@ export function useShareModule() {
   })
 }
 
-export function useUpdateModuleShare(moduleId?: number) {
+export function useUpdateModuleShare() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: (payload: UpdateModuleSharePayload) => updateModuleShare(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["rbac", "module-shares", moduleId] })
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["rbac", "module-shares", variables.moduleId] })
       toast.success("Đã cập nhật quyền")
     },
     onError: () => {
@@ -46,9 +46,9 @@ export function useRevokeModuleShare(moduleId?: number) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (shareId: number) => revokeModuleShare(shareId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["rbac", "module-shares", moduleId] })
+    mutationFn: ({ shareId, moduleId: mId }: { shareId: number; moduleId: number }) => revokeModuleShare(shareId),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["rbac", "module-shares", variables.moduleId] })
       toast.success("Đã thu hồi quyền truy cập")
     },
     onError: () => {

@@ -12,6 +12,8 @@ import { SCORMService } from "@/services/scormService"
 import { contentEventBus } from "@/lib/content-events"
 import {
   sanitizeVietnameseString,
+  sanitizeFileName,
+  validateUploadedFile,
   streamFileToDisk,
   scanZipEntries,
   extractZipFromDisk,
@@ -66,10 +68,7 @@ export async function POST(
     const isOwner = content.ownerId === (Number(session.user.id) as any)
     const hasEditViaShare = !!sharedContent
 
-    if (!canManageAll && !isOwner && !hasEditViaShare) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    }
-    if (!canUpdate && !hasEditViaShare) {
+    if (!canManageAll && !isOwner && !canUpdate && !hasEditViaShare) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
@@ -78,16 +77,23 @@ export async function POST(
     const contentType = formData.get("contentType") as "FILE_ZIP_HTML" | "FILE_ZIP_SCORM"
     const file = formData.get("file") as File
 
-    if (!contentType || !file) {
-      return NextResponse.json({ error: "Missing required fields: contentType and file" }, { status: 400 })
+    if (!contentType) {
+      return NextResponse.json({ error: "Thiếu loại nội dung (contentType)" }, { status: 400 })
     }
-    if (file.size === 0) return NextResponse.json({ error: "File is empty" }, { status: 400 })
-    if (file.size > 1000 * 1024 * 1024) return NextResponse.json({ error: "File too large (max 1000MB)" }, { status: 400 })
-    if (!file.name.toLowerCase().endsWith('.zip')) return NextResponse.json({ error: "Only ZIP files are allowed" }, { status: 400 })
+    if (!["FILE_ZIP_HTML", "FILE_ZIP_SCORM"].includes(contentType)) {
+      return NextResponse.json({ error: `Loại nội dung không hợp lệ: "${contentType}"` }, { status: 400 })
+    }
 
-    // Build paths
+    // Validate file using shared utility
+    const fileError = validateUploadedFile(file)
+    if (fileError) {
+      return NextResponse.json({ error: fileError.error, code: fileError.code }, { status: 400 })
+    }
+
+    // Build paths - sanitize filename to handle spaces and special characters
     const timestamp = Date.now()
-    const fileNameWithoutExt = file.name.replace(/\.[^/.]+$/, "")
+    const sanitizedName = sanitizeFileName(file.name)
+    const fileNameWithoutExt = sanitizedName.replace(/\.[^/.]+$/, "")
     const extractedDirName = `${fileNameWithoutExt}_${timestamp}`
     const sanitizedProject = sanitizeVietnameseString(project.name)
     const sanitizedModule = sanitizeVietnameseString(module.name)
@@ -245,6 +251,10 @@ export async function POST(
     return response
   } catch (error) {
     console.error("Error uploading file:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    const message = error instanceof Error ? error.message : "Lỗi không xác định"
+    return NextResponse.json(
+      { error: `Lỗi server khi upload file: ${message}` },
+      { status: 500 }
+    )
   }
 }

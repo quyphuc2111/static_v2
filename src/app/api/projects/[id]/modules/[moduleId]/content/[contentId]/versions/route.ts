@@ -34,6 +34,23 @@ export async function GET(
       return NextResponse.json({ error: "Content not found" }, { status: 404 })
     }
 
+    // Authorization: verify user can access this content
+    const isAdmin = (session.user.roles || []).includes("ADMINISTRATOR")
+    const isOwner = content.ownerId === Number(session.user.id)
+    if (!isAdmin && !isOwner) {
+      // Check if user has shared access
+      const sharedAccess = await (prisma as any).contentSharing?.findFirst?.({
+        where: {
+          contentId: cId,
+          sharedWithId: Number(session.user.id),
+          status: 'ACTIVE',
+        }
+      }).catch(() => null)
+      if (!sharedAccess) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+    }
+
     // Get historical versions
     const historicalVersions = await (prisma as any).contentVersion.findMany({
       where: { contentId: cId },

@@ -112,7 +112,9 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!selectedType || !title || !file) {
@@ -134,11 +136,17 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
       file,
     }
 
-    // Fire and forget — close modal immediately, upload runs in background
-    createContentMut.mutate(payload)
-    toast.info("Đang tải lên nội dung, vui lòng chờ...")
-    resetForm()
-    onOpenChange(false)
+    setIsSubmitting(true)
+    try {
+      await createContentMut.mutateAsync(payload)
+      toast.success("Đang xử lý nội dung...")
+      resetForm()
+      onOpenChange(false)
+    } catch {
+      // Error is handled by the mutation's onError callback
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const resetForm = () => {

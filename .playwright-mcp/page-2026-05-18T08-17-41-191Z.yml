@@ -1,0 +1,46 @@
+- generic [active] [ref=e1]:
+  - region "Notifications Alt+T"
+  - generic [ref=e2]:
+    - generic [ref=e4]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - generic [ref=e8]: SC
+          - heading "Static Server" [level=1] [ref=e9]
+        - button [ref=e10]:
+          - img
+      - navigation [ref=e11]
+      - generic [ref=e12]:
+        - generic [ref=e13]:
+          - img [ref=e15]
+          - generic [ref=e16]:
+            - paragraph
+            - paragraph [ref=e17]: User
+        - button "Đăng xuất" [ref=e18]:
+          - img
+          - generic [ref=e19]: Đăng xuất
+    - heading [level=2]
+    - generic [ref=e20]:
+      - banner [ref=e21]:
+        - navigation [ref=e23]:
+          - generic [ref=e24]: Home
+          - generic [ref=e25]: /
+          - generic [ref=e26]: Dashboard
+        - generic [ref=e27]:
+          - button "Chuyển đổi giao diện" [ref=e28]:
+            - img
+          - generic [ref=e29]:
+            - generic [ref=e30]:
+              - generic [ref=e31]: User
+              - generic [ref=e32]: USER
+            - img [ref=e34]
+      - main [ref=e35]:
+        - generic [ref=e37]:
+          - generic [ref=e38]:
+            - heading "Dashboard" [level=2] [ref=e39]
+            - paragraph [ref=e40]: Tổng quan hệ thống quản lý tài liệu
+          - generic [ref=e54]:
+            - heading "Thống kê nhanh" [level=2] [ref=e56]
+            - heading "Hoạt động gần đây" [level=2] [ref=e68]
+  - button "Open Next.js Dev Tools" [ref=e97] [cursor=pointer]:
+    - img [ref=e98]
+  - alert [ref=e101]

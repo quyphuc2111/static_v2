@@ -1,9 +1,19 @@
 import { contentEventBus, ContentStatusEvent } from "@/lib/content-events"
+import { getSession } from "@/lib/session"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
 
 export async function GET() {
+  // Authentication check
+  const session = await getSession()
+  if (!session?.user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    })
+  }
+
   const encoder = new TextEncoder()
   let unsubscribe: (() => void) | null = null
   let heartbeat: NodeJS.Timeout | null = null

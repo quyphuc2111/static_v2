@@ -1,12 +1,14 @@
 "use client"
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useRouter } from "next/navigation"
 import { getMe, getMeOptional, login, logout } from "../auth.service"
 import type { LoginPayload } from "../auth.interface"
 import cachedKeys from "@/constants/cachedKeys"
 
 export function useAuth(optionalOnLoginPage: boolean = false) {
   const qc = useQueryClient()
+  const router = useRouter()
   const meQuery = useQuery({
     queryKey: cachedKeys.auth.me,
     queryFn: optionalOnLoginPage ? getMeOptional : getMe,
@@ -21,8 +23,8 @@ export function useAuth(optionalOnLoginPage: boolean = false) {
   const logoutMutation = useMutation({
     mutationFn: () => logout(),
     onSuccess: () => {
-      qc.clear()
-      window.location.href = '/login'
+      qc.removeQueries({ queryKey: cachedKeys.auth.me })
+      router.push('/login')
     },
   })
 

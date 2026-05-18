@@ -224,6 +224,11 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ message: "Invalid permission" }, { status: 400 })
     }
 
+    const existing = await prisma.moduleShare.findUnique({ where: { id: Number(id) } })
+    if (!existing) {
+      return NextResponse.json({ message: "Share not found" }, { status: 404 })
+    }
+
     const share = await prisma.moduleShare.update({
       where: { id: Number(id) },
       data: { permission, updatedAt: new Date() },

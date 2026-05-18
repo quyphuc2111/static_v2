@@ -12,6 +12,7 @@ import { SCORMService } from "@/services/scormService"
 import { contentEventBus } from "@/lib/content-events"
 import {
   sanitizeVietnameseString,
+  validateUploadedFile,
   streamFileToDisk,
   scanZipEntries,
   extractZipFromDisk,
@@ -38,7 +39,7 @@ export async function POST(
     }
 
     // Fetch content + shared permission in parallel
-    const [content, sharedContent] = await Promise.all([
+    const [content, sharedContent, sharedModule] = await Promise.all([
       prisma.contentData.findFirst({
         where: { id: cId as any, projectId: pId as any, moduleId: mId as any, isDeleted: false },
         include: { owner: true }
@@ -78,15 +79,18 @@ export async function POST(
     const contentType = formData.get("contentType") as string
     const file = formData.get("file") as File
 
-    if (!contentType || !file) {
-      return NextResponse.json({ error: "Missing contentType or file" }, { status: 400 })
+    if (!contentType) {
+      return NextResponse.json({ error: "Thiếu loại nội dung (contentType)" }, { status: 400 })
     }
     if (!["FILE_ZIP_HTML", "FILE_ZIP_SCORM"].includes(contentType)) {
-      return NextResponse.json({ error: "Invalid contentType" }, { status: 400 })
+      return NextResponse.json({ error: `Loại nội dung không hợp lệ: "${contentType}". Chỉ chấp nhận FILE_ZIP_HTML hoặc FILE_ZIP_SCORM.` }, { status: 400 })
     }
-    if (file.size === 0) return NextResponse.json({ error: "File is empty" }, { status: 400 })
-    if (file.size > 1000 * 1024 * 1024) return NextResponse.json({ error: "File too large (max 1000MB)" }, { status: 400 })
-    if (!file.name.toLowerCase().endsWith('.zip')) return NextResponse.json({ error: "Only ZIP files are allowed" }, { status: 400 })
+
+    // Validate file using shared utility
+    const fileError = validateUploadedFile(file)
+    if (fileError) {
+      return NextResponse.json({ error: fileError.error, code: fileError.code }, { status: 400 })
+    }
 
     const currentContentUrl = content.contentUrl
     if (!currentContentUrl) {
@@ -227,10 +231,10 @@ export async function POST(
           stripPrefix = wrapperFolder + '/'
         }
 
-        // Also strip launchDir prefix if targetDir already includes it
+        // launchDirPrefix calculation (no special handling needed — extraction uses stripPrefix directly)
         const launchDirPrefix = launchDir && targetDir !== contentDir ? launchDir + '/' : ''
         if (launchDirPrefix && !stripPrefix.endsWith(launchDirPrefix)) {
-          // If stripPrefix doesn't already include launchDir, we need to handle it during extraction
+          stripPrefix = stripPrefix + launchDirPrefix
         }
 
         // Validate ZIP contains expected HTML
@@ -353,6 +357,10 @@ export async function POST(
     return response
   } catch (error) {
     console.error("Error updating file:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    const message = error instanceof Error ? error.message : "Lỗi không xác định"
+    return NextResponse.json(
+      { error: `Lỗi server khi cập nhật file: ${message}` },
+      { status: 500 }
+    )
   }
 }

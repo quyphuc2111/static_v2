@@ -96,7 +96,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       }
     }
 
-    // Use transaction to ensure atomicity
+    // Use transaction to ensure atomicity (collect file paths for cleanup after commit)
+    const filesToDelete: { contentDir: string; versionsDir: string }[] = []
+
     const result = await prisma.$transaction(async (tx) => {
       if (canHardDelete) {
         // Admin: hard delete DB records
@@ -107,16 +109,13 @@ export async function POST(req: NextRequest, { params }: Params) {
           }
         })
 
-        // Remove physical files + version archives
+        // Collect file paths for deletion after transaction commits
         for (const item of existingContent) {
-          try {
-            if (item.contentUrl) {
-              const contentDir = join(process.cwd(), 'public', item.contentUrl)
-              await rm(contentDir, { recursive: true, force: true })
-              const versionsDir = join(contentDir, '..', `_versions_${item.id}`)
-              await rm(versionsDir, { recursive: true, force: true })
-            }
-          } catch { /* ignore file errors */ }
+          if (item.contentUrl) {
+            const contentDir = join(process.cwd(), 'public', item.contentUrl)
+            const versionsDir = join(contentDir, '..', `_versions_${item.id}`)
+            filesToDelete.push({ contentDir, versionsDir })
+          }
         }
 
         return deleteResult
@@ -127,7 +126,7 @@ export async function POST(req: NextRequest, { params }: Params) {
             id: { in: numericIds as any },
             moduleId: mId as any
           },
-          data: { 
+          data: {
             isDeleted: true,
             deletedAt: new Date(),
             updatedAt: new Date()
@@ -136,6 +135,14 @@ export async function POST(req: NextRequest, { params }: Params) {
         return { count: updateResult.count }
       }
     })
+
+    // Perform filesystem deletions after successful transaction commit
+    for (const { contentDir, versionsDir } of filesToDelete) {
+      try {
+        await rm(contentDir, { recursive: true, force: true })
+        await rm(versionsDir, { recursive: true, force: true })
+      } catch { /* ignore file errors */ }
+    }
     
     // Log audit for each deleted content
     const action = canHardDelete ? 'bulk_hard_deleted' : 'bulk_soft_deleted'

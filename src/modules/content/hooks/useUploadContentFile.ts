@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useRef, useEffect } from "react"
 import httpService from "@/services/instance"
 import cachedKeys from "@/constants/cachedKeys"
 import { toast } from "react-toastify"
@@ -49,18 +50,36 @@ async function uploadContentFile(
 
 export function useUploadContentFile(projectId: string, moduleId: string) {
   const queryClient = useQueryClient()
+  const timeoutsRef = useRef<NodeJS.Timeout[]>([])
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      timeoutsRef.current.forEach(id => clearTimeout(id))
+      timeoutsRef.current = []
+    }
+  }, [])
 
   return useMutation({
     mutationFn: ({ contentId, payload }: { contentId: string; payload: UploadContentFilePayload }) =>
       uploadContentFile(projectId, moduleId, contentId, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
-        queryKey: cachedKeys.content.list(projectId, moduleId) 
+      queryClient.invalidateQueries({
+        queryKey: cachedKeys.content.list(projectId, moduleId)
       })
-      queryClient.invalidateQueries({ 
-        queryKey: cachedKeys.content.stats(projectId) 
+      queryClient.invalidateQueries({
+        queryKey: cachedKeys.content.stats(projectId)
       })
-      toast.success("Upload file thành công!")
+      toast.success("Đang xử lý file...")
+      // Background processing takes 2-10s. Schedule delayed re-invalidations
+      const delays = [3000, 6000, 10000]
+      delays.forEach(delay => {
+        const id = setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: cachedKeys.content.list(projectId, moduleId) })
+          queryClient.invalidateQueries({ queryKey: cachedKeys.content.stats(projectId) })
+        }, delay)
+        timeoutsRef.current.push(id)
+      })
     },
     onError: (error: any) => {
       console.error("Upload content file error:", error)

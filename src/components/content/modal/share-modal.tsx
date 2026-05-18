@@ -23,6 +23,7 @@ import {
   Trash2,
   Users,
   Search,
+  Check
 } from 'lucide-react';
 import {
   useModuleShares,
@@ -99,8 +100,8 @@ export function ShareModuleModal({
     isOpen && moduleId ? moduleId : undefined
   );
   const shareMutation = useShareModule();
-  const updateMutation = useUpdateModuleShare(moduleId);
-  const revokeMutation = useRevokeModuleShare(moduleId);
+  const updateMutation = useUpdateModuleShare();
+  const revokeMutation = useRevokeModuleShare();
 
   const { user: me } = useAuth();
 
@@ -194,8 +195,8 @@ export function ShareModuleModal({
   };
 
   const handlePermissionChange = (shareId: number, newPermission: string) => {
-    if (newPermission === 'remove') { revokeMutation.mutate(shareId); return; }
-    updateMutation.mutate({ id: shareId, permission: newPermission as Permission });
+    if (newPermission === 'remove') { revokeMutation.mutate({ shareId, moduleId: moduleId! }); return; }
+    updateMutation.mutate({ id: shareId, moduleId: moduleId!, permission: newPermission as Permission });
   };
 
   const isInviting = shareMutation.isPending;

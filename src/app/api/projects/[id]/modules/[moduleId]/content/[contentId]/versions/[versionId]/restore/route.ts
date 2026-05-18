@@ -27,14 +27,7 @@ export async function POST(
     const cId = Number(contentId)
     const vId = Number(versionId)
 
-    // Permission check
-    const isAdmin = (session.user.roles || []).includes("ADMINISTRATOR")
-    const canEdit = isAdmin || await checkPermission(PermissionName.EDIT_CONTENT, session.user.id)
-    if (!canEdit) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-    }
-
-    // Get current content
+    // Get current content first (needed for ownership check)
     const content = await prisma.contentData.findFirst({
       where: {
         id: cId as any,
@@ -46,6 +39,25 @@ export async function POST(
 
     if (!content) {
       return NextResponse.json({ error: "Content not found" }, { status: 404 })
+    }
+
+    // Permission check (includes ownership and sharing)
+    const isAdmin = (session.user.roles || []).includes("ADMINISTRATOR")
+    const isOwner = content.ownerId === Number(session.user.id)
+    const hasEditPermission = await checkPermission(PermissionName.EDIT_CONTENT, session.user.id)
+    // Check if user has edit access via content sharing
+    const sharedEditGrant = await (prisma as any).contentSharing?.findFirst?.({
+      where: {
+        contentId: cId,
+        sharedWithId: Number(session.user.id),
+        canEdit: true,
+        status: 'ACTIVE',
+      }
+    }).catch(() => null)
+
+    const canEdit = isAdmin || isOwner || !!sharedEditGrant || hasEditPermission
+    if (!canEdit) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
     // Get the version to restore
