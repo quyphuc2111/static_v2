@@ -16,8 +16,9 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
-# Build Next.js
-RUN npm run build
+# Build Next.js with version folder
+ARG VERSION=v1
+RUN npx next build && node scripts/copyFiles.js ${VERSION}
 
 # Stage 3: Production runner
 FROM node:20-alpine AS runner
