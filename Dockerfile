@@ -18,7 +18,7 @@ RUN npx prisma generate
 
 # Build Next.js with version folder
 ARG VERSION=v1
-RUN npx next build && node scripts/copyFiles.js ${VERSION}
+RUN touch .env && npx next build && node scripts/copyFiles.js ${VERSION}
 
 # Stage 3: Production runner
 FROM node:20-alpine AS runner
