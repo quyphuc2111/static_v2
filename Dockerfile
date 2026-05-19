@@ -19,7 +19,8 @@ RUN npx prisma generate
 # Copy source code
 COPY . .
 
-# Build Next.js
+# Build Next.js (increase memory to avoid OOM on low-RAM servers)
+ENV NODE_OPTIONS="--max-old-space-size=1536"
 RUN touch .env && npx next build
 
 # Remove dev dependencies, keep only production deps for runner
