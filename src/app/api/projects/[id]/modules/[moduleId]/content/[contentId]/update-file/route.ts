@@ -214,28 +214,12 @@ export async function POST(
         }
 
         // Scan ZIP entries to compute strip prefix (memory-efficient, reads only central directory)
-        const { allFiles, htmlFiles: zipHtmlFiles, wrapperFolder } = await scanZipEntries(tempZipPath)
+        const { htmlFiles: zipHtmlFiles, wrapperFolder } = await scanZipEntries(tempZipPath)
 
-        // Compute strip prefix
-        let stripPrefix = ''
-        if (expectedHtmlFile) {
-          const match = allFiles.find(f => {
-            const parts = f.split('/')
-            return parts[parts.length - 1].toLowerCase() === expectedHtmlFile!.toLowerCase()
-          })
-          if (match) {
-            const idx = match.lastIndexOf(expectedHtmlFile)
-            if (idx > 0) stripPrefix = match.substring(0, idx)
-          }
-        } else if (wrapperFolder) {
-          stripPrefix = wrapperFolder + '/'
-        }
-
-        // launchDirPrefix calculation (no special handling needed — extraction uses stripPrefix directly)
-        const launchDirPrefix = launchDir && targetDir !== contentDir ? launchDir + '/' : ''
-        if (launchDirPrefix && !stripPrefix.endsWith(launchDirPrefix)) {
-          stripPrefix = stripPrefix + launchDirPrefix
-        }
+        // Compute strip prefix: only strip the ZIP's wrapper folder.
+        // targetDir already accounts for launchDir (e.g., contentDir/Export),
+        // so we just need to remove the ZIP's top-level wrapper to flatten contents into targetDir.
+        const stripPrefix = wrapperFolder ? wrapperFolder + '/' : ''
 
         // Validate ZIP contains expected HTML
         if (expectedHtmlFile) {
