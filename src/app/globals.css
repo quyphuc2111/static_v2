@@ -115,6 +115,11 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+body {
+@apply bg-background text-foreground;
+pointer-events: auto !important; 
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

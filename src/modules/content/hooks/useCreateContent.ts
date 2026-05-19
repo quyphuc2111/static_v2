@@ -2,21 +2,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { createContent } from "../content.service"
 import { CreateContentPayload } from "../content.interface"
 import { toast } from "react-toastify"
-import { useRef, useEffect } from "react"
+import { useRef } from "react"
 
 export function useCreateContent(projectId: string, moduleId: string) {
   const queryClient = useQueryClient()
 
   const optimisticIdRef = useRef<string>("")
-  const timeoutsRef = useRef<NodeJS.Timeout[]>([])
-
-  // Cleanup timeouts on unmount
-  useEffect(() => {
-    return () => {
-      timeoutsRef.current.forEach(id => clearTimeout(id))
-      timeoutsRef.current = []
-    }
-  }, [])
 
   const updateOptimisticProgress = (progress: number) => {
     const queryKey = ["content", projectId, moduleId]
@@ -77,16 +68,6 @@ export function useCreateContent(projectId: string, moduleId: string) {
       toast.success("Đang xử lý nội dung...")
       queryClient.invalidateQueries({ queryKey: ["content", projectId, moduleId] })
       queryClient.invalidateQueries({ queryKey: ["content", "stats"] })
-      // Background processing takes 2-10s. Schedule delayed re-invalidations
-      // to catch when processing completes.
-      const delays = [3000, 6000, 10000]
-      delays.forEach(delay => {
-        const id = setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ["content", projectId, moduleId] })
-          queryClient.invalidateQueries({ queryKey: ["content", "stats"] })
-        }, delay)
-        timeoutsRef.current.push(id)
-      })
     },
     onError: (e: any, _payload, context) => {
       optimisticIdRef.current = ""

@@ -5,137 +5,107 @@ import { useQueryClient } from "@tanstack/react-query"
 import cachedKeys from "@/constants/cachedKeys"
 import { toast } from "react-toastify"
 
-interface ContentStatusItem {
-  id: number
+interface ContentStatusEvent {
+  type: "status_changed"
+  contentId: number
+  projectId: number
+  moduleId: number
   status: string
-  progress: number | null
-  title: string
+  progress?: number
 }
 
 /**
- * Polling-based content status hook.
- * Replaces SSE (EventSource) which is blocked by Cloudflare's proxy.
- * 
- * Strategy:
- * - Poll for items with status=PROCESSING
- * - When items disappear from PROCESSING list (became COMPLETED/FAILED), invalidate queries
- * - Fast polling (3s) when items are processing, slow (15s) when idle
+ * SSE-based content status hook.
+ * Connects to /api/content-events and listens for real-time status changes.
+ * When content finishes processing (COMPLETED/FAILED), invalidates queries.
  */
 export function useContentSSE(projectId: string, moduleId: string) {
   const queryClient = useQueryClient()
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  const isPollingRef = useRef(false)
-  const abortControllerRef = useRef<AbortController | null>(null)
-  const pendingImmediateRef = useRef(false)
-  // Track IDs that were in PROCESSING state on previous poll
-  const processingIdsRef = useRef<Set<number>>(new Set())
+  const eventSourceRef = useRef<EventSource | null>(null)
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  const POLL_INTERVAL_ACTIVE = 3000   // 3s when processing
-  const POLL_INTERVAL_IDLE = 15000    // 15s idle check
-
-  const pollStatus = useCallback(async () => {
-    if (!projectId || !moduleId || isPollingRef.current) {
-      if (isPollingRef.current) pendingImmediateRef.current = true
-      return
-    }
-    isPollingRef.current = true
-
-    // Create abort controller for this request
-    const controller = new AbortController()
-    abortControllerRef.current = controller
-
-    try {
-      const res = await fetch(
-        `/api/content-status?projectId=${projectId}&moduleId=${moduleId}&statuses=PROCESSING`,
-        { credentials: "include", signal: controller.signal }
-      )
-
-      if (controller.signal.aborted) return
-
-      if (!res.ok) {
-        if (res.status === 401) return
-        console.warn("[content-poll] Status check failed:", res.status)
-        return
-      }
-
-      const { data }: { data: ContentStatusItem[] } = await res.json()
-
-      if (controller.signal.aborted) return
-
-      const currentProcessingIds = new Set(data.map(item => item.id))
-      const previousIds = processingIdsRef.current
-
-      // Items that were PROCESSING before but are no longer → they completed or failed
-      const finishedIds: number[] = []
-      for (const id of previousIds) {
-        if (!currentProcessingIds.has(id)) {
-          finishedIds.push(id)
-        }
-      }
-
-      // If any items finished processing, invalidate queries to refresh the content list
-      if (finishedIds.length > 0 && !controller.signal.aborted) {
-        toast.success("Xử lý file hoàn tất!")
-        queryClient.invalidateQueries({
-          queryKey: cachedKeys.content.list(projectId, moduleId),
-        })
-        queryClient.invalidateQueries({
-          queryKey: cachedKeys.content.stats(projectId),
-        })
-      }
-
-      // Update tracking
-      processingIdsRef.current = currentProcessingIds
-    } catch (error: any) {
-      if (error?.name === "AbortError") return
-      console.warn("[content-poll] Network error:", error)
-    } finally {
-      isPollingRef.current = false
-      abortControllerRef.current = null
-
-      // If a triggerFastPoll was called while we were polling, run again immediately
-      if (pendingImmediateRef.current) {
-        pendingImmediateRef.current = false
-        pollStatus()
-      }
-    }
+  const invalidateContent = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: cachedKeys.content.list(projectId, moduleId),
+    })
+    queryClient.invalidateQueries({
+      queryKey: cachedKeys.content.stats(projectId),
+    })
   }, [projectId, moduleId, queryClient])
 
-  // Effect to manage polling interval based on processingIds
   useEffect(() => {
     if (!projectId || !moduleId) return
 
-    // Start polling
-    pollStatus()
-    intervalRef.current = setInterval(pollStatus, POLL_INTERVAL_IDLE)
+    let isMounted = true
+
+    function connect() {
+      if (!isMounted) return
+
+      // Close existing connection before creating a new one
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close()
+        eventSourceRef.current = null
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current)
+        reconnectTimeoutRef.current = null
+      }
+
+      const es = new EventSource("/api/content-events")
+      eventSourceRef.current = es
+
+      es.onmessage = (event) => {
+        try {
+          const data: ContentStatusEvent = JSON.parse(event.data)
+
+          // Only handle events for our project/module
+          if (
+            data.type === "status_changed" &&
+            String(data.projectId) === projectId &&
+            String(data.moduleId) === moduleId
+          ) {
+            // Content finished processing → invalidate queries
+            if (data.status === "COMPLETED" || data.status === "FAILED") {
+              if (data.status === "COMPLETED") {
+                toast.success("Xử lý file hoàn tất!")
+              } else {
+                toast.error("Xử lý file thất bại!")
+              }
+              invalidateContent()
+            }
+          }
+        } catch {
+          // Ignore parse errors (heartbeats are comments, not data)
+        }
+      }
+
+      es.onerror = () => {
+        es.close()
+        eventSourceRef.current = null
+        // Reconnect after 5s
+        if (isMounted) {
+          reconnectTimeoutRef.current = setTimeout(connect, 5000)
+        }
+      }
+    }
+
+    connect()
 
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-        intervalRef.current = null
+      isMounted = false
+      eventSourceRef.current?.close()
+      eventSourceRef.current = null
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current)
+        reconnectTimeoutRef.current = null
       }
-      // Abort any in-flight request
-      abortControllerRef.current?.abort()
-      abortControllerRef.current = null
-      processingIdsRef.current.clear()
-      pendingImmediateRef.current = false
     }
-  }, [projectId, moduleId, pollStatus])
+  }, [projectId, moduleId, invalidateContent])
 
-  // Expose manual trigger — call after upload/update to start fast polling
+  // Keep triggerFastPoll for backward compatibility — now just invalidates immediately
   const triggerFastPoll = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-    }
-    // Switch to fast interval
-    intervalRef.current = setInterval(pollStatus, POLL_INTERVAL_ACTIVE)
-    // Trigger immediate poll (or queue if one is in progress)
-    if (isPollingRef.current) {
-      pendingImmediateRef.current = true
-    } else {
-      pollStatus()
-    }
-  }, [pollStatus])
+    invalidateContent()
+  }, [invalidateContent])
 
   return { triggerFastPoll }
 }

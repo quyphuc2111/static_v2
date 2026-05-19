@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { useProjects } from "@/modules/project/hooks/useProjects"
+import { useUpdateProject } from "@/modules/project/hooks/useUpdateProject"
 import { toast } from "react-toastify"
 
 interface Project {
@@ -33,13 +33,12 @@ interface EditProjectDialogProps {
 }
 
 export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDialogProps) {
-  const { updateProject } = useProjects()
+  const updateMutation = useUpdateProject(project.id)
   const [formData, setFormData] = useState({
     name: project.name,
     description: project.description || "",
     status: project.status,
   })
-  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     setFormData({
@@ -57,22 +56,15 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
       return
     }
 
-    setLoading(true)
     try {
-      await updateProject(project.id, {
+      await updateMutation.mutateAsync({
         name: formData.name.trim(),
         description: formData.description.trim(),
         status: formData.status as "ACTIVE" | "INACTIVE" | "ARCHIVED",
       })
-
-      toast.success(`Dự án "${formData.name}" đã được cập nhật.`)
-
       onOpenChange(false)
     } catch (error: any) {
-      const message = error?.response?.data?.message || "Cập nhật dự án thất bại"
-      toast.error(message)
-    } finally {
-      setLoading(false)
+      // Error handled by useUpdateProject hook
     }
   }
 
@@ -115,7 +107,7 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
                   <SelectContent>
                     <SelectItem value="ACTIVE">Đang hoạt động</SelectItem>
                     <SelectItem value="INACTIVE">Tạm dừng</SelectItem>
-                    <SelectItem value="ARCHIVED">Đã lưu trữ</SelectItem>
+                    {/* <SelectItem value="ARCHIVED">Đã lưu trữ</SelectItem> */}
                   </SelectContent>
                 </Select>
               </div>
@@ -126,8 +118,8 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Hủy
           </Button>
-          <Button type="submit" disabled={loading} onClick={handleSubmit}>
-            {loading ? "Đang cập nhật..." : "Lưu thay đổi"}
+          <Button type="submit" disabled={updateMutation.isPending} onClick={handleSubmit}>
+            {updateMutation.isPending ? "Đang cập nhật..." : "Lưu thay đổi"}
           </Button>
         </DialogFooter>
       </DialogContent>

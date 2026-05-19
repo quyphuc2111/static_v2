@@ -23,7 +23,9 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { useProjects } from "@/modules/project/hooks/useProjects"
+import { useQuery } from "@tanstack/react-query"
+import { listProjects } from "@/modules/project/project.service"
+import cachedKeys from "@/constants/cachedKeys"
 import { useModules } from "@/modules/project/hooks/useModules"
 import { useContent } from "@/modules/content/hooks/useContent"
 import { CreateModuleDialog } from "@/components/project/modal/create-module-dialog"
@@ -101,7 +103,13 @@ export function ProjectDetail() {
 
   // API hooks
   useContentSSE(projectId, activeModuleId)
-  const { projects, isLoading: projectsLoading } = useProjects()
+  // Use select to only subscribe to the specific project — avoids re-render when other projects change
+  const { data: project, isLoading: projectsLoading } = useQuery({
+    queryKey: cachedKeys.project.list(),
+    queryFn: () => listProjects(),
+    select: (data) => data?.find((p: any) => String(p.id) === projectId),
+    enabled: !!projectId,
+  })
   const { data: modules, isLoading: modulesLoading } = useModules(projectId, !!projectId)
   const { data: contentList, isLoading: contentLoading } = useContent(
     projectId,
@@ -114,11 +122,6 @@ export function ProjectDetail() {
   const softDeleteMutation = useSoftDeleteContent(projectId, activeModuleId)
   const hardDeleteMutation = useHardDeleteContent(projectId, activeModuleId)
   const restoreMutation = useRestoreContent(projectId, activeModuleId)
-
-  const project = useMemo(
-    () => projects?.find((p) => p.id === projectId),
-    [projects, projectId]
-  )
 
   const filteredModules = useMemo(() => {
     const filtered = (modules || []).filter((m: any) =>
@@ -499,12 +502,11 @@ export function ProjectDetail() {
               <Table>
                 <TableHeader className="bg-slate-50 dark:bg-slate-900/50 sticky top-0 z-10">
                   <TableRow>
-                    <TableHead>Tiêu đề</TableHead>
+                    <TableHead className="min-w-[180px]">Tiêu đề</TableHead>
                     <TableHead className="w-[200px] xl:w-[280px]">Mô tả</TableHead>
-                    <TableHead>Loại</TableHead>
-                    <TableHead>Kích thước</TableHead>
+                    <TableHead>Loại / Kích thước</TableHead>
                     <TableHead>Trạng thái</TableHead>
-                    <TableHead>Người tạo</TableHead>
+                    <TableHead>Người tạo / Cập nhật</TableHead>
                     <TableHead className="text-right">Thao tác</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -514,16 +516,15 @@ export function ProjectDetail() {
                       <TableRow key={i}>
                         <TableCell><Skeleton className="h-4 w-40" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                        <TableCell><Skeleton className="h-8 w-20" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                        <TableCell><Skeleton className="h-8 w-28" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
                       </TableRow>
                     ))
                   ) : filteredContent.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-10 text-slate-500">
+                      <TableCell colSpan={6} className="text-center py-10 text-slate-500">
                         {contentSearch ? (
                           "Không tìm thấy nội dung phù hợp."
                         ) : showDeleted ? (
@@ -538,11 +539,11 @@ export function ProjectDetail() {
                     </TableRow>
                   ) : (
                     paginatedContent.map((content: any) => (
-                      <TableRow key={content.id} className={showDeleted ? "opacity-60" : ""}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2" title={content.title}>
-                            <FileText className="h-4 w-4 text-slate-400 shrink-0" />
-                            <span className="truncate max-w-[200px] block">{content.title}</span>
+                      <TableRow key={content.id} className={`${showDeleted ? "opacity-60" : ""} h-14`}>
+                        <TableCell className="font-medium py-3">
+                          <div className="flex items-center gap-2.5" title={content.title}>
+                            <FileText className="h-4.5 w-4.5 text-slate-400 shrink-0" />
+                            <span className="truncate max-w-[240px] block text-sm">{content.title}</span>
                           </div>
                         </TableCell>
                         <TableCell className="w-[200px] xl:w-[280px] max-w-0 overflow-hidden">
@@ -573,12 +574,18 @@ export function ProjectDetail() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="font-mono text-[10px] bg-slate-50 dark:bg-slate-800">
-                            {content.contentType === "FILE_ZIP_SCORM" ? "SCORM" : "HTML"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
-                          {formatFileSize(content.fileSize)}
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className={`font-mono text-[11px] px-2 py-0.5 ${
+                              content.contentType === "FILE_ZIP_SCORM"
+                                ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800"
+                                : "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-900/20 dark:text-sky-300 dark:border-sky-800"
+                            }`}>
+                              {content.contentType === "FILE_ZIP_SCORM" ? "SCORM" : "HTML"}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                              {formatFileSize(content.fileSize)}
+                            </span>
+                          </div>
                         </TableCell>
                         <TableCell>
                           {content.status === "UPLOADING" ? (
@@ -610,9 +617,16 @@ export function ProjectDetail() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">
-                            {content.owner?.username || content.owner?.name || '—'}
-                          </span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-xs font-medium text-foreground whitespace-nowrap">
+                              {content.owner?.username || content.owner?.name || '—'}
+                            </span>
+                            <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                              {content.updatedAt
+                                ? new Date(content.updatedAt).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                                : '—'}
+                            </span>
+                          </div>
                         </TableCell>
                         <TableCell className="text-right">
                           {showDeleted ? (
@@ -667,18 +681,56 @@ export function ProjectDetail() {
                             const itemCanHardDelete = isAdmin || canManageAll || canHardDeleteGlobal;
 
                             return (
-                              <>
+                              <div className="flex items-center justify-end gap-1">
                                 {content.status === "COMPLETED" && (
-                                  <Button variant="ghost" size="icon" asChild>
-                                    <Link
-                                      href={content.contentType === "FILE_ZIP_SCORM"
-                                        ? getScormContentUrl(content as ContentItem)
-                                        : getContentUrl(content as ContentItem)}
-                                      target="_blank"
-                                    >
-                                      <Play className="h-4 w-4 text-blue-600" />
-                                    </Link>
-                                  </Button>
+                                  <div className="flex items-center gap-1">
+                                    <TooltipProvider delayDuration={300}>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                            <Link
+                                              href={content.contentType === "FILE_ZIP_SCORM"
+                                                ? getScormContentUrl(content as ContentItem)
+                                                : getContentUrl(content as ContentItem)}
+                                              target="_blank"
+                                            >
+                                              <Play className="h-4 w-4 text-blue-600" />
+                                            </Link>
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="z-50">Xem</TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                    <TooltipProvider delayDuration={300}>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button variant="ghost" size="icon" className="h-8 w-8"
+                                            onClick={() => {
+                                              const url = getContentUrl(content as ContentItem)
+                                              const fullUrl = `${window.location.origin}${url}`
+                                              navigator.clipboard.writeText(fullUrl)
+                                              toast.success("Đã sao chép URL")
+                                            }}>
+                                            <Copy className="h-4 w-4 text-slate-500" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="z-50">Sao chép URL</TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                    {itemCanEdit && (
+                                      <TooltipProvider delayDuration={300}>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8"
+                                              onClick={() => setUpdateFileContent(content as ContentItem)}>
+                                              <Upload className="h-4 w-4 text-orange-500" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent className="z-50">Cập nhật file</TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    )}
+                                  </div>
                                 )}
                                 <DropdownMenu modal={false}>
                                   <DropdownMenuTrigger asChild>
@@ -687,33 +739,6 @@ export function ProjectDetail() {
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
-                                    {content.status === "COMPLETED" && (
-                                      <>
-                                        <DropdownMenuItem
-                                          className="gap-2 focus:bg-blue-50 focus:text-blue-700 dark:focus:bg-blue-900/30"
-                                          onClick={() => {
-                                            const url = content.contentType === "FILE_ZIP_SCORM"
-                                              ? getScormContentUrl(content as ContentItem)
-                                              : getContentUrl(content as ContentItem)
-                                            window.open(url, "_blank")
-                                          }}
-                                        >
-                                          <ExternalLink className="h-4 w-4" /> Xem nội dung
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                          className="gap-2 focus:bg-blue-50 focus:text-blue-700 dark:focus:bg-blue-900/30"
-                                          onClick={() => {
-                                            const url = getContentUrl(content as ContentItem)
-                                            const fullUrl = `${window.location.origin}${url}`
-                                            navigator.clipboard.writeText(fullUrl)
-                                            toast.success("Đã sao chép URL")
-                                          }}
-                                        >
-                                          <Copy className="h-4 w-4" /> Sao chép URL
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                      </>
-                                    )}
                                     {itemCanEdit && (
                                       <DropdownMenuItem
                                         className="gap-2 focus:bg-blue-50 focus:text-blue-700 dark:focus:bg-blue-900/30"
@@ -730,14 +755,7 @@ export function ProjectDetail() {
                                         <Upload className="h-4 w-4" /> Cập nhật file
                                       </DropdownMenuItem>
                                     )}
-                                    {itemCanDownload && (
-                                      <DropdownMenuItem
-                                        className="gap-2 focus:bg-blue-50 focus:text-blue-700 dark:focus:bg-blue-900/30"
-                                        onClick={() => downloadMutation.mutate(content.id)}
-                                      >
-                                        <Download className="h-4 w-4" /> Tải xuống ZIP
-                                      </DropdownMenuItem>
-                                    )}
+                              
                                     <DropdownMenuItem
                                       className="gap-2 focus:bg-blue-50 focus:text-blue-700 dark:focus:bg-blue-900/30"
                                       onClick={() => setVersionHistoryContent(content as ContentItem)}
@@ -763,7 +781,7 @@ export function ProjectDetail() {
                                     )}
                                   </DropdownMenuContent>
                                 </DropdownMenu>
-                              </>
+                              </div>
                             )
                           })()}
                         </TableCell>

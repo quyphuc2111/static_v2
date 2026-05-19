@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { useRef, useEffect } from "react"
 import httpService from "@/services/instance"
 import { toast } from "react-toastify"
 import cachedKeys from "@/constants/cachedKeys"
@@ -33,15 +32,6 @@ async function updateContentFile(
 
 export function useUpdateContentFile(projectId: string, moduleId: string) {
   const queryClient = useQueryClient()
-  const timeoutsRef = useRef<NodeJS.Timeout[]>([])
-
-  // Cleanup timeouts on unmount
-  useEffect(() => {
-    return () => {
-      timeoutsRef.current.forEach(id => clearTimeout(id))
-      timeoutsRef.current = []
-    }
-  }, [])
 
   return useMutation({
     mutationFn: ({ contentId, payload }: { contentId: string; payload: UpdateContentFilePayload }) =>
@@ -53,16 +43,6 @@ export function useUpdateContentFile(projectId: string, moduleId: string) {
       })
       await queryClient.invalidateQueries({
         queryKey: cachedKeys.content.stats(projectId)
-      })
-      // Background processing takes 2-10s. Schedule delayed re-invalidations
-      // to catch when processing completes (polling hook handles long-running cases)
-      const delays = [3000, 6000, 10000]
-      delays.forEach(delay => {
-        const id = setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: cachedKeys.content.list(projectId, moduleId) })
-          queryClient.invalidateQueries({ queryKey: cachedKeys.content.stats(projectId) })
-        }, delay)
-        timeoutsRef.current.push(id)
       })
     },
     onError: (error: any) => {

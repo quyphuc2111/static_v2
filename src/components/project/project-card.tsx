@@ -76,15 +76,14 @@ export function ProjectCard({ project, onDelete }: ProjectCardProps) {
   const statusClass = project.isDeleted
     ? "bg-red-100 text-red-600 dark:bg-red-900/30"
     : project.status === "ACTIVE"
-    ? "bg-green-100 text-green-700 dark:bg-green-900/30"
-    : "bg-slate-100 text-slate-500 dark:bg-slate-800"
+      ? "bg-green-100 text-green-700 dark:bg-green-900/30"
+      : "bg-slate-100 text-slate-500 dark:bg-slate-800"
 
   return (
     <>
       <div
-        className={`bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all flex flex-col group hover:-translate-y-0.5 relative cursor-pointer ${
-          project.isDeleted ? "opacity-60" : ""
-        }`}
+        className={`bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all flex flex-col group hover:-translate-y-0.5 relative cursor-pointer ${project.isDeleted ? "opacity-60" : ""
+          }`}
         onClick={() => !project.isDeleted && router.push(`/projects/${project.id}`)}
       >
         <div className="flex justify-between items-start mb-4">
@@ -192,21 +191,20 @@ export function ProjectCard({ project, onDelete }: ProjectCardProps) {
         </div>
       </div>
 
-      {editOpen && (
-        <EditProjectDialog
+      {
+        editOpen && (<EditProjectDialog
           project={project as any}
           open={editOpen}
-          onOpenChange={(open) => !open && setEditOpen(false)}
-        />
-      )}
+          onOpenChange={setEditOpen}
+        />)
 
-      {modulesOpen && (
-        <ModuleManagementDialog
-          project={project as any}
-          open={modulesOpen}
-          onOpenChange={(open) => !open && setModulesOpen(false)}
-        />
-      )}
+      }
+
+      <ModuleManagementDialog
+        project={project as any}
+        open={modulesOpen}
+        onOpenChange={setModulesOpen}
+      />
     </>
   )
 }

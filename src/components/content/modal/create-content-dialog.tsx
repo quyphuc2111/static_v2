@@ -139,7 +139,6 @@ export function CreateContentDialog({ open, onOpenChange, projectId, moduleId }:
     setIsSubmitting(true)
     try {
       await createContentMut.mutateAsync(payload)
-      toast.success("Đang xử lý nội dung...")
       resetForm()
       onOpenChange(false)
     } catch {
