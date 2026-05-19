@@ -19,9 +19,8 @@ RUN npx prisma generate
 # Copy source code
 COPY . .
 
-# Build Next.js with version folder
-ARG VERSION=v1
-RUN touch .env && npx next build && node scripts/copyFiles.js ${VERSION}
+# Build Next.js
+RUN touch .env && npx next build
 
 # Remove dev dependencies, keep only production deps for runner
 RUN npm prune --omit=dev && npx prisma generate
